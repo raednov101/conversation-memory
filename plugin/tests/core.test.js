@@ -127,3 +127,37 @@ test("review: ids must be strings — arrays can't slip through revoke/replaces"
   m = C.applyDraft(m, v.draft, { date: "y" }).memory; assert.equal(m.decisions[0].status, "active");
   assert.equal(C.normalizeMemory({ decisions: [{ id: ["d7"], text: "x", replaces: ["d1"] }] }).decisions[0].replaces, "");
 });
+
+// ---------------- phase 3: corrections, sharing, version comparison ----------------
+const withTwo = () => C.applyDraft(C.emptyMemory(), C.validateDraft(D({ summary: { goal: "هدف" }, decisions: { add: [{ text: "قرار المستخدم", source: "user" }, { text: "اقتراح النموذج", source: "assistant" }] }, constraints: { add: ["قيد أ", "قيد ب"] } }), "b-1").draft, { date: "2026-10-19", allowSummary: true }).memory;
+test("fix: edit, approve a suggestion, revoke, remove, constraints, summary, log — and say what changed", () => {
+  const m = withTwo();
+  const v = C.validateFix({ decisions: { edit: [{ id: "d1", text: "قرار معدّل" }], approve: ["d2"], remove: ["d77"] }, constraints: { remove: ["قيد أ"], add: ["قيد ج"] }, summary: { goal: "هدف جديد" }, log: { remove: ["b-1"] } });
+  assert.ok(v.ok);
+  const r = C.applyFix(m, v.fix, "2026-10-20");
+  assert.equal(r.memory.decisions[0].text, "قرار معدّل"); assert.equal(r.memory.decisions[1].source, "assistant-approved");
+  assert.deepEqual(r.memory.constraints, ["قيد ب", "قيد ج"]); assert.equal(r.memory.summary.goal, "هدف جديد"); assert.equal(r.memory.log.length, 0);
+  assert.deepEqual(r.missing, ["d77"], "unknown ids are reported, not ignored silently");
+  assert.ok(r.changes.length >= 5); assert.equal(m.decisions[0].text, "قرار المستخدم", "input not mutated");
+  const rv = C.applyFix(m, C.validateFix({ decisions: { revoke: ["d1"] } }).fix, "x"); assert.equal(rv.memory.decisions[0].status, "revoked");
+});
+test("fix: rejects empty or malformed fixes; secrets in corrections are redacted", () => {
+  assert.equal(C.validateFix({}).ok, false); assert.equal(C.validateFix(null).ok, false); assert.equal(C.validateFix({ decisions: [] }).ok, false);
+  assert.equal(C.validateFix({ summary: {} }).ok, false);
+  const r = C.applyFix(withTwo(), C.validateFix({ decisions: { edit: [{ id: "d1", text: "password=hunter2secret" }] } }).fix, "x");
+  assert.ok(r.redacted); assert.doesNotMatch(JSON.stringify(r.memory), /hunter2/);
+});
+test("share: only the chosen parts, active decisions only, within the budget", () => {
+  const m = withTwo();
+  const t = C.renderSelection(m, { summary: true, decisions: ["d1"], constraints: true, log: ["b-1"] });
+  assert.match(t, /الخلاصة الحالية/); assert.match(t, /قرار المستخدم/); assert.doesNotMatch(t, /اقتراح النموذج/); assert.match(t, /قيد أ/); assert.match(t, /من سجل النقاش/);
+  assert.equal(C.renderSelection(m, { decisions: ["d2"] }).includes("اقتراح النموذج"), true, "a suggestion can be shared when chosen, labelled as such");
+  assert.ok(C.renderSelection(m, { summary: true, constraints: true, log: ["b-1"] }, 40).length < 80);
+  assert.equal(C.renderSelection(m, {}), "");
+});
+test("diff: changed, removed and added lines; huge inputs stay fast", () => {
+  assert.deepEqual(C.diffLines("أ\nب\nج", "أ\nب2\nج\nد").map((x) => x.op + x.line), [" أ", "-ب", "+ب2", " ج", "+د"]);
+  assert.deepEqual(C.diffLines("x", "x").map((x) => x.op), [" "]);
+  const big = Array.from({ length: 3000 }, (_, i) => "سطر " + i).join("\n");
+  const t0 = Date.now(); const d = C.diffLines(big, big + "\nجديد"); assert.ok(Date.now() - t0 < 5000); assert.equal(d.filter((x) => x.op === "+").length, 1);
+});

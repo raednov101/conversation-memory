@@ -49,7 +49,11 @@ function normSession(v) {
     id: p.id, status: ["pending", "saved", "stuck", "expired"].includes(p.status) ? p.status : "pending", attempts: int(p.attempts), created: int(p.created),
     at: int(p.at), pid: String(p.pid || "").slice(0, 80), h: String(p.h || "").slice(0, 24), name: String(p.name || "").slice(0, 60),
   })).slice(-50);
-  return { count, t: int(o.t), msgs, done, lastBatchEnd: Math.min(int(o.lastBatchEnd), count), batches, pins, tp: String(o.tp || "").slice(0, 4096), lastSave: String(o.lastSave || "").slice(0, 40), lastError: String(o.lastError || "").slice(0, 300) };
+  const fixes = (Array.isArray(o.fixes) ? o.fixes : []).filter((f) => f && /^fix-[a-f0-9]{8}$/.test(f.id)).map((f) => ({
+    id: f.id, status: ["pending", "saved", "stuck", "expired"].includes(f.status) ? f.status : "pending", attempts: int(f.attempts), created: int(f.created),
+    at: int(f.at), ask: String(f.ask || "").slice(0, 500),
+  })).slice(-20);
+  return { count, t: int(o.t), msgs, done, lastBatchEnd: Math.min(int(o.lastBatchEnd), count), batches, pins, fixes, tp: String(o.tp || "").slice(0, 4096), lastSave: String(o.lastSave || "").slice(0, 40), lastError: String(o.lastError || "").slice(0, 300) };
 }
 function loadState() {
   for (const f of ["state.json", "state.json.bak"]) {
@@ -61,7 +65,7 @@ function loadState() {
   return { v: 1, sessions: {} };
 }
 const undone = (x) => Object.keys(x.msgs).some((i) => !x.done[i]);
-const busy = (x) => x.batches.some((b) => b.status === "pending" || b.status === "stuck") || undone(x) || x.pins.some((p) => p.status === "pending");
+const busy = (x) => x.batches.some((b) => b.status === "pending" || b.status === "stuck") || undone(x) || x.pins.some((p) => p.status === "pending") || x.fixes.some((f) => f.status === "pending");
 function saveState(state) {
   if (!lockFile) return;
   const sorted = Object.entries(state.sessions).sort((a, b) => (busy(b[1]) - busy(a[1])) || (b[1].t - a[1].t));

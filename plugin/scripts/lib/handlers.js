@@ -10,6 +10,7 @@ const { input, projectDir, sid, sid8, P, HOME, PRIV, notes, pubSafe, inboxOk } =
 const { loadState, session, writeStatus } = require("./state");
 const { listBackups, describeBackup, restoreBackup, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin } = require("./store");
 const { readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture } = require("./transcript");
+const { fixRequest, commitFix, pinsCommand, shareCommand } = require("./features");
 const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt } = require("./requests");
 
 function onPrompt(state, out) {
@@ -40,6 +41,10 @@ function onPrompt(state, out) {
     if (!pinsDirOk() || !inboxOk()) { for (const p of pins) p.status = "expired"; notes.push("⚠️ ذاكرة المحادثة: لا يمكن تثبيت نصوص لأن CONVERSATION_PINS أو .conversation-memory غير صالح (رابط رمزي؟)."); }
     else for (const p of pins) ctx.push(pinRequest(p));
   }
+  const fixes = s.fixes.filter((f) => f.status === "pending");
+  if (fixes.length) { if (!inboxOk()) { for (const f of fixes) f.status = "expired"; } else for (const f of fixes) ctx.push(fixRequest(f)); }
+  if (cmd.pins) ctx.push(pinsCommand(cmd.args));
+  if (cmd.share) ctx.push(shareCommand(cmd.args));
   if (ctx.length) out.hookSpecificOutput = { hookEventName: "UserPromptSubmit", additionalContext: ctx.join("\n\n") };
   writeStatus(s);
 }
@@ -78,7 +83,7 @@ function onStop(state, out) {
   const s = session(state);
   // drafts waiting to be applied: take the shared write lock first. If another writer holds it, consume nothing,
   // count no attempt, and try again after the next reply (the draft stays where it is).
-  const ids = [...s.batches.filter((b) => b.status === "pending" || b.status === "stuck"), ...s.pins.filter((p) => p.status === "pending")].map((x) => x.id);
+  const ids = [...s.batches.filter((b) => b.status === "pending" || b.status === "stuck"), ...s.pins.filter((p) => p.status === "pending"), ...s.fixes.filter((f) => f.status === "pending")].map((x) => x.id);
   const waiting = pubSafe() && ids.some((id) => lst(draftPath(id)));
   if (waiting) {
     if (!holdWriteLock(8000)) { notes.push("⏳ ذاكرة المحادثة: برنامج آخر (إضافة المتصفح؟) يكتب في الذاكرة الآن؛ بقيت المسودة كما هي وتُحفظ بعد ردك القادم."); writeStatus(s); return; }
@@ -150,6 +155,19 @@ function stopWork(s, out) {
     if (p.attempts >= MAX_ATTEMPTS) { p.status = "stuck"; notes.push(`⚠️ ذاكرة المحادثة: تعذّر التثبيت: ${r.err}.`); }
     else asks.push(`- التثبيت: ${r.err}. أعد كتابة "${draftPath(p.id)}".`);
   }
+  // 2b) corrections the user asked for
+  for (const f of s.fixes.filter((x) => x.status === "pending")) {
+    let d = null, r;
+    try { d = readDraft(f.id, f.created); if (!d) continue; r = d.err ? { err: d.err } : commitFix(d.json); }
+    catch (e) { if (!d) continue; r = { err: "خطأ داخلي أثناء التصحيح (" + (e.code || e.name || "?") + ")" }; }
+    if (r.writeFailed) { notes.push(`⚠️ ذاكرة المحادثة: تعذّر حفظ التصحيح: ${r.err}. المسودة باقية وتُعاد المحاولة بعد ردك القادم.`); continue; }
+    if (d && d.path) unlinkSafe(d.path);
+    if (r.cancelled) { f.status = "expired"; continue; }
+    if (r.ok) { f.status = "saved"; notes.push(`✏️ ذاكرة المحادثة: صُحّحت الذاكرة — ${r.ok.changes.join("، ")}${r.ok.missing.length ? `. لم يوجد: ${r.ok.missing.join("، ")}` : ""}. للتراجع: /conversation-memory:undo`); continue; }
+    f.attempts += 1;
+    if (f.attempts >= MAX_ATTEMPTS) { f.status = "stuck"; notes.push(`⚠️ ذاكرة المحادثة: تعذّر التصحيح: ${r.err}.`); }
+    else asks.push(`- التصحيح: ${r.err}. أعد كتابة "${draftPath(f.id)}".`);
+  }
   // 3) still pending → ask again once per turn; give up visibly after MAX_ATTEMPTS turns
   const still = s.batches.filter((b) => b.status === "pending" && !lst(draftPath(b.id)));   // (a kept draft is not "missing")
   const mem = readMemory();
@@ -167,7 +185,7 @@ function stopWork(s, out) {
   if (asks.length && !input.stop_hook_active) { out.decision = "block"; out.reason = `[conversation-memory]\n${asks.join("\n")}`; }
   // 4) orphaned drafts older than a day
   // (only our own file names, only in a real folder — never through a link)
-  if (pubSafe()) try { const live = new Set([...s.batches, ...s.pins].filter((x) => x.status === "pending" || x.status === "stuck").map((x) => x.id));
+  if (pubSafe()) try { const live = new Set([...s.batches, ...s.pins, ...s.fixes].filter((x) => x.status === "pending" || x.status === "stuck").map((x) => x.id));
     for (const f of fs.readdirSync(P.inbox)) { if (!/^[a-z0-9-]{1,80}\.json$/.test(f)) continue; const p = path.join(P.inbox, f), st = lst(p); if (st && st.isFile() && Date.now() - st.mtimeMs > 86400000 && !live.has(f.replace(/\.json$/, ""))) unlinkSafe(p); } } catch {}
   writeStatus(s);
 }
@@ -241,7 +259,7 @@ function onPreTool(out) {
   const t = lst(fp); if (t && (t.isSymbolicLink() || !t.isFile() || t.nlink > 1)) return;
   const st = loadState(), s = st.sessions[sid];
   if (!s) return;
-  const live = [...s.batches.filter((b) => b.status === "pending" || b.status === "stuck"), ...s.pins.filter((p) => p.status === "pending")].map((x) => x.id);
+  const live = [...s.batches.filter((b) => b.status === "pending" || b.status === "stuck"), ...s.pins.filter((p) => p.status === "pending"), ...s.fixes.filter((f) => f.status === "pending")].map((x) => x.id);
   if (!live.includes(m[1])) return;
   out.hookSpecificOutput = { hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: "conversation-memory: مسودة الذاكرة المطلوبة" };
 }

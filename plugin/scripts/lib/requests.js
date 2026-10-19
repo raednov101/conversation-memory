@@ -57,8 +57,11 @@ function parseCommand(prompt) {
   const slash = /^\/[A-Za-z0-9_:.-]+(\s|$)/.test(t);
   if (t.startsWith(CMD + "save") || t === "احفظ الذاكرة") return { save: true, slash };
   if (t.startsWith(CMD + "status") || t === "حالة الذاكرة") return { status: true, slash };
-  if (t.startsWith(CMD + "pin")) return { pin: true, name: C.slug(t.slice((CMD + "pin").length)), slash };
+  if (t.startsWith(CMD + "pin") && !t.startsWith(CMD + "pins")) return { pin: true, name: C.slug(t.slice((CMD + "pin").length)), slash };
   if (t.startsWith(CMD + "undo")) return { restore: 1, slash };
+  if (t.startsWith(CMD + "fix")) return { fix: true, ask: t.slice((CMD + "fix").length).trim().slice(0, 500), slash };
+  if (t.startsWith(CMD + "pins")) return { pins: true, args: t.slice((CMD + "pins").length).trim(), slash };
+  if (t.startsWith(CMD + "share")) return { share: true, args: t.slice((CMD + "share").length).trim(), slash };
   if (t.startsWith(CMD + "restore")) { const n = parseInt(t.slice((CMD + "restore").length), 10); return { restore: n >= 1 && n <= 99 ? n : 0, listOnly: !(n >= 1), slash }; }
   return { slash };
 }
@@ -79,6 +82,8 @@ function recordPrompt(s, pid, h, cmd) {
     s.lastBatchEnd = s.count;
   }
   for (const p of s.pins) if (p.status === "pending" && s.count - p.at >= PIN_TURNS) p.status = "expired";
+  for (const f of s.fixes) if (f.status === "pending" && s.count - f.at >= PIN_TURNS) f.status = "expired";
+  if (cmd.fix) s.fixes.push({ id: `fix-${nonce(4)}`, status: "pending", attempts: 0, created: Date.now(), at: s.count, ask: cmd.ask || "" });
   if (cmd.pin) s.pins.push({ id: `pin-${nonce(4)}`, status: "pending", attempts: 0, created: Date.now(), at: s.count, pid: String(pid || "").slice(0, 80), h: h || "", name: cmd.name || "" });
   return changed;
 }

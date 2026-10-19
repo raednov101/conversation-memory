@@ -171,4 +171,26 @@ function savePin(name, text) {
   return { name, v: last + 1, sha: sha256(text) };
 }
 
-module.exports = { listBackups, describeBackup, restoreBackup, sweepTemps, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin };
+// every version of one pinned text, oldest first: { v, text, sha, date }
+function pinVersions(name) {
+  if (!C.pinNameOk(name) || !pinsDirOk()) return [];
+  const d = path.join(P.pins, name), sd = lst(d);
+  if (!sd || sd.isSymbolicLink() || !sd.isDirectory()) return [];
+  const out = [];
+  for (const f of fs.readdirSync(d)) {
+    const m = f.match(/^v(\d+)\.md$/); if (!m) continue;
+    const r = readSafe(path.join(d, f), MAX_JSON); if (r.text == null) continue;
+    out.push({ v: +m[1], text: r.text, sha: sha256(r.text), date: new Date(r.stat.mtimeMs).toLocaleString("sv-SE").slice(0, 16) });
+  }
+  return out.sort((x, y) => x.v - y.v);
+}
+// a chosen part of the memory written for another conversation (.conversation-memory/share/, git-ignored)
+function writeShare(text) {
+  if (!pubSafe() || !safeDir(P.pub, 0o755)) return { err: "مجلد .conversation-memory غير صالح" };
+  const d = path.join(P.pub, "share");
+  if (!safeDir(d, 0o755)) return { err: "مجلد المشاركة غير صالح" };
+  const f = path.join(d, `${stamp()}.md`);
+  try { writeVerified(f, text); return { path: f }; } catch (e) { return { err: "تعذّرت الكتابة: " + (e.code || e.message) }; }
+}
+
+module.exports = { pinVersions, writeShare, listBackups, describeBackup, restoreBackup, sweepTemps, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin };

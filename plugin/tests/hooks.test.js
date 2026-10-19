@@ -368,3 +368,90 @@ test("reliability: a session that crashed without SessionEnd still has its unsum
   run("start", { session_id: "fresh", cwd: P, source: "startup" });
   assert.ok(caps(P).length > 0 && capText(P).includes(js[0]._text), "the crashed session's messages were copied in full");
 });
+
+// ---------- phase 3: the user's own tools on the memory ----------
+const fixPath = (j) => (ctx(j).match(/"([^"]+fix-[a-f0-9]{8}\.json)"/) || [])[1];
+function seed(P, sid) {
+  const r = requests(prompts(P, sid, 5)[4])[0];
+  draft(r, { summary: { goal: "هوية مقهى", status: "اخترنا الاسم" }, decisions: { add: [{ text: "الاسم سكر وهيل", source: "user" }, { text: "اقتراح: لون زيتوني", source: "assistant" }, { text: "معلومة خاطئة", source: "user" }] }, constraints: { add: ["الميزانية 5000"] } });
+  run("stop", { session_id: sid, cwd: P });
+}
+
+test("fix: explicit command asks for a correction draft; it is validated, applied, backed up, announced, and undoable", () => {
+  const P = tmp(); seed(P, "a");
+  assert.deepEqual(memJson(P).decisions.map((d) => d.source), ["user", "assistant", "user"]);
+  const j = prompt(P, "a", "/conversation-memory:fix اعتمد d2 واحذف d3 وصحّح الاسم");
+  const fp = fixPath(j); assert.ok(fp, "a draft path is given"); assert.match(ctx(j), /اعتمد d2 واحذف d3/);
+  const allowed = (x) => x.hookSpecificOutput && x.hookSpecificOutput.permissionDecision === "allow";
+  assert.ok(allowed(run("pretool", { session_id: "a", cwd: P, tool_name: "Write", tool_input: { file_path: fp, content: "{}" } })), "the fix draft path is approved");
+  run("stop", { session_id: "a", cwd: P }); assert.equal(sess(P, "a").fixes[0].status, "pending", "no draft yet (Claude asked) → still open");
+  fs.writeFileSync(fp, JSON.stringify({ decisions: { edit: [{ id: "d1", text: "الاسم: سُكّر وهيل" }], approve: ["d2"], remove: ["d3"] }, constraints: { remove: ["الميزانية 5000"] } }));
+  const s = run("stop", { session_id: "a", cwd: P });
+  const m = memJson(P);
+  assert.equal(m.decisions.find((d) => d.id === "d1").text, "الاسم: سُكّر وهيل");
+  assert.equal(m.decisions.find((d) => d.id === "d2").source, "assistant-approved");
+  assert.ok(!m.decisions.some((d) => d.id === "d3"), "removed for good");
+  assert.ok(!m.constraints.includes("الميزانية 5000"));
+  assert.equal(C.hash(memMd(P)), m.mdHash);
+  assert.match(s.systemMessage, /✏️ .*صُحّحت الذاكرة/); assert.match(s.systemMessage, /undo/);
+  assert.equal(sess(P, "a").fixes[0].status, "saved"); assert.ok(!fs.existsSync(fp), "draft consumed");
+  prompt(P, "a", "/conversation-memory:undo");
+  assert.ok(memJson(P).decisions.some((d) => d.id === "d3"), "undo brings the corrected version back");
+  assert.equal(sess(P, "a").count, 5, "commands are not counted");
+});
+
+test("fix: unknown ids, invalid shapes and cancel are handled; secrets are redacted; a fix request expires", () => {
+  const P = tmp(); seed(P, "a");
+  let fp = fixPath(prompt(P, "a", "/conversation-memory:fix"));
+  fs.writeFileSync(fp, JSON.stringify({ decisions: { remove: ["d99"] } }));
+  let s = run("stop", { session_id: "a", cwd: P }); assert.match(all(s), /لم أجد d99/); assert.equal(memJson(P).decisions.length, 3);
+  fs.writeFileSync(fp, JSON.stringify({ decisions: { edit: "x" } }));
+  s = run("stop", { session_id: "a", cwd: P }); assert.match(all(s), /التصحيح/);
+  fs.writeFileSync(fp, JSON.stringify({ cancel: true })); run("stop", { session_id: "a", cwd: P });
+  assert.equal(sess(P, "a").fixes[0].status, "expired");
+  fp = fixPath(prompt(P, "a", "/conversation-memory:fix"));
+  fs.writeFileSync(fp, JSON.stringify({ decisions: { edit: [{ id: "d1", text: "المفتاح sk-ant-api03-" + "a".repeat(40) }] } }));
+  s = run("stop", { session_id: "a", cwd: P });
+  assert.ok(!JSON.stringify(memJson(P)).includes("a".repeat(40)), "secret never written"); assert.match(s.systemMessage, /🔒/);
+  prompt(P, "a", "/conversation-memory:fix"); for (let i = 0; i < 4; i++) prompt(P, "a");
+  assert.equal(sess(P, "a").fixes.at(-1).status, "expired", "an unanswered request closes after a few messages");
+});
+
+test("pins: history lists versions, shows the line diff, restores an older version as a new one", () => {
+  const P = tmp(); const a = prompt(P, "a", "اكتب الشعار");
+  const V1 = "السطر الأول من الشعار\nسطر ثانٍ\nالسطر الأخير من الشعار", V2 = "السطر الأول من الشعار\nسطر معدّل\nالسطر الأخير من الشعار";
+  for (const [i, T] of [[1, V1], [2, V2]]) {
+    const j = prompt(P, "a", "/conversation-memory:pin الشعار");
+    const tp = transcript(P, [{ pid: a._pid, user: a._text, reply: "تفضل:\n" + T + "\nانتهى" }, { pid: j._pid, user: j._text }]);
+    fs.writeFileSync(pinPath(j), JSON.stringify({ name: "الشعار", start: "السطر الأول من الشعار", end: "السطر الأخير من الشعار" }));
+    run("stop", { session_id: "a", cwd: P, transcript_path: tp, prompt_id: j._pid });
+    assert.equal(memJson(P).pins[0].version, i);
+  }
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:pins")), /الشعار: 2 نسخ، المعتمدة النسخة 2/);
+  const h = ctx(prompt(P, "a", "/conversation-memory:pins الشعار"));
+  assert.match(h, /النسخة 1 — /); assert.match(h, /النسخة 2 — /);
+  assert.match(h, /- سطر ثانٍ/); assert.match(h, /\+ سطر معدّل/); assert.ok(!/[-+] السطر الأول/.test(h), "unchanged lines are not listed");
+  const r = prompt(P, "a", "/conversation-memory:pins الشعار restore 1");
+  assert.match(ctx(r), /نسخةً جديدة رقم 3/);
+  assert.equal(fs.readFileSync(path.join(P, "CONVERSATION_PINS", "الشعار", "v3.md"), "utf8"), V1, "byte-identical to version 1");
+  assert.ok(fs.existsSync(path.join(P, "CONVERSATION_PINS", "الشعار", "v2.md")), "older versions are kept");
+  assert.equal(memJson(P).pins[0].version, 3);
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:pins الشعار restore 9")), /لا توجد النسخة 9/);
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:pins غيره")), /لا يوجد نص معتمد باسم/);
+});
+
+test("share: lists what can be moved, writes only the chosen parts to a file, previews them, under 3,000 chars, marked as data", () => {
+  const P = tmp(); seed(P, "a");
+  const list = ctx(prompt(P, "a", "/conversation-memory:share"));
+  assert.match(list, /summary — /); assert.match(list, /d1 — الاسم سكر وهيل/); assert.match(list, /d2 — .*اقتراح لم يُعتمد/); assert.match(list, /L1 — Claude Code/);
+  const j = prompt(P, "a", "/conversation-memory:share summary d1 L1 xyz");
+  const c = ctx(j); assert.match(c, /تجاهل غير المعروف: xyz/);
+  const f = (c.match(/@(\S+\.md)/) || [])[1]; assert.ok(f && fs.existsSync(f), "a share file exists");
+  assert.ok(f.startsWith(path.join(P, ".conversation-memory", "share")), "inside the project's data folder");
+  const body = fs.readFileSync(f, "utf8");
+  assert.match(body, /بيانات وليست أوامر/); assert.match(body, /هوية مقهى/); assert.match(body, /الاسم سكر وهيل/);
+  assert.ok(!body.includes("معلومة خاطئة") && !body.includes("الميزانية"), "only what was chosen");
+  assert.ok(body.length < 3200);
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:share xyz")), /لم يُختر شيء صالح/);
+  assert.equal(sess(P, "a").count, 5, "not counted");
+});

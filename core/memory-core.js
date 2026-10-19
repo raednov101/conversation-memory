@@ -255,6 +255,94 @@
     return out;
   }
 
+  // ---------- corrections (the user fixes the memory directly; every fix is a normal, backed-up, undoable write) ----------
+  // shape: { decisions?: { edit: [{id, text}], approve: [id], revoke: [id], remove: [id] }, constraints?: { add: [], remove: [] },
+  //          summary?: {goal, status, next[], open[]}, log?: { remove: [id] } }
+  function validateFix(f) {
+    if (!isObj(f)) return { ok: false, error: "التصحيح يجب أن يكون كائن JSON" };
+    const out = {}, ids = (v) => (Array.isArray(v) ? v : []).filter(isId).slice(0, LIMITS.list);
+    if (f.decisions !== undefined) {
+      if (!isObj(f.decisions)) return { ok: false, error: "decisions يجب أن يكون كائناً" };
+      const edit = (Array.isArray(f.decisions.edit) ? f.decisions.edit : []).filter(isObj).filter((x) => isId(x.id)).map((x) => ({ id: x.id, text: cleanStr(x.text) })).filter((x) => x.text).slice(0, LIMITS.list);
+      out.decisions = { edit, approve: ids(f.decisions.approve), revoke: ids(f.decisions.revoke), remove: ids(f.decisions.remove) };
+    }
+    if (f.constraints !== undefined) {
+      if (!isObj(f.constraints)) return { ok: false, error: "constraints يجب أن يكون كائناً" };
+      out.constraints = { add: cleanList(f.constraints.add), remove: cleanList(f.constraints.remove) };
+    }
+    if (f.summary !== undefined) {
+      if (!isObj(f.summary)) return { ok: false, error: "summary يجب أن يكون كائناً" };
+      out.summary = { goal: cleanStr(f.summary.goal), status: cleanStr(f.summary.status), next: cleanList(f.summary.next), open: cleanList(f.summary.open) };
+      if (!out.summary.goal && !out.summary.status) return { ok: false, error: "summary يحتاج goal أو status على الأقل" };
+    }
+    if (f.log !== undefined) {
+      if (!isObj(f.log)) return { ok: false, error: "log يجب أن يكون كائناً فيه remove" };
+      out.log = { remove: (Array.isArray(f.log.remove) ? f.log.remove : []).filter((x) => typeof x === "string" && x.length <= 100).slice(0, LIMITS.list) };
+    }
+    if (!Object.keys(out).length) return { ok: false, error: "لا يوجد ما يُصحَّح" };
+    return { ok: true, fix: out };
+  }
+  // → { memory, changes: [human-readable lines], missing: [ids not found], redacted } — never mutates its input
+  function applyFix(memory, fix, date) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
+    const changes = [], missing = [];
+    let redacted = false;
+    const R = (t) => { const r = redact(t); if (r.changed) redacted = true; return r.text; };
+    const find = (id) => { const d = m.decisions.find((x) => x.id === id); if (!d) missing.push(id); return d; };
+    if (fix.decisions) {
+      for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); changes.push(`عُدّل نص ${d.id}`); } }
+      for (const id of fix.decisions.approve) { const d = find(id); if (d && d.source === "assistant") { d.source = "assistant-approved"; changes.push(`اعتُمد الاقتراح ${id}`); } }
+      for (const id of fix.decisions.revoke) { const d = find(id); if (d && d.status === "active") { d.status = "revoked"; d.revokedOn = date || ""; changes.push(`أُلغي ${id}`); } }
+      for (const id of fix.decisions.remove) { const before = m.decisions.length; m.decisions = m.decisions.filter((x) => x.id !== id); if (m.decisions.length < before) changes.push(`حُذف ${id} نهائياً`); else missing.push(id); }
+    }
+    if (fix.constraints) {
+      const rm = new Set(fix.constraints.remove), had = m.constraints.length;
+      m.constraints = m.constraints.filter((c) => !rm.has(c));
+      if (m.constraints.length < had) changes.push(`حُذف ${had - m.constraints.length} من القيود`);
+      for (const c of fix.constraints.add.map(R)) if (!m.constraints.includes(c)) { m.constraints.push(c); changes.push("أُضيف قيد"); }
+    }
+    if (fix.summary) { m.summary = { goal: R(fix.summary.goal), status: R(fix.summary.status), next: fix.summary.next.map(R), open: fix.summary.open.map(R) }; changes.push("استُبدلت الخلاصة الحالية"); }
+    if (fix.log) for (const id of fix.log.remove) { const before = m.log.length; m.log = m.log.filter((e) => e.id !== id); if (m.log.length < before) changes.push(`حُذفت دفعة من السجل (${id})`); else missing.push(id); }
+    if (changes.length) m.updated = date || m.updated;
+    return { memory: m, changes, missing: [...new Set(missing)], redacted };
+  }
+
+  // ---------- sharing: chosen parts of the memory as text for another conversation ----------
+  // sel: { summary: bool, decisions: [ids], constraints: bool, pins: [names], log: [ids] } → text, cut at `budget` characters
+  function renderSelection(m, sel, budget = 3000) {
+    const parts = [];
+    if (sel.summary) parts.push("الخلاصة الحالية:\n" + renderSummary(m));
+    const ds = m.decisions.filter((d) => d.status === "active" && (sel.decisions || []).includes(d.id));
+    if (ds.length) parts.push("قرارات:\n" + ds.map((d) => `- ${d.text} (${SOURCE_LABEL[d.source]})`).join("\n"));
+    if (sel.constraints && m.constraints.length) parts.push("القيود:\n" + bullets(m.constraints));
+    const ps = m.pins.filter((p) => (sel.pins || []).includes(p.name));
+    if (ps.length) parts.push("نصوص معتمدة (النص الحرفي في ملفه):\n" + ps.map((p) => `- ${p.name} — النسخة ${p.version}، ${p.path}`).join("\n"));
+    const es = m.log.filter((e) => (sel.log || []).includes(e.id));
+    if (es.length) parts.push("من سجل النقاش:\n" + es.map(renderEntry).join("\n\n"));
+    let out = parts.join("\n\n");
+    if (out.length > budget) out = out.slice(0, budget) + "\n…(اقتُطع عند " + budget + " حرف)";
+    return out;
+  }
+
+  // ---------- line diff (for comparing versions of a pinned text) ----------
+  // → [{op: " " | "-" | "+", line}] ; LCS on lines, capped so huge texts stay fast (beyond the cap: whole-text replace)
+  function diffLines(a, b) {
+    const A = String(a).split("\n"), B = String(b).split("\n");
+    // common start and end first: a typical revision touches a few lines in the middle
+    let p = 0; while (p < A.length && p < B.length && A[p] === B[p]) p++;
+    let q = 0; while (q < A.length - p && q < B.length - p && A[A.length - 1 - q] === B[B.length - 1 - q]) q++;
+    const head = A.slice(0, p).map((line) => ({ op: " ", line })), tail = A.slice(A.length - q).map((line) => ({ op: " ", line }));
+    const X = A.slice(p, A.length - q), Y = B.slice(p, B.length - q);
+    if (X.length * Y.length > 4e6) return [...head, ...X.map((line) => ({ op: "-", line })), ...Y.map((line) => ({ op: "+", line })), ...tail];
+    const n = X.length, k = Y.length, L = Array.from({ length: n + 1 }, () => new Uint32Array(k + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = k - 1; j >= 0; j--) L[i][j] = X[i] === Y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const mid = []; let i = 0, j = 0;
+    while (i < n && j < k) { if (X[i] === Y[j]) { mid.push({ op: " ", line: X[i] }); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) mid.push({ op: "-", line: X[i++] }); else mid.push({ op: "+", line: Y[j++] }); }
+    while (i < n) mid.push({ op: "-", line: X[i++] });
+    while (j < k) mid.push({ op: "+", line: Y[j++] });
+    return [...head, ...mid, ...tail];
+  }
+
   // ---------- pins ----------
   const slug = (n) => String(n || "").replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, " ").replace(/\[\s*conversation-memory\s*\]/gi, " ").replace(/\s+/g, " ").replace(/^[.\s]+|[.\s]+$/g, "").slice(0, 60);
   const WINDOWS_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
@@ -302,5 +390,5 @@
   function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: String(mdText).slice(0, LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
-    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, isGeneratedView };
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, isGeneratedView, validateFix, applyFix, renderSelection, diffLines };
 });
