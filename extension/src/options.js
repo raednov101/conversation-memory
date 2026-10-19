@@ -134,8 +134,8 @@ function renderMemory() {
     const li = el("li");
     const txt = el("div", { className: "txt" }, el("b", { textContent: d.id + " " }), d.text, el("span", { className: "tag" + (d.source === "assistant" ? " sug" : ""), textContent: SRC[d.source] || d.source }));
     const acts = el("div", { className: "acts" });
-    if (d.source === "assistant") acts.append(btn("✅ اعتماد", () => applyFix({ decisions: { approve: [d.id] } }), "اعتمد هذا الاقتراح قراراً"));
-    acts.append(btn("✏️ تعديل", () => editRow(li, d.text, (t) => applyFix({ decisions: { edit: [{ id: d.id, text: t }] } }))),
+    if (d.source === "assistant") acts.append(btn("✅ اعتماد", () => applyFix({ decisions: { approve: [d.id] } }), "وافقت عليه: يصير قراراً معتمداً"));
+    acts.append(btn("✏️ تعديل", () => editRow(li, d.text, (t) => applyFix({ decisions: { edit: [{ id: d.id, text: t }] } })), "صحّح نصه"),
       btn("🚫 إلغاء", () => applyFix({ decisions: { revoke: [d.id] } }), "لم يعد سارياً؛ يبقى في سجل الملغى"),
       btn("🗑️ حذف", () => applyFix({ decisions: { remove: [d.id] } }), "حذف نهائي لمعلومة خاطئة أو حساسة"));
     li.append(txt, acts); ds.append(li);

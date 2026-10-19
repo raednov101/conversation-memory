@@ -44,6 +44,7 @@
   details p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
   code{font-size:11.5px;direction:ltr;unicode-bidi:isolate}
   .tools{margin-top:12px}
+  .intro{margin:0 0 10px;padding:8px 10px;border-radius:9px;background:var(--soft);border-inline-start:3px solid var(--gold);font-size:13px}
   .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:-4px -4px 10px;padding:0 4px 8px;overflow-x:auto}
   .tabs button{border:0;background:none;color:var(--muted);font-weight:700;padding:6px 10px;border-radius:8px}
   .tabs button.on{color:var(--fg);background:var(--soft);box-shadow:inset 0 -2px 0 var(--gold)}
@@ -106,23 +107,24 @@
 
   <section class="card tools" id="tools" hidden>
     <nav class="tabs" role="tablist">
-      <button type="button" data-tab="fixSec" class="on">✏️ الذاكرة</button>
+      <button type="button" data-tab="fixSec" class="on">✏️ مراجعة الذاكرة</button>
       <button type="button" data-tab="pinSec">📌 النصوص المعتمدة</button>
       <button type="button" data-tab="bkSec">↩️ النسخ السابقة</button>
     </nav>
 
     <div id="fixSec" class="pane on">
+      <p class="intro">هذا ما حفظته الإضافة من محادثاتك عن هذا المشروع، وهو ما يُعطى للنموذج في المحادثات القادمة. إن وجدت فيه خطأً فصحّحه هنا.</p>
       <p id="fixMsg" class="msg" role="status"></p>
       <div class="sumgrid">
         <label>الهدف<textarea id="sGoal" rows="2"></textarea></label>
         <label>الوضع الآن<textarea id="sStatus" rows="2"></textarea></label>
       </div>
       <button id="sSave" type="button" class="small">حفظ الخلاصة</button>
-      <h3>القرارات والمقترحات</h3>
+      <h3>القرارات والمقترحات <span class="muted">— ما اتُّفق عليه. «اقتراح لم يُعتمد» فكرة من النموذج لم توافق عليها بعد</span></h3>
       <ul id="decisions" class="items"><li class="muted">…</li></ul>
-      <h3>القيود</h3>
+      <h3>القيود <span class="muted">— شروط ثابتة يلتزم بها النموذج</span></h3>
       <ul id="constraints" class="items"><li class="muted">…</li></ul>
-      <h3>السجل <span class="muted">(أحدث 15 دفعة)</span></h3>
+      <h3>السجل <span class="muted">— ملخص كل مجموعة رسائل، الأحدث أولاً</span></h3>
       <ul id="log" class="items"><li class="muted">…</li></ul>
       <p class="muted">كل تغيير تُحفظ قبله نسخة احتياطية، ويُتراجع عنه بزر واحد.</p>
     </div>
