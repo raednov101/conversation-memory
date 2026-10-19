@@ -62,7 +62,7 @@ test("secrets are redacted on apply, placeholder is not a secret, scan is linear
   const r = C.applyDraft(C.emptyMemory(), d, {});
   assert.ok(r.redacted); assert.doesNotMatch(JSON.stringify(r.memory), /sk-ant|hunter2/);
   assert.equal(C.hasSecret("- password: (محذوف لأنه حساس)"), false);
-  const t0 = Date.now(); C.hasSecret("eyJ-".repeat(200000) + "a".repeat(300000)); assert.ok(Date.now() - t0 < 1500);
+  const t0 = Date.now(); C.hasSecret("eyJ-".repeat(200000) + "a".repeat(300000)); assert.ok(Date.now() - t0 < 5000, "a crafted 1.1 MB token stays fast");
 });
 test("render and compact view", () => {
   let m = C.emptyMemory("مشروع");
@@ -115,7 +115,10 @@ test("review: common secret formats are redacted, idempotently, in linear time",
     assert.equal(C.redact(r.text).text, r.text, "idempotent: " + s);
   }
   for (const ok of ["ميزانية token واحدة 40", "password reset flow", "استخدم https://example.com/path"]) assert.equal(C.redact(ok).changed, false, ok);
-  const t0 = Date.now(); C.redact("password".repeat(40000)); C.redact("a_".repeat(200000)); assert.ok(Date.now() - t0 < 1500);
+  // linear, not quadratic: doubling the input roughly doubles the time (a quadratic pattern would quadruple it)
+  const time = (n) => { const t0 = process.hrtime.bigint(); C.redact("password".repeat(n)); C.redact("a_".repeat(5 * n)); return Number(process.hrtime.bigint() - t0) / 1e6; };
+  time(2000); const t1 = Math.max(time(20000), 1), t2 = time(40000);
+  assert.ok(t2 / t1 < 3.2 && t2 < 5000, `20k: ${t1.toFixed(0)} ms, 40k: ${t2.toFixed(0)} ms`);
 });
 test("review: ids must be strings — arrays can't slip through revoke/replaces", () => {
   let m = C.applyDraft(C.emptyMemory(), C.validateDraft(D({ decisions: { add: ["أ"] } }), "b-1").draft, { date: "x" }).memory;

@@ -234,7 +234,7 @@ test("lock: live holder respected (event queued, user told), dead or ancient hol
   fs.unlinkSync(path.join(PRIV(P), "lock")); prompt(P, "a");
   assert.equal(sess(P, "a").count, 2); assert.ok(sess(P, "a").batches.some((b) => b.kind === "manual"), "queued save command still takes effect");
   fs.writeFileSync(path.join(PRIV(P), "lock"), `1 ${os.hostname()} ${Date.now() - 120e3}`);
-  const t0 = Date.now(); prompt(P, "a"); assert.ok(Date.now() - t0 < 2000 && sess(P, "a").count === 3, "pid reused (1 is alive) but older than 60 s → cleared");
+  const t0 = Date.now(); prompt(P, "a"); assert.ok(Date.now() - t0 < 4000 && sess(P, "a").count === 3, "pid reused (1 is alive) but older than 60 s → cleared at once, not after the 5 s wait");
 });
 
 test("robustness: garbage input, missing HOME dir, crafted large files stay fast", () => {

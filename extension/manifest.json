@@ -23,6 +23,13 @@
       "js": [
         "src/memory-core.js",
         "src/linking.js",
+        "src/page/policy.js",
+        "src/page/adapters.js",
+        "src/page/reader.js",
+        "src/page/composer.js",
+        "src/page/summarizer.js",
+        "src/page/bridge.js",
+        "src/page/ui.js",
         "src/content.js"
       ],
       "run_at": "document_idle"
