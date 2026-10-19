@@ -380,7 +380,7 @@ with sync_playwright() as pw:
     for k in range(40):
         reply = "⟦ذاكرة:بداية⟧" + json.dumps({"summary": {"goal": f"هدف {k}"}, "entry": {"raised": [f"دفعة اختبار رقم {k} " + "ن" * 3000], "decided": [], "changed": []}}, ensure_ascii=False) + "⟦ذاكرة:نهاية⟧"
         opt.evaluate("""([pid, reply, k]) => { chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { project: pid } }).then((p) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'commit', args: { project: pid, reply, batch: 'kill-' + k, base: p.base, platform: 'chatgpt', chat: 'x', range: String(k) } })).catch(() => {}); }""", [pid_, reply, k])
-        time.sleep(0.01 + (k % 7) * 0.012)
+        time.sleep(0.01 + (k % 10) * 0.04)   # from almost at once to well after a typical write, so both cut and whole writes happen on any machine
         try: sw.evaluate("() => chrome.offscreen.closeDocument().catch(() => {})")
         except Exception: pass
         time.sleep(0.15)
