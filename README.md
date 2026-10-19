@@ -28,7 +28,7 @@
 **التثبيت (خطوة واحدة):** اكتب داخل Claude Code:
 
 ```
-/plugin install conversation-memory --marketplace raedesc/conversation-memory
+/plugin install conversation-memory --marketplace raednov101/conversation-memory
 ```
 
 يتطلب **Node.js 18 أو أحدث** وClaude Code 2.1.275 أو أحدث. وإن كان عندك إصدار قديم مثبّت من ملف، أزله أولاً بـ `/plugin`.
