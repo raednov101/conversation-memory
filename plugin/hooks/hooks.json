@@ -1,0 +1,24 @@
+{
+  "description": "conversation-memory: counts messages, asks for a JSON draft every N, validates and saves it, copies unsummarized messages before compaction or closing, loads a compact memory at session start, approves only its own draft writes, and shows a status-line indicator.",
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.js\" prompt", "timeout": 10 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.js\" stop", "timeout": 15 } ] }
+    ],
+    "PreCompact": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.js\" precompact", "timeout": 30 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.js\" end", "timeout": 30 } ] }
+    ],
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.js\" start", "timeout": 10 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Write|Read", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.js\" pretool", "timeout": 10 } ] }
+    ]
+  },
+  "modules": ["./indicator.ts"]
+}

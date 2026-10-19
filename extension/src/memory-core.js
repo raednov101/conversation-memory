@@ -1,0 +1,298 @@
+/* conversation-memory core — shared, unmodified, by the Claude Code plugin and the browser extension.
+ * Pure functions only: no file system, no network, no clock except where a date is passed in.
+ *
+ *   CONVERSATION_MEMORY.json  — the source of truth (this module defines and validates it)
+ *   CONVERSATION_MEMORY.md    — a view rendered from it; never parsed back
+ *
+ * A writer never replaces the memory wholesale. Every change is a draft of operations
+ * (replace the current summary, add/revoke a decision, add/remove a constraint, append a log entry)
+ * validated here and applied here, so two writers can't silently erase each other's work. */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.MemoryCore = api;
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const FORMAT = "conversation-memory/1";
+  const LIMITS = { str: 2000, title: 200, list: 50, decisions: 300, constraints: 100, log: 2000, entryMin: 30, imported: 400000 };
+  const SOURCES = ["user", "assistant-approved", "assistant"];
+  const SOURCE_LABEL = { user: "المستخدم", "assistant-approved": "اقتراح اعتمده المستخدم", assistant: "اقتراح لم يُعتمد" };
+  const PLATFORMS = { "claude-code": "Claude Code", chatgpt: "ChatGPT", "claude-web": "Claude (الويب)" };
+
+  // ---------- small helpers ----------
+  const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+  const isId = (v) => typeof v === "string" && /^d\d{1,6}$/.test(v);
+  // strip control characters (keep \n and \t), system markers, and wrapper look-alikes; clamp length
+  function cleanStr(v, max = LIMITS.str) {
+    if (typeof v !== "string") return "";
+    let s = v.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u2028\u2029]/g, "");
+    let prev;
+    do { prev = s; s = s.replace(/<!--\s*\/?\s*cm:[^>]*-->/gi, "").replace(/<\/?\s*conversation_memory[^>]*>/gi, ""); } while (s !== prev);
+    s = s.trim();
+    return s.length > max ? s.slice(0, max) + "…" : s;
+  }
+  const cleanList = (v, max = LIMITS.list) => (Array.isArray(v) ? v : []).map((x) => cleanStr(x)).filter(Boolean).slice(0, max);
+  const visibleLen = (s) => s.replace(/[\s\-*#>|:._…()\[\]«»"']/g, "").length;
+  // tiny deterministic hash (cyrb53) — change detection only, identical in Node and browsers
+  function hash(str) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, "0");
+  }
+
+  // ---------- secrets (linear time: one token pass, anchored token test) ----------
+  const TOKEN_RE = /[A-Za-z0-9_.\-]+/g;
+  const SECRET_TOKEN_RE = /^(sk-[A-Za-z0-9_-]{20,}|[sr]k_(live|test)_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}$|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})/;
+  const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/g;
+  const PLACEHOLDER = "(محذوف لأنه حساس)";
+  // key names that contain a secret word (aws_secret_access_key, DB_PASSWORD, api-key, …) followed by = or : and a value.
+  // Bounded repetitions keep it linear; the lookahead keeps redaction idempotent.
+  const ASSIGN_RE = /([A-Za-z0-9_\-]{0,40}(?:password|passwd|pwd|api[_-]?key|secret|token|access[_-]?key|private[_-]?key)[A-Za-z0-9_\-]{0,40}|كلمة\s{0,3}(?:ال)?(?:مرور|سر))(["']?\s{0,5}[:=]\s{0,5})(?!\(محذوف)["']?[^\s"']{5,200}/gi;
+  const BEARER_RE = /\b(Bearer|Basic|Token)\s+(?!\(محذوف)[A-Za-z0-9._~+\/=-]{16,}/g;
+  const URL_CRED_RE = /\b([a-z][a-z0-9+.\-]{1,20}:\/\/)[^\s:\/@]{1,100}:[^\s@\/]{1,200}@/gi;
+  const isSecretToken = (t) => t.length < 20000 && SECRET_TOKEN_RE.test(t);
+  function redact(text) {
+    let changed = false;
+    const out = String(text)
+      .replace(PRIVATE_KEY_RE, () => ((changed = true), PLACEHOLDER))
+      .replace(URL_CRED_RE, (m, scheme) => ((changed = true), `${scheme}${PLACEHOLDER}@`))
+      .replace(BEARER_RE, (m, k) => ((changed = true), `${k} ${PLACEHOLDER}`))
+      .replace(ASSIGN_RE, (m, k) => ((changed = true), `${k}: ${PLACEHOLDER}`))
+      .replace(TOKEN_RE, (t) => (isSecretToken(t) ? ((changed = true), PLACEHOLDER) : t));
+    return { text: out, changed };
+  }
+  const hasSecret = (t) => redact(t).changed;
+
+  // ---------- the memory document ----------
+  function emptyMemory(title) {
+    return { format: FORMAT, title: cleanStr(title || "ذاكرة المشروع", LIMITS.title), updated: "",
+      summary: { goal: "", status: "", next: [], open: [] }, decisions: [], constraints: [], pins: [], log: [], imported: null, mdHash: "", archived: 0 };
+  }
+  // accept anything (hand-edited, older, partial) and return a well-formed memory; never throws
+  function normalizeMemory(input) {
+    const m = emptyMemory(isObj(input) ? input.title : "");
+    if (!isObj(input)) return m;
+    m.updated = cleanStr(input.updated, 40);
+    const s = isObj(input.summary) ? input.summary : {};
+    m.summary = { goal: cleanStr(s.goal), status: cleanStr(s.status), next: cleanList(s.next), open: cleanList(s.open) };
+    const seen = new Set();
+    m.decisions = (Array.isArray(input.decisions) ? input.decisions : []).filter(isObj).map((d) => ({
+      id: isId(d.id) ? d.id : "", text: cleanStr(d.text), source: SOURCES.includes(d.source) ? d.source : "user",
+      date: cleanStr(d.date, 40), status: d.status === "revoked" ? "revoked" : "active", revokedOn: cleanStr(d.revokedOn, 40), replaces: isId(d.replaces) ? d.replaces : "",
+    })).filter((d) => d.text).slice(-LIMITS.decisions);
+    let next = 1 + Math.max(0, ...m.decisions.map((d) => +String(d.id).slice(1) || 0));
+    for (const d of m.decisions) { if (!d.id || seen.has(d.id)) d.id = "d" + next++; seen.add(d.id); }
+    m.constraints = [...new Set(cleanList(input.constraints, LIMITS.constraints))];
+    // the path is rebuilt from a validated name and version, never taken from the file (no "..", no other folders)
+    m.pins = (Array.isArray(input.pins) ? input.pins : []).filter(isObj).filter((p) => typeof p.name === "string" && pinNameOk(p.name)).map((p) => {
+      const name = p.name.trim().replace(/\s+/g, " "), version = Math.min(999999, Math.max(1, Math.floor(+p.version) || 1));
+      return { name, version, path: pinPath(name, version), sha: typeof p.sha === "string" && /^[0-9a-f]{8,64}$/.test(p.sha) ? p.sha : "", date: cleanStr(p.date, 40) };
+    });
+    m.log = (Array.isArray(input.log) ? input.log : []).filter(isObj).map((e) => ({
+      id: cleanStr(e.id, 100), platform: PLATFORMS[e.platform] ? e.platform : "claude-code", chat: cleanStr(e.chat, 200), range: cleanStr(e.range, 40), date: cleanStr(e.date, 40),
+      raised: cleanList(e.raised), decided: cleanList(e.decided), changed: cleanList(e.changed),
+    })).filter((e) => e.id).slice(-LIMITS.log);
+    if (isObj(input.imported) && typeof input.imported.text === "string") m.imported = { date: cleanStr(input.imported.date, 40), text: input.imported.text.slice(0, LIMITS.imported) };
+    m.mdHash = typeof input.mdHash === "string" ? input.mdHash.slice(0, 32) : "";
+    m.archived = Math.max(0, Math.floor(+input.archived) || 0);
+    return m;
+  }
+  // parse the JSON file text; a file that exists but isn't valid JSON is an error, never silently replaced
+  function parseMemory(text) {
+    if (text == null || text === "") return { ok: true, memory: emptyMemory() };
+    try { const j = JSON.parse(text); if (!isObj(j)) throw new Error("not an object"); return { ok: true, memory: normalizeMemory(j) }; }
+    catch (e) { return { ok: false, error: "ملف CONVERSATION_MEMORY.json ليس JSON صالحاً: " + e.message }; }
+  }
+  const serialize = (m) => JSON.stringify(m, null, 2) + "\n";
+  const token = (fileText) => (fileText ? hash(fileText).slice(0, 12) : "none");
+
+  // ---------- drafts ----------
+  // shape: { batch, base?, summary?: {goal,status,next[],open[]}, decisions?: {add:[{text,source,replaces?}], revoke:[id]},
+  //          constraints?: {add:[], remove:[]}, entry: {raised[], decided[], changed[]} }
+  function validateDraft(d, expectBatch) {
+    if (!isObj(d)) return { ok: false, error: "المسودة يجب أن تكون كائن JSON" };
+    const batch = typeof d.batch === "string" ? d.batch : "";
+    if (expectBatch && batch !== expectBatch) return { ok: false, error: `المسودة تخص دفعة أخرى (${batch || "بلا معرّف"})` };
+    const out = { batch, base: typeof d.base === "string" ? d.base.slice(0, 20) : "" };
+    if (d.summary !== undefined) {
+      if (!isObj(d.summary)) return { ok: false, error: "summary يجب أن يكون كائناً" };
+      out.summary = { goal: cleanStr(d.summary.goal), status: cleanStr(d.summary.status), next: cleanList(d.summary.next), open: cleanList(d.summary.open) };
+      if (!out.summary.goal && !out.summary.status) return { ok: false, error: "summary يحتاج goal أو status على الأقل" };
+    }
+    if (d.decisions !== undefined) {
+      if (!isObj(d.decisions)) return { ok: false, error: "decisions يجب أن يكون كائناً فيه add و revoke" };
+      const add = (Array.isArray(d.decisions.add) ? d.decisions.add : []).map((x) => (typeof x === "string" ? { text: x } : x)).filter(isObj)
+        .map((x) => ({ text: cleanStr(x.text), source: SOURCES.includes(x.source) ? x.source : "user", replaces: isId(x.replaces) ? x.replaces : "" }))
+        .filter((x) => x.text).slice(0, LIMITS.list);
+      const revoke = (Array.isArray(d.decisions.revoke) ? d.decisions.revoke : []).filter(isId).slice(0, LIMITS.list);
+      out.decisions = { add, revoke };
+    }
+    if (d.constraints !== undefined) {
+      if (!isObj(d.constraints)) return { ok: false, error: "constraints يجب أن يكون كائناً فيه add و remove" };
+      out.constraints = { add: cleanList(d.constraints.add), remove: cleanList(d.constraints.remove) };
+    }
+    const e = isObj(d.entry) ? d.entry : null;
+    if (!e) return { ok: false, error: "entry مطلوب (raised و decided و changed)" };
+    out.entry = { raised: cleanList(e.raised), decided: cleanList(e.decided), changed: cleanList(e.changed) };
+    const all = [...out.entry.raised, ...out.entry.decided, ...out.entry.changed].join(" ");
+    if (visibleLen(all) < LIMITS.entryMin) return { ok: false, error: "ملخص الدفعة (entry) فارغ أو قصير جداً" };
+    return { ok: true, draft: out };
+  }
+
+  // apply a validated draft. ctx: { platform, chat, range, date, allowSummary }
+  // returns { memory, applied, redacted, skipped[] } — never mutates its input
+  function applyDraft(memory, draft, ctx) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
+    if (m.log.some((e) => e.id === draft.batch)) return { memory: m, applied: false, redacted: false, skipped: ["already-applied"] };
+    let redacted = false;
+    const R = (s) => { const r = redact(s); if (r.changed) redacted = true; return r.text; };
+    const RL = (l) => l.map(R);
+    const skipped = [];
+    const date = ctx.date || "";
+    if (draft.summary) {
+      if (ctx.allowSummary) m.summary = { goal: R(draft.summary.goal), status: R(draft.summary.status), next: RL(draft.summary.next), open: RL(draft.summary.open) };
+      else skipped.push("summary");
+    }
+    if (draft.decisions) {
+      for (const id of draft.decisions.revoke) { const d = m.decisions.find((x) => x.id === id && x.status === "active"); if (d) { d.status = "revoked"; d.revokedOn = date; } }
+      let next = 1 + Math.max(0, ...m.decisions.map((d) => +d.id.slice(1) || 0));
+      for (const a of draft.decisions.add) {
+        const text = R(a.text);
+        if (m.decisions.some((d) => d.status === "active" && d.text === text)) continue; // same decision twice
+        if (a.replaces) { const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active"); if (old) { old.status = "revoked"; old.revokedOn = date; } }
+        m.decisions.push({ id: "d" + next++, text, source: a.source, date, status: "active", revokedOn: "", replaces: a.replaces });
+      }
+      m.decisions = m.decisions.slice(-LIMITS.decisions);
+    }
+    if (draft.constraints) {
+      const rm = new Set(draft.constraints.remove);
+      m.constraints = [...new Set([...m.constraints.filter((c) => !rm.has(c)), ...RL(draft.constraints.add)])].slice(-LIMITS.constraints);
+    }
+    m.log.push({ id: draft.batch, platform: PLATFORMS[ctx.platform] ? ctx.platform : "claude-code", chat: cleanStr(ctx.chat || "", 200), range: cleanStr(ctx.range || "", 40), date,
+      raised: RL(draft.entry.raised), decided: RL(draft.entry.decided), changed: RL(draft.entry.changed) });
+    m.log = m.log.slice(-LIMITS.log);
+    m.updated = date;
+    return { memory: m, applied: true, redacted, skipped };
+  }
+
+  // a model's reply (browser extension) → draft fields. The reply holds a JSON object between two markers.
+  const START = "⟦ذاكرة:بداية⟧", END = "⟦ذاكرة:نهاية⟧";
+  function parseModelReply(text) {
+    const i = text.indexOf(START), j = i < 0 ? -1 : text.indexOf(END, i + START.length);
+    if (i < 0 || j < 0) return { ok: false, error: "لم أجد الملخص في رد النموذج (العلامات مفقودة)" };
+    let body = text.slice(i + START.length, j).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    const a = body.indexOf("{"), b = body.lastIndexOf("}");
+    if (a < 0 || b < a) return { ok: false, error: "الملخص ليس JSON" };
+    try { return { ok: true, fields: JSON.parse(body.slice(a, b + 1)) }; }
+    catch (e) { return { ok: false, error: "الملخص ليس JSON صالحاً: " + e.message }; }
+  }
+
+  // ---------- rendering ----------
+  const bullets = (l) => l.map((x) => `- ${x}`).join("\n");
+  // decisions = what the user decided or approved; the assistant's unapproved suggestions are listed apart
+  const isDecision = (d) => d.status === "active" && d.source !== "assistant";
+  const isSuggestion = (d) => d.status === "active" && d.source === "assistant";
+  function renderSuggestions(m) {
+    const l = m.decisions.filter(isSuggestion);
+    return l.length ? l.map((d) => `- **${d.id}** ${d.text}${d.date ? ` _(${d.date})_` : ""}`).join("\n") : "";
+  }
+  function renderDecisions(m, withRevoked) {
+    const active = m.decisions.filter(isDecision);
+    let out = active.length ? active.map((d) => `- **${d.id}** ${d.text} _(${SOURCE_LABEL[d.source]}${d.date ? "، " + d.date : ""}${d.replaces ? "، يحل محل " + d.replaces : ""})_`).join("\n") : "لا قرارات سارية بعد.";
+    const revoked = m.decisions.filter((d) => d.status === "revoked");
+    if (withRevoked && revoked.length) out += "\n\n<details><summary>قرارات أُلغيت (" + revoked.length + ")</summary>\n\n" + revoked.map((d) => `- ~~${d.text}~~ _(أُلغي ${d.revokedOn || ""})_`).join("\n") + "\n\n</details>";
+    return out;
+  }
+  function renderPins(m) {
+    return m.pins.length ? m.pins.map((p) => `- **${p.name}** — النسخة ${p.version} · ${p.date} · بصمة ${p.sha.slice(0, 12)} · \`${p.path}\``).join("\n") + "\nالنص الكامل في الملف المذكور؛ عند استخدامه اقرأه وانسخه حرفياً."
+      : "لا توجد نصوص معتمدة بعد.";
+  }
+  function renderSummary(m) {
+    const s = m.summary, lines = [];
+    if (s.goal) lines.push(`- **الهدف:** ${s.goal}`);
+    if (s.status) lines.push(`- **الوضع الآن:** ${s.status}`);
+    if (s.next.length) lines.push(`- **الخطوة التالية:**\n${s.next.map((x) => `  - ${x}`).join("\n")}`);
+    if (s.open.length) lines.push(`- **أسئلة مفتوحة:**\n${s.open.map((x) => `  - ${x}`).join("\n")}`);
+    return lines.join("\n") || "لم تُكتب خلاصة بعد.";
+  }
+  function renderEntry(e) {
+    const parts = [`### ${PLATFORMS[e.platform] || e.platform}${e.chat ? " · " + e.chat : ""}${e.range ? " · الرسائل " + e.range : ""}${e.date ? " · " + e.date : ""}`];
+    if (e.raised.length) parts.push(`**ما طُرح:**\n${bullets(e.raised)}`);
+    if (e.decided.length) parts.push(`**ما تقرّر:**\n${bullets(e.decided)}`);
+    if (e.changed.length) parts.push(`**ما تغيّر:**\n${bullets(e.changed)}`);
+    return parts.join("\n");
+  }
+  // the human view of the whole memory (generated; edits belong in the JSON, through Claude)
+  function render(m) {
+    const sug = renderSuggestions(m);
+    const out = [`# ${m.title}`, "", `> يُولَّد تلقائياً من CONVERSATION_MEMORY.json — آخر تحديث: ${m.updated || "—"}. لا تعدّله يدوياً: يُعاد توليده عند كل حفظ، وتعديلك اليدوي يُحفظ في نسخة جانبية.`, "",
+      "## الخلاصة الحالية", renderSummary(m), "", "## القرارات السارية", renderDecisions(m, true), "",
+      ...(sug ? ["## مقترحات لم تُعتمد بعد", sug, ""] : []),
+      "## القيود والمتطلبات", m.constraints.length ? bullets(m.constraints) : "لا قيود مسجلة بعد.", "",
+      "## النصوص المعتمدة", renderPins(m), "", "## السجل", m.log.length ? m.log.map(renderEntry).join("\n\n") : "لا سجل بعد."];
+    if (m.archived) out.push("", `_(${m.archived} دفعة أقدم نُقلت إلى الأرشيف في .conversation-memory/archive/ للحفاظ على حجم الملف.)_`);
+    if (m.imported) out.push("", `## من الإصدار السابق (${m.imported.date})`, "", m.imported.text);
+    return out.join("\n") + "\n";
+  }
+  // the small view loaded into context at session start: current state first, then the newest log entries within budget
+  function renderCompact(m, budget = 5000) {
+    const sug = renderSuggestions(m);
+    const head = [`# ${m.title}`, "## الخلاصة الحالية", renderSummary(m), "## القرارات السارية", renderDecisions(m, false), ...(sug ? ["## مقترحات لم تُعتمد بعد", sug] : []),
+      "## القيود والمتطلبات", m.constraints.length ? bullets(m.constraints) : "لا قيود مسجلة بعد.", "## النصوص المعتمدة", renderPins(m)].join("\n");
+    let out = head.length > budget ? head.slice(0, budget) + "\n…(اقتُطع؛ الملف الكامل أدناه)" : head;
+    const entries = [];
+    for (let k = m.log.length - 1; k >= 0; k--) {
+      const r = renderEntry(m.log[k]);
+      if (out.length + entries.reduce((a, x) => a + x.length, 0) + r.length + 40 > budget) break;
+      entries.unshift(r);
+    }
+    if (entries.length) out += "\n## أحدث السجل\n" + entries.join("\n\n");
+    const hidden = m.log.length - entries.length;
+    if (hidden > 0 || m.imported) out += `\n\n(${hidden > 0 ? `${hidden} دفعة أقدم` : ""}${hidden > 0 && m.imported ? " و" : ""}${m.imported ? "محتوى الإصدار السابق" : ""} في CONVERSATION_MEMORY.md — اقرأه عند الحاجة فقط.)`;
+    return out;
+  }
+
+  // ---------- pins ----------
+  const slug = (n) => String(n || "").replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, " ").replace(/\[\s*conversation-memory\s*\]/gi, " ").replace(/\s+/g, " ").replace(/^[.\s]+|[.\s]+$/g, "").slice(0, 60);
+  const WINDOWS_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
+  const pinNameOk = (n) => { const s = slug(n); return !!s && s === String(n).trim().replace(/\s+/g, " ") && !WINDOWS_RESERVED.test(s); };
+  const pinPath = (name, version) => `CONVERSATION_PINS/${name}/v${version}.md`;
+  function upsertPin(m, pin) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.pins = out.pins.filter((p) => p.name !== pin.name); out.pins.push(pin); out.pins.sort((a, b) => (a.name < b.name ? -1 : 1)); return normalizeMemory(out); }
+
+  // extract the exact text that starts with `start` and ends with `end` from candidate sources (newest/most likely first).
+  // Rules: the first source with exactly one candidate wins; a source with several distinct candidates is ambiguous (error).
+  function extractVerbatim(sources, start, end) {
+    for (const src of sources) {
+      if (typeof src !== "string" || !src) continue;
+      const spans = new Set();
+      for (let i = src.indexOf(start); i >= 0 && spans.size < 10; i = src.indexOf(start, i + 1)) {
+        let e = src.indexOf(end, i + start.length);
+        if (e < 0) e = src.indexOf(end, i);
+        if (e >= 0) spans.add(src.slice(i, e + end.length));
+      }
+      if (spans.size === 1) return { ok: true, text: [...spans][0] };
+      if (spans.size > 1) return { ok: false, error: `في رسالة واحدة أكثر من نص يطابق البداية والنهاية (${spans.size}). اختر بداية ونهاية أدق` };
+    }
+    return { ok: false, error: "لم أجد نصاً في المحادثة يبدأ وينتهي بما كُتب. انسخ البداية والنهاية حرفياً" };
+  }
+
+  // keep the JSON under maxBytes: the oldest log entries move to an archive (returned for the writer to store), then the imported v0 text is cut
+  const utf8Len = (s) => { let n = 0; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); n += c < 0x80 ? 1 : c < 0x800 ? 2 : c >= 0xd800 && c < 0xdc00 ? (i++, 4) : 3; } return n; };
+  function trimForSize(memory, maxBytes) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
+    const archived = [];
+    while (utf8Len(serialize(m)) > maxBytes && m.log.length > 20) { const k = Math.max(1, Math.floor(m.log.length / 10)); archived.push(...m.log.splice(0, k)); }
+    if (utf8Len(serialize(m)) > maxBytes && m.imported) { archived.push({ id: "imported-v0", imported: m.imported }); m.imported = null; }
+    m.archived += archived.length;
+    return { memory: m, archived, fits: utf8Len(serialize(m)) <= maxBytes };
+  }
+
+  // a text from a v0.x Markdown file, kept read-only when migrating
+  function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: String(mdText).slice(0, LIMITS.imported) }; return out; }
+
+  return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len };
+});

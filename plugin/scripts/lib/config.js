@@ -1,0 +1,12 @@
+"use strict";
+// Settings. One place for every limit the hooks use.
+
+// ---------------- settings ----------------
+const EVERY = Math.min(100, Math.max(1, Math.floor(Number(process.env.CONV_MEMORY_EVERY)) || 5));
+const INJECT_BUDGET = 5000, CAPTURE_BUDGET = 12000, PART_CHARS = 40000, MAX_DRAFT = 300 * 1024, MAX_JSON = 4 * 1024 * 1024;
+const MAX_TRANSCRIPT = 50 * 1024 * 1024, MAX_SESSIONS = 50, KEEP_MSGS = 500, MAX_UNDONE = 2000, MAX_ATTEMPTS = 3, MAX_BACKUPS = 10;
+const TRIM_AT = 3 * 1024 * 1024, WLOCK_STALE = 15000;
+const LOCK_WAIT = 5000, LOCK_STALE = 60000, PIN_TURNS = 3, ANCHOR_MIN = 15, ANCHOR_MAX = 300;
+const CMD = "/conversation-memory:";
+
+module.exports = { EVERY, INJECT_BUDGET, CAPTURE_BUDGET, PART_CHARS, MAX_DRAFT, MAX_JSON, MAX_TRANSCRIPT, MAX_SESSIONS, KEEP_MSGS, MAX_UNDONE, MAX_ATTEMPTS, MAX_BACKUPS, TRIM_AT, WLOCK_STALE, LOCK_WAIT, LOCK_STALE, PIN_TURNS, ANCHOR_MIN, ANCHOR_MAX, CMD };

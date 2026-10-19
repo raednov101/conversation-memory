@@ -1,0 +1,7 @@
+{
+  "name": "conversation-memory",
+  "version": "1.0.2",
+  "description": "ذاكرة للمحادثات الطويلة: كل 5 رسائل يكتب Claude مسودة JSON ويتحقق منها النظام ويحفظها في CONVERSATION_MEMORY.json/.md داخل المشروع؛ نصوص معتمدة حرفية، ونسخ كامل قبل ضغط السياق، ومؤشر في شريط الحالة.",
+  "author": { "name": "Raed" },
+  "keywords": ["memory", "summary", "context", "long-conversation", "ذاكرة", "تلخيص"]
+}

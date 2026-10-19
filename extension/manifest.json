@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "ذاكرة المحادثة — ChatGPT و Claude",
+  "short_name": "ذاكرة المحادثة",
+  "version": "1.0.2",
+  "description": "كل 5 رسائل يلخّص المحادثة ويحفظها في مجلد مشروعك (CONVERSATION_MEMORY.json و .md)، بنفس صيغة بلقن Claude Code. يعمل في chatgpt.com و claude.ai.",
+  "minimum_chrome_version": "122",
+  "permissions": [
+    "storage",
+    "offscreen",
+    "contextMenus"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "src/memory-core.js",
+        "src/linking.js",
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "src/options.html",
+  "action": {
+    "default_title": "ذاكرة المحادثة",
+    "default_popup": "src/options.html?popup=1"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}
