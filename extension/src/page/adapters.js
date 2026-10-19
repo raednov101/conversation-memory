@@ -48,6 +48,11 @@
       composer: () => pick(["#prompt-textarea", "div.ProseMirror[contenteditable='true']", "textarea[name='prompt']", "form textarea"]),
       sendButton: () => pick(['[data-testid="send-button"]', 'button[aria-label*="Send" i]', 'button[aria-label*="إرسال"]']),
       title: () => document.title.replace(/\s*[-|]\s*ChatGPT\s*$/i, "").replace(/^ChatGPT(:.*)?$/i, "").trim(),
+      // a ChatGPT project: /g/g-p-<id>-<name>/… (its chats and its new-chat page)
+      scope: () => {
+        const m = location.pathname.match(/\/g\/(g-p-[a-z0-9]+)(?:-([^/]+))?/i);
+        return m ? { key: "chatgpt-" + m[1].toLowerCase(), name: m[2] ? decodeURIComponent(m[2]).replace(/-/g, " ") : "" } : null;
+      },
     },
     claude: {
       name: "Claude", platform: "claude-web",
@@ -63,6 +68,14 @@
       composer: () => pick(["div.ProseMirror[contenteditable='true']", "[contenteditable='true'][role='textbox']", "fieldset textarea"]),
       sendButton: () => pick(['button[aria-label*="Send" i]', 'button[aria-label*="إرسال"]']),
       title: () => document.title.replace(/\s*[-|]\s*Claude\s*$/i, "").replace(/^Claude$/i, "").trim(),
+      // a Claude project: its own page /project/<id>, or the project link shown in a chat (not the sidebar's list)
+      scope: () => {
+        const m = location.pathname.match(/^\/project\/([0-9a-f-]{8,64})/i);
+        if (m) return { key: "claude-" + m[1].toLowerCase(), name: document.title.replace(/\s*[-|]\s*Claude\s*$/i, "").trim() };
+        const a = [...document.querySelectorAll('a[href^="/project/"]')].find((x) => !x.closest("nav, aside, [data-testid*='sidebar' i]"));
+        const id = a && (a.getAttribute("href").match(/^\/project\/([0-9a-f-]{8,64})/i) || [])[1];
+        return id ? { key: "claude-" + id.toLowerCase(), name: (a.innerText || "").trim() } : null;
+      },
     },
   };
 

@@ -1,5 +1,5 @@
 "use strict";
-/* global MemoryCore */
+/* global MemoryCore, URL */
 function idb() {
   return new Promise((res, rej) => {
     const r = indexedDB.open("cm", 1);
@@ -20,12 +20,13 @@ const $ = (id) => document.getElementById(id);
 const inPopup = new URLSearchParams(location.search).has("popup");
 const openTab = () => { chrome.runtime.openOptionsPage(); window.close(); };
 
-// the memory's own sections mean nothing until a folder is chosen and writable: hide them until then
 if (inPopup) document.body.classList.add("popup");
-// the memory tools mean nothing until a folder is chosen and writable; the toolbar popup shows only folder and settings
+// which project's memory the tools below show (inside the browser each site project has its own; a linked folder is one)
+const scopeSel = () => ($("scopeSel").hidden ? "general" : $("scopeSel").value || "general");
+const fsOp = (op, args) => chrome.runtime.sendMessage({ cmd: "fs", op, args: { scope: scopeSel(), ...(args || {}) } }).catch((err) => ({ ok: false, error: String(err) }));
 function showMemorySections(ready) {
   $("tools").hidden = !ready || inPopup;
-  const c = $("folderChip"); c.textContent = ready ? "✓ جاهز" : "يلزم مجلد"; c.className = "chip " + (ready ? "ok" : "warn");
+  const c = $("folderChip"); c.textContent = ready ? "✓ تعمل" : "يلزم إذن"; c.className = "chip " + (ready ? "ok" : "warn");
 }
 document.querySelector(".tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
@@ -35,21 +36,54 @@ document.querySelector(".tabs").addEventListener("click", (e) => {
 async function refresh() {
   const h = await kv("root");
   const s = $("folderState");
-  if (!h) { s.textContent = "لم يُختر بعد"; s.className = "state warn"; $("grant").hidden = true; showMemorySections(false); return; }
+  $("unlink").hidden = !h;
+  if (!h) {   // the default: inside the browser, nothing to choose
+    s.textContent = "تلقائياً داخل المتصفح، ولكل مشروع في Claude أو ChatGPT ذاكرته."; s.className = "state ok";
+    $("grant").hidden = true; $("pick").textContent = "📁 ربط بمجلد على الجهاز (اختياري)";
+    showMemorySections(true); await loadScopes();
+    if (!inPopup) { loadMemory(); loadBackups(); }
+    return;
+  }
+  $("scopes").hidden = true; $("scopeSel").hidden = true; $("pick").textContent = "📁 تغيير المجلد";
   const p = await h.queryPermission({ mode: "readwrite" });
   showMemorySections(p === "granted");
-  if (p === "granted" && !inPopup && !mem) { loadMemory(); loadBackups(); }
-  s.textContent = p === "granted" ? `«${h.name}»` : `«${h.name}» — يلزم منح الإذن`;
+  if (p === "granted" && !inPopup) { loadMemory(); loadBackups(); }
+  s.textContent = p === "granted" ? `في مجلد «${h.name}» على جهازك.` : `مجلد «${h.name}» — يلزم منح الإذن.`;
   s.className = "state " + (p === "granted" ? "ok" : "warn");
   $("grant").hidden = p === "granted";
+}
+// the projects saved inside the browser: each can be downloaded as a readable file
+async function loadScopes() {
+  const r = await fsOp("listScopes", { scope: "general" });
+  const ul = $("scopes"), sel = $("scopeSel"), keep = sel.value;
+  ul.textContent = ""; sel.textContent = "";
+  const list = (r && r.ok && r.list) || [];
+  ul.hidden = !list.length; sel.hidden = list.length < 2;
+  for (const x of list) {
+    const dl = document.createElement("button"); dl.type = "button"; dl.className = "small"; dl.textContent = "⬇️ تنزيل";
+    dl.onclick = async () => {
+      const e = await fsOp("exportMd", { scope: x.scope });
+      if (!e.ok) { dl.textContent = "تعذّر"; return; }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([e.text], { type: "text/markdown" }));
+      a.download = `ذاكرة - ${String(e.name).replace(/[\\/:*?"<>|]/g, " ").slice(0, 60)}.md`; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+    const li = document.createElement("li"), t = document.createElement("div");
+    t.className = "txt"; t.innerHTML = "<b></b> <span class=muted></span>";
+    t.firstChild.textContent = x.name; t.lastChild.textContent = `— ${x.decisions} قرار، ${x.log} دفعة`;
+    li.append(t, dl); ul.append(li);
+    const o = document.createElement("option"); o.value = x.scope; o.textContent = x.name; sel.append(o);
+  }
+  if (keep && list.some((x) => x.scope === keep)) sel.value = keep;
 }
 $("pick").addEventListener("click", async () => {
   if (inPopup) return openTab();
   try {
     const h = await window.showDirectoryPicker({ id: "cm-project", mode: "readwrite" });
+    await h.requestPermission({ mode: "readwrite" });
     await kv("root", h);
     await chrome.storage.local.set({ folderAt: Date.now() });   // open chats re-read the folder (and its project id) at once
-    await h.requestPermission({ mode: "readwrite" });
   } catch (e) {
     if (e.name !== "AbortError") { const st = $("folderState"); st.textContent = "تعذّر اختيار المجلد: " + e.message; st.className = "state err"; return; }
   }
@@ -60,7 +94,12 @@ $("grant").addEventListener("click", async () => {
   const h = await kv("root"); if (h) await h.requestPermission({ mode: "readwrite" }).catch(() => {});
   refresh();
 });
-
+$("scopeSel").addEventListener("change", () => { mem = null; openPin = null; loadMemory(); loadBackups(); });
+$("unlink").addEventListener("click", async () => {
+  const db = await idb(); await new Promise((res) => { const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").delete("root"); tx.oncomplete = res; tx.onerror = res; });
+  await chrome.storage.local.set({ folderAt: Date.now() });
+  refresh();
+});
 async function loadSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
   $("every").value = settings.every || 5;
@@ -82,9 +121,9 @@ loadSettings(); refresh();
 // earlier versions of the memory, newest first; restoring one keeps the current version as a backup
 async function loadBackups() {
   const ol = $("backups");
-  const r = await chrome.runtime.sendMessage({ cmd: "fs", op: "listBackups" }).catch(() => null);
+  const r = await fsOp("listBackups");
   ol.textContent = "";
-  if (!r || !r.ok || !r.list.length) { const li = document.createElement("li"); li.className = "muted"; li.textContent = r && !r.ok ? "اختر مجلد المشروع وامنح الإذن أولاً." : "لا توجد نسخ سابقة بعد."; ol.append(li); return; }
+  if (!r || !r.ok || !r.list.length) { const li = document.createElement("li"); li.className = "muted"; li.textContent = r && !r.ok ? "امنح إذن الكتابة للمجلد أولاً." : "لا توجد نسخ سابقة بعد."; ol.append(li); return; }
   r.list.slice(0, 10).forEach((b, i) => {
     const li = document.createElement("li"), span = document.createElement("span"), btn = document.createElement("button");
     span.textContent = `${b.when} — ${b.decisions} قرار، ${b.log} دفعة${b.goal ? ` — «${b.goal}»` : ""}`;
@@ -94,14 +133,12 @@ async function loadBackups() {
 }
 $("backups").addEventListener("click", async (e) => {
   const n = e.target && e.target.dataset && e.target.dataset.n; if (!n) return;
-  const r = await chrome.runtime.sendMessage({ cmd: "fs", op: "restore", args: { n: +n } }).catch((err) => ({ ok: false, error: String(err) }));
+  const r = await fsOp("restore", { n: +n });
   $("restoreMsg").textContent = r.ok ? `استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.` : `لم يُسترجع شيء: ${r.error}`;
   loadBackups();
 });
-if (!inPopup) loadBackups();
 
 // ---------- the memory as read from the folder (for the pinned texts) ----------
-const fsOp = (op, args) => chrome.runtime.sendMessage({ cmd: "fs", op, args }).catch((err) => ({ ok: false, error: String(err) }));
 const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) e.append(k); return e; };
 const btn = (text, onclick, title) => el("button", { type: "button", textContent: text, onclick, title: title || "" });
 let mem = null;
@@ -151,5 +188,4 @@ async function showPin(name, keep) {
   if (!keep) { if (vs.length > 1) showDiff(vs, vs[vs.length - 2].v, vs[vs.length - 1].v); else if (vs.length) showDiff(vs, vs[0].v, vs[0].v); }
 }
 
-if (!inPopup) loadMemory();
 chrome.storage.onChanged.addListener((ch) => { if (ch.folderAt && !inPopup) { loadMemory(); loadBackups(); } });

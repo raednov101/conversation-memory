@@ -36,3 +36,7 @@ test("the share button is offered wherever the folder is ready, never without on
   assert.ok(describe({ phase: "new", fsSt, fsOk: true }, auto, (e) => e, 3).btns.some(([, a]) => a === "share"));
   assert.ok(!describe({ phase: "nofolder", fsSt: { ok: true, folder: null }, fsOk: false }, auto, (e) => e, 3).btns.some(([, a]) => a === "share"));
 });
+test("after the extension is updated, an open page asks to be refreshed instead of asking for a folder", () => {
+  const r = describe({ phase: "new", fsSt: { ok: false, error: "inactive" }, fsOk: false }, auto, (e) => (e === "inactive" ? "حدّث الصفحة" : e), 3);
+  assert.equal(r.text, "🧠 🔄 حدّث الصفحة"); assert.ok(!r.btns.length, "no folder button");
+});

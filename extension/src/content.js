@@ -42,6 +42,20 @@
   const costOf = (st, w, replyLen) => { const c = { req: w.reqLen || 0, rep: replyLen || 0 }; const t = st.costTotal || { n: 0, chars: 0 }; return { lastCost: c, costTotal: { n: t.n + 1, chars: t.chars + c.req + c.rep } }; };
   const saved = (st, w, note, replyLen) => Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen));
 
+  // ---------- which project of the site this chat belongs to (each has its own memory) ----------
+  // Known from the address or the page; a chat started from a project's page keeps that project once created.
+  const GENERAL = { key: "general", name: "" };
+  let newPageScope = null;
+  async function currentScope(id, loaded) {
+    const s = A.scope ? A.scope() : null;
+    if (!id) { newPageScope = s ? { ...s, at: Date.now() } : null; return s || GENERAL; }
+    const k = `scope:${chatKey(id)}`, known = await B.get(k, null);
+    if (known && known.key) return known;
+    const sc = s || (newPageScope && Date.now() - newPageScope.at < 120000 ? newPageScope : null);
+    if (sc || loaded) await B.set(k, { key: (sc || GENERAL).key, name: (sc || GENERAL).name || "" });   // remembered once the page is read
+    return sc || GENERAL;
+  }
+
   // ---------- proof that you created a chat here (see linking.js): a real send from a new-chat page ----------
   let sentOnNew = null;
   function noteSend(e) {
@@ -57,7 +71,10 @@
     busy = true;
     try {
       const id = A.chatId();
-      const fsSt = await folderStatus(force.folder);
+      const sc = await currentScope(id, A.messages().length > 0);
+      const moved = sc.key !== B.scope;
+      if (moved) { B.scope = sc.key; B.scopeName = sc.name || ""; }
+      const fsSt = await folderStatus(force.folder || moved);
       const fsOk = !!(fsSt.ok && fsSt.permission === "granted" && PID);
       if (!id) { view = { phase: "new", fsSt, fsOk }; return; }
       if (!fsOk) { view = { phase: "nofolder", fsSt, fsOk }; return; }

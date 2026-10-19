@@ -9,7 +9,10 @@ const nonce = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.
 const today = () => new Date().toLocaleString("sv-SE").slice(0, 16);
 const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(".", "-").slice(0, 19);
 
-// ---------- stored folder handle ----------
+// ---------- where the memory lives ----------
+// By default inside the browser (the extension's private file system: no folder to choose, no permission to grant),
+// one folder per project of the site (a Claude or ChatGPT project; "general" for chats outside any project).
+// If the user links a folder on their computer (to share the memory with Claude Code), everything goes there instead.
 function idb() {
   return new Promise((res, rej) => {
     const r = indexedDB.open("cm", 1);
@@ -17,13 +20,24 @@ function idb() {
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
 }
+async function kvSet(k, v) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction("kv", "readwrite"); const q = tx.objectStore("kv").put(v, k); q.onsuccess = () => res(true); q.onerror = () => rej(q.error); }); }
 async function kvGet(k) { const db = await idb(); return new Promise((res, rej) => { const q = db.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+let SCOPE = "general", SCOPE_NAME = "";   // set for each request (requests run one at a time, under the "cm-write" lock)
+const cleanScope = (s) => (/^[a-z0-9-]{1,80}$/.test(String(s || "")) ? String(s) : "general");
+async function browserRoot(scope = SCOPE) { return dir(await navigator.storage.getDirectory(), ["projects", scope]); }
 async function root() {
   const h = await kvGet("root");
-  if (!h) return { err: "noFolder" };
+  if (!h) return { h: await browserRoot(), inBrowser: true };
   if ((await h.queryPermission({ mode: "readwrite" })) !== "granted") return { err: "needPermission" };
   return { h };
 }
+async function scopeNames() { return (await kvGet("scopeNames")) || {}; }
+async function rememberScopeName() {
+  if (!SCOPE_NAME) return;
+  const n = await scopeNames(); if (n[SCOPE] === SCOPE_NAME) return;
+  n[SCOPE] = SCOPE_NAME.slice(0, 80); await kvSet("scopeNames", n);
+}
+const scopeLabel = async (scope) => (scope === "general" ? "محادثات خارج المشاريع" : (await scopeNames())[scope] || scope);
 
 // ---------- fs helpers ----------
 async function dir(base, parts, create = true) { let d = base; for (const p of parts) d = await d.getDirectoryHandle(p, { create }); return d; }
@@ -222,7 +236,11 @@ async function pinWrite(h, name, text, lk) {
 const ops = {
   async status() {
     const h = await kvGet("root");
-    if (!h) return { ok: true, folder: null, permission: "none" };
+    if (!h) {
+      await rememberScopeName();
+      try { const b = await browserRoot(); return { ok: true, folder: await scopeLabel(SCOPE), inBrowser: true, scope: SCOPE, permission: "granted", projectId: await projectId(b) }; }
+      catch (e) { return { ok: false, error: "تعذّر الحفظ داخل المتصفح: " + String((e && e.message) || e) }; }
+    }
     const permission = await h.queryPermission({ mode: "readwrite" });
     if (permission !== "granted") return { ok: true, folder: h.name, permission };
     try { return { ok: true, folder: h.name, permission, projectId: await projectId(h) }; }
@@ -320,6 +338,27 @@ const ops = {
     if (!C.pinNameOk(name)) return { ok: false, error: "اسم غير صالح" };
     return { ok: true, name, versions: await versionsOf(h, name) };
   },
+  // the projects saved inside the browser, for the settings page
+  async listScopes() {
+    const out = [], names = await scopeNames();
+    let d; try { d = await dir(await navigator.storage.getDirectory(), ["projects"]); } catch { return { ok: true, list: [], linked: !!(await kvGet("root")) }; }
+    for await (const [scope, fh] of d.entries()) {
+      if (fh.kind !== "directory") continue;
+      const cur = await readMemory(fh).catch(() => null);
+      if (!cur || !cur.exists) continue;
+      out.push({ scope, name: scope === "general" ? "محادثات خارج المشاريع" : names[scope] || scope, decisions: cur.memory.decisions.filter((x) => x.status === "active").length, log: cur.memory.log.length, updated: cur.memory.updated });
+    }
+    out.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+    return { ok: true, list: out, linked: !!(await kvGet("root")) };
+  },
+  // the readable memory of one project, to download as a file
+  async exportMd() {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    const cur = await readMemory(h);
+    if (cur.bad) return { ok: false, error: cur.bad };
+    if (!cur.exists) return { ok: false, error: "لا توجد ذاكرة محفوظة لهذا المشروع بعد" };
+    return { ok: true, text: C.render(cur.memory), name: await scopeLabel(SCOPE) };
+  },
   // bring back version v of a pinned text: saved as a new version, the older ones stay
   async pinRestore({ name, v }) {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
@@ -334,7 +373,8 @@ const ops = {
 
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   if (!msg || msg.target !== "offscreen" || !Object.prototype.hasOwnProperty.call(ops, msg.op)) return;
-  navigator.locks.request("cm-write", () => ops[msg.op](msg.args || {}))
+  const args = msg.args || {};
+  navigator.locks.request("cm-write", () => { SCOPE = cleanScope(args.scope); SCOPE_NAME = String(args.scopeName || ""); return ops[msg.op](args); })
     .then(reply, (e) => reply({ ok: false, error: e && e.name === "NotAllowedError" ? "needPermission" : String((e && e.message) || e) }));
   return true;
 });

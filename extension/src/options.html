@@ -77,14 +77,16 @@
 
   <div class="grid">
     <section class="card">
-      <h2>مجلد المشروع</h2>
-      <p style="margin:0">الحالة: <span id="folderState" class="state">…</span></p>
+      <h2>أين تُحفظ الذاكرة</h2>
+      <p style="margin:0"><span id="folderState" class="state">…</span></p>
+      <ul id="scopes" class="items" hidden></ul>
       <div class="row">
-        <button id="pick" class="primary" type="button">📁 اختيار المجلد</button>
-        <button id="grant" type="button" hidden>🔓 منح إذن الكتابة</button>
+        <button id="grant" class="primary" type="button" hidden>🔓 منح إذن الكتابة</button>
+        <button id="pick" type="button">📁 ربط بمجلد على الجهاز (اختياري)</button>
+        <button id="unlink" type="button" hidden>↩️ العودة للحفظ داخل المتصفح</button>
       </div>
-      <details><summary>ماذا يُكتب فيه؟</summary>
-        <p><code>CONVERSATION_MEMORY.json</code> المرجع، و<code>.md</code> نسخة للقراءة، و<code>CONVERSATION_PINS/</code> النصوص المعتمدة، و<code>.conversation-memory/</code> نص المحادثات والنسخ الاحتياطية (مستثنى من git). عند طلب الإذن اختر «السماح في كل زيارة».</p>
+      <details><summary>متى أربط مجلداً؟</summary>
+        <p>فقط إن أردت أن تشترك الإضافة وبلقن Claude Code في ذاكرة مشروع واحد. يُكتب فيه <code>CONVERSATION_MEMORY.json</code> و<code>.md</code> والنصوص المعتمدة، وعند طلب الإذن اختر «السماح في كل زيارة».</p>
       </details>
     </section>
 
@@ -102,6 +104,7 @@
   </div>
 
   <section class="card tools" id="tools" hidden>
+    <div class="field" style="margin-top:0"><label for="scopeSel">المشروع</label><select id="scopeSel" hidden></select></div>
     <nav class="tabs" role="tablist">
       <button type="button" data-tab="pinSec" class="on">📌 النصوص المعتمدة</button>
       <button type="button" data-tab="bkSec">↩️ النسخ السابقة</button>

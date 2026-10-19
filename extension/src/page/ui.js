@@ -32,6 +32,7 @@
     const s = v.st || {};
     let cls = "idle", text = "🧠 الذاكرة", info = "";
     const btns = [];
+    if (v.fsSt && v.fsSt.error === "inactive") { cls = "warn"; text = "🧠 🔄 حدّث الصفحة"; info = esc(why("inactive")) + "."; return { cls, text, info, btns }; }
     if (!v.fsSt || !v.fsSt.ok || !v.fsSt.folder) { cls = "warn"; text = "🧠 اختر مجلد المشروع"; info = v.fsSt && !v.fsSt.ok && v.fsSt.error ? esc(why(v.fsSt.error)) : "لم يُحدَّد مجلد المشروع بعد."; btns.push(["📁 اختيار المجلد", "options"]); }
     else if (v.fsSt.permission === "granted" && !v.fsOk) { cls = "warn"; text = "🧠 ⚠️ المجلد"; info = `تعذّر تجهيز مجلد المشروع «${esc(v.fsSt.folder)}»${v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : ""}.`; btns.push(["⚙️ الإعدادات", "options"]); }
     else if (!v.fsOk) { cls = "warn"; text = "🧠 🔓 امنح الإذن"; info = `يلزم إذن الكتابة في «${esc(v.fsSt.folder)}».`; btns.push(["🔓 منح الإذن", "options"]); }
@@ -41,7 +42,7 @@
         `<br><span class="muted">اربطها إن كانت عن هذا المشروع؛ تُلخَّص حينها من أولها (${v.userCount} ${v.userCount === 1 ? "رسالة" : "رسائل"} حتى الآن).</span>`;
       btns.push(["🔗 اربط بالمشروع", "link"], SHARE);
     }
-    else if (v.phase === "new") { text = "🧠 محادثة جديدة"; info = `المجلد: ${esc(v.fsSt.folder)}`; btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE); }
+    else if (v.phase === "new") { text = "🧠 محادثة جديدة"; info = v.fsSt.inBrowser ? `الذاكرة: ${esc(v.fsSt.folder)}` : `المجلد: ${esc(v.fsSt.folder)}`; btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE); }
     else if (v.phase === "chat") {
       const since = Math.max(0, v.userCount - s.summarizedUpTo), manual = settings.mode === "manual";
       const prog = manual ? `${since} · يدوي` : `${Math.min(since, settings.every)}/${settings.every}`;

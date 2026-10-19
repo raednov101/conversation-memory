@@ -103,10 +103,26 @@ with sync_playwright() as pw:
     if os.path.exists(plugin_core):
         ok(core_ext == open(plugin_core).read(), "the extension's memory-core.js is byte-identical to the plugin's")
 
-    print("— no folder chosen —")
-    p0 = ctx.new_page(); p0.goto(BASE + page("chatgpt", "/c/nofolder/", "x - ChatGPT"))
-    ok("اختر مجلد" in (wait(lambda: pill(p0) if "اختر" in pill(p0) else None, 10) or ""), "without a folder the indicator asks you to choose one")
+    print("— nothing to set up: the memory is kept inside the browser, one per project of the site —")
+    p0 = ctx.new_page(); p0.goto(BASE + new_chat("chatgpt", "/c/inbrowser/", "داخل المتصفح - ChatGPT"))
+    ok("اختر" not in (wait(lambda: pill(p0) if "🧠" in pill(p0) and "…" not in pill(p0) else None, 10) or "اختر"), "with no folder chosen, it works at once (no folder to pick)", pill(p0))
+    for i in range(1, 6): say(p0, f"داخل المتصفح {i}")
+    j0 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "general/CONVERSATION_MEMORY.json")), 20) or {}
+    ok(j0.get("log") and j0["log"][0]["range"] == "1–5", "…and the summary is saved in the browser, under «chats outside projects»", j0)
     p0.close()
+    p0 = ctx.new_page(); p0.goto(BASE + new_chat("chatgpt", "/g/g-p-abc123-cafe/c/inproject/", "مشروع - ChatGPT"))
+    wait(lambda: "🧠" in pill(p0), 10)
+    for i in range(1, 6): say(p0, f"داخل مشروع {i}")
+    j1 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-g-p-abc123/CONVERSATION_MEMORY.json")), 20) or {}
+    ok(j1.get("log") and len((json.loads(read("projects", "general/CONVERSATION_MEMORY.json") or "{}")).get("log", [])) == 1, "a chat inside a ChatGPT project gets that project's own memory", j1)
+    p0.close()
+    opt.reload(); opt.wait_for_load_state()
+    names = wait(lambda: (lambda t: t if "cafe" in t and "خارج المشاريع" in t else None)(opt.locator("#scopes").inner_text()), 8) or opt.locator("#scopes").inner_text()
+    ok("cafe" in names and "خارج المشاريع" in names and opt.locator("#scopes button").count() == 2, "the settings page lists both projects, each with a download button", names)
+    with opt.expect_download() as dl:
+        opt.locator("#scopes li").filter(has_text="cafe").locator("button").click()
+    md = open(dl.value.path(), encoding="utf-8").read()
+    ok("داخل مشروع" in md or "## السجل" in md, "…and the download is that project's readable memory", md[:200])
 
     for platform, name, pid in (("chatgpt", "ChatGPT", "chatgpt"), ("claude", "Claude", "claude-web")):
         print(f"— {name}: counter, full transcript, JSON summary every 5 —")
