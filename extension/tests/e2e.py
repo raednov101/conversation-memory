@@ -23,14 +23,14 @@ json.dump(m, open(os.path.join(build, "manifest.json"), "w"), ensure_ascii=False
 # ---- fake sites ----
 site = tempfile.mkdtemp(prefix="cm-site-")
 shutil.copy(os.path.join(EXT, "tests", "mock.js"), site)
-def page(platform, path, title, pre=(), timeout=0, after=""):
+def page(platform, path, title, pre=(), timeout=0, after="", variant=""):
     d = os.path.join(site, path.strip("/")); os.makedirs(d, exist_ok=True)
-    cid = "prompt-textarea" if platform == "chatgpt" else "composer"
+    cid = ("composer-2026" if variant else "prompt-textarea") if platform == "chatgpt" else "composer"
     def msg(role, text):
         if platform == "chatgpt": return f'<div data-message-author-role="{role}">{text}</div>'
         return f'<div data-testid="user-message">{text}</div>' if role == "user" else f'<div data-is-streaming="false" class="font-claude-response">{text}</div>'
     thread = "".join(msg("user", f"رسالة قديمة {i}") + msg("assistant", f"رد قديم {i}") for i in pre)
-    to = (f' data-cm-test-timeout="{timeout}"' if timeout else "") + (f' data-cm-test-after-send="{after}"' if after else "")
+    to = (f' data-cm-test-timeout="{timeout}"' if timeout else "") + (f' data-cm-test-after-send="{after}"' if after else "") + (f' data-cm-test-variant="{variant}"' if variant else "")
     open(os.path.join(d, "index.html"), "w").write(f"""<!doctype html><html data-cm-test-platform="{platform}"{to}><head><meta charset="utf-8"><title>{title}</title></head>
 <body><main id="thread">{thread}</main><div id="{cid}" class="ProseMirror" contenteditable="true"></div><div id="bar"></div><script src="/mock.js"></script></body></html>""")
     return path
@@ -535,6 +535,22 @@ with sync_playwright() as pw:
     ok(wait(lambda: (lambda m: m and any(x["range"] == "6–11" for x in m["log"]))(mem(proj)), 20), "manual mode: the button summarizes all waiting messages (6–11)", [x["range"] for x in (mem(proj) or {}).get("log", [])])
     opt.evaluate("async () => { const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, mode: 'auto' } }); }")
     p.close()
+
+    print("— the page structures seen on the real sites (October 2026) —")
+    for platform, name in (("chatgpt", "ChatGPT"), ("claude", "Claude")):
+        proj = f"proj-real-{platform}"; use_folder(proj)
+        path = "/c/real-2026/" if platform == "chatgpt" else "/chat/real-2026/"
+        p = ctx.new_page(); p.goto(BASE + new_chat(platform, path, "هيكل حقيقي - Claude" if platform == "claude" else "هيكل حقيقي", variant="2026"))
+        wait(lambda: "🧠" in pill(p), 10)
+        for i in range(1, 6): say(p, f"رسالة الهيكل الحقيقي {i}")
+        ok(wait(lambda: (lambda m: m and m["log"])(mem(proj)), 20), f"{name} (2026 structure): read, counted and summarized", pill(p))
+        raw = read(proj, f".conversation-memory/chats/{platform}-real-2026.md") or ""
+        ok("رسالة الهيكل الحقيقي 5" in raw and "قال ChatGPT" not in raw and "Claude responded" not in raw and "just now" not in raw,
+           f"{name} (2026 structure): the transcript holds the messages only, not screen-reader headings or times", raw[-300:])
+        p.wait_for_timeout(4500)   # Claude's "just now" becomes "1 minute ago" meanwhile
+        ok("0/5" in pill(p) and "سيُعاد تلخيص" not in panel_text(p), f"{name} (2026 structure): a changing time label is not mistaken for a regenerated reply", panel_text(p))
+        ok((mem(proj) or {}).get("log", [{}])[0].get("chat") == "هيكل حقيقي", f"{name} (2026 structure): the chat title is read without the site name", (mem(proj) or {}).get("log", [{}])[0].get("chat"))
+        p.close()
 
     print("— a page the extension can't read says so —")
     use_folder("proj-chatgpt")

@@ -2,12 +2,37 @@
 (() => {
   const P = document.documentElement.dataset.cmTestPlatform;
   const thread = document.getElementById("thread");
-  const composer = document.getElementById("prompt-textarea") || document.getElementById("composer");
+  const composer = document.getElementById("prompt-textarea") || document.getElementById("composer") || document.querySelector(".ProseMirror");
   const bar = document.getElementById("bar");
   window.__delay = 500;
   window.__summaryOverride = null;
   window.__sent = [];
+  // "2026": the structures seen on the real sites in October 2026 — ChatGPT's search-unit turns with a screen-reader
+  // heading, Claude's assistant-message with a heading, markdown and a relative time that changes ("just now" → "1 min")
+  const V = document.documentElement.dataset.cmTestVariant === "2026";
+  let turn = 0;
+  function addMsg2026(role, text) {
+    const el = document.createElement("div");
+    const setText = (t) => {
+      if (P === "chatgpt") {
+        if (role === "user") el.innerHTML = '<div data-user-message-bubble="true"><div dir="auto"></div></div>';
+        else el.innerHTML = '<h4 class="sr-only" data-conversation-role="assistant" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">قال ChatGPT:</h4><div><div class="md"></div></div>';
+        el.querySelector(role === "user" ? "[dir=auto]" : ".md").innerText = t;
+      } else if (role === "user") { el.innerText = t; }
+      else {
+        el.innerHTML = '<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)"></h2><div><div data-cds="Prose"><div data-perf-reply-text="" class="standard-markdown"></div></div></div><div><button aria-label="Copy"></button><time data-cds="RelativeTime">just now</time></div>';
+        el.querySelector("h2").textContent = "Claude responded: " + t.slice(0, 40);
+        el.querySelector(".standard-markdown").innerText = t;
+        setTimeout(() => { const tm = el.querySelector("time"); if (tm) tm.textContent = "1 minute ago"; }, 3000);
+      }
+    };
+    if (P === "chatgpt") el.setAttribute("data-content-search-unit-key", `fallback-turn-${role === "user" ? ++turn : turn}:${role === "user" ? 0 : 1}:${role}`);
+    else if (role === "user") el.setAttribute("data-testid", "user-message");
+    else { el.setAttribute("data-testid", "assistant-message"); el.setAttribute("data-is-streaming", "true"); }
+    setText(text); el.__set = setText; thread.appendChild(el); return el;
+  }
   function addMsg(role, text) {
+    if (V) return addMsg2026(role, text);
     const el = document.createElement("div");
     if (P === "chatgpt") el.setAttribute("data-message-author-role", role);
     else if (role === "user") el.setAttribute("data-testid", "user-message");
@@ -16,8 +41,8 @@
   }
   function button(kind) {
     const b = document.createElement("button");
-    if (kind === "send") { if (P === "chatgpt") b.setAttribute("data-testid", "send-button"); else b.setAttribute("aria-label", "Send message"); b.onclick = () => window.__send(); }
-    else { if (P === "chatgpt") b.setAttribute("data-testid", "stop-button"); else b.setAttribute("aria-label", "Stop response"); }
+    if (kind === "send") { if (V && P === "chatgpt") b.setAttribute("aria-label", "إرسال"); else if (P === "chatgpt") b.setAttribute("data-testid", "send-button"); else b.setAttribute("aria-label", "Send message"); b.onclick = () => window.__send(); }
+    else { if (V && P === "chatgpt") b.setAttribute("aria-label", "إيقاف"); else if (P === "chatgpt") b.setAttribute("data-testid", "stop-button"); else b.setAttribute("aria-label", "Stop response"); }
     b.textContent = kind; return b;
   }
   bar.appendChild(button("send"));
@@ -49,7 +74,7 @@
     bar.innerHTML = ""; bar.appendChild(button("stop"));
     setTimeout(() => {
       const text = reply(t);
-      if (P === "chatgpt") addMsg("assistant", text); else { a.innerText = text; a.setAttribute("data-is-streaming", "false"); }
+      if (P === "chatgpt") addMsg("assistant", text); else if (V) { a.__set(text); a.setAttribute("data-is-streaming", "false"); } else { a.innerText = text; a.setAttribute("data-is-streaming", "false"); }
       bar.innerHTML = ""; bar.appendChild(button("send"));
     }, window.__delay);
   };

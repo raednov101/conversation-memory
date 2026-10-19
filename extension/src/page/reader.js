@@ -11,7 +11,7 @@
     const turns = [], hk = [], empty = [];
     let n = 0, inHK = false;
     for (const m of adapter.messages()) {
-      const text = textOf(m.el);
+      const text = (m.text != null ? String(m.text) : textOf(m.el)).replace(/\r\n/g, "\n").trim();
       if (m.role === "user") {
         if (text.startsWith(HK)) { inHK = true; hk.push({ text, reply: null }); continue; }
         inHK = false; n++; turns.push({ role: "user", n, text });

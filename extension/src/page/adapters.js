@@ -7,6 +7,22 @@
   const inOrder = (els) => els.filter((e, i) => !els.some((o, j) => j !== i && o.contains(e)))
     .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
 
+  // the text of a message without what screen readers or the toolbar add ("قال ChatGPT:", "Claude responded:", "just now"):
+  // those change over time and would look like an edited message
+  const SKIP = ".sr-only, time, button, [data-cds='RelativeTime'], [aria-hidden='true']";
+  const visible = (el) => (el.innerText || el.textContent || "");
+  function cleanText(el) {
+    if (!el.querySelector(SKIP)) return visible(el);
+    const parts = [];
+    (function walk(e) { for (const c of e.children) { if (c.matches(SKIP)) continue; if (c.querySelector(SKIP)) walk(c); else parts.push(visible(c)); } })(el);
+    return parts.filter((t) => t.trim()).join("\n");
+  }
+  // all outermost matches of the first selector that finds any inside el, joined; else the cleaned text of el
+  function partsText(el, sels) {
+    for (const s of sels) { const f = [...el.querySelectorAll(s)]; if (f.length) return inOrder(f).map(visible).join("\n"); }
+    return cleanText(el);
+  }
+
   function detect() {
     const h = location.hostname;
     if (h === "chatgpt.com" || h === "chat.openai.com") return "chatgpt";
@@ -16,24 +32,32 @@
   }
 
   const ADAPTERS = {
+    // ChatGPT has served several page structures at once (by account, experiment and sign-in): all are read
     chatgpt: {
       name: "ChatGPT", platform: "chatgpt",
-      chatId: () => (location.pathname.match(/\/c\/([\w-]+)/) || [])[1],
-      messages: () => inOrder([...document.querySelectorAll("[data-message-author-role]")])
-        .map((el) => ({ role: el.getAttribute("data-message-author-role"), el })).filter((m) => m.role === "user" || m.role === "assistant"),
-      generating: () => !!pick(['[data-testid="stop-button"]', 'button[aria-label*="Stop" i]', 'button[aria-label*="إيقاف"]']),
-      composer: () => pick(["#prompt-textarea", "div.ProseMirror[contenteditable='true']", "form textarea"]),
+      chatId: () => (location.pathname.match(/\/u?c\/([\w-]+)/) || [])[1],
+      messages: () => {
+        const role = new Map();
+        for (const e of document.querySelectorAll("[data-message-author-role]")) role.set(e, e.getAttribute("data-message-author-role"));
+        for (const e of document.querySelectorAll("li[data-message-role]")) role.set(e, e.getAttribute("data-message-role"));
+        for (const e of document.querySelectorAll("[data-content-search-unit-key$=':user'], [data-content-search-unit-key$=':assistant']")) role.set(e, e.getAttribute("data-content-search-unit-key").split(":").pop());
+        return inOrder([...role.keys()]).map((el) => ({ role: role.get(el), el })).filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ ...m, text: m.role === "user" ? partsText(m.el, ["[data-user-message-bubble] [dir='auto']", "[data-user-message-bubble]"]) : partsText(m.el, ["[data-assistant-markdown-root]", ".markdown"]) }));
+      },
+      generating: () => !!pick(['[data-testid="stop-button"]', 'button[aria-label*="Stop" i]', 'button[aria-label*="إيقاف"]', "li[data-message-role='assistant'][data-assistant-content-started]:not([data-message-complete])"]),
+      composer: () => pick(["#prompt-textarea", "div.ProseMirror[contenteditable='true']", "textarea[name='prompt']", "form textarea"]),
       sendButton: () => pick(['[data-testid="send-button"]', 'button[aria-label*="Send" i]', 'button[aria-label*="إرسال"]']),
-      title: () => document.title.replace(/\s*[-|]\s*ChatGPT\s*$/i, "").replace(/^ChatGPT$/i, "").trim(),
+      title: () => document.title.replace(/\s*[-|]\s*ChatGPT\s*$/i, "").replace(/^ChatGPT(:.*)?$/i, "").trim(),
     },
     claude: {
       name: "Claude", platform: "claude-web",
       chatId: () => (location.pathname.match(/\/chat\/([\w-]+)/) || [])[1],
       messages: () => {
         const u = [...document.querySelectorAll('[data-testid="user-message"]')];
-        const a = [...document.querySelectorAll("[data-is-streaming], .font-claude-response")];
+        const a = [...document.querySelectorAll('[data-testid="assistant-message"], [data-is-streaming], .font-claude-response')];
         const role = new Map(); u.forEach((e) => role.set(e, "user")); a.forEach((e) => { if (!role.has(e)) role.set(e, "assistant"); });
-        return inOrder([...role.keys()]).map((el) => ({ role: role.get(el), el }));
+        return inOrder([...role.keys()]).map((el) => ({ role: role.get(el), el,
+          text: role.get(el) === "user" ? cleanText(el) : partsText(el, ["[data-perf-reply-text]", ".standard-markdown", ".font-claude-response"]) }));
       },
       generating: () => !!pick(['[data-is-streaming="true"]', 'button[aria-label*="Stop" i]', 'button[aria-label*="إيقاف"]']),
       composer: () => pick(["div.ProseMirror[contenteditable='true']", "[contenteditable='true'][role='textbox']", "fieldset textarea"]),
