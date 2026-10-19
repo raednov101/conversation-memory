@@ -258,9 +258,20 @@ test("robustness: garbage input, missing HOME dir, crafted large files stay fast
 
 test("64 simultaneous messages: none lost", async () => {
   const P = tmp();
-  const one = (i) => new Promise((res) => { const c = spawn(process.execPath, [S, "prompt"], { cwd: CWD, env: ENV }); c.stdin.end(JSON.stringify({ session_id: "same", cwd: P, prompt: "x", prompt_id: "c" + i })); c.on("close", res); });
-  await Promise.all(Array.from({ length: 64 }, (_, i) => one(i)));
-  prompt(P, "same"); assert.equal(sess(P, "same").count, 65);
+  // each run reports how it ended, so a shortfall says whether a hook failed to start, crashed, or the plugin lost a message
+  const one = (i) => new Promise((res) => {
+    let out = "", err = "";
+    const c = spawn(process.execPath, [S, "prompt"], { cwd: CWD, env: { ...ENV, CM_DEBUG: "1" } });
+    c.stdout.on("data", (d) => (out += d)); c.stderr.on("data", (d) => (err += d));
+    c.on("error", (e) => res({ i, code: "spawn:" + e.code, out, err }));
+    c.on("close", (code, sig) => res({ i, code: sig || code, out, err }));
+    c.stdin.end(JSON.stringify({ session_id: "same", cwd: P, prompt: "x", prompt_id: "c" + i }));
+  });
+  const runs = await Promise.all(Array.from({ length: 64 }, (_, i) => one(i)));
+  prompt(P, "same");
+  const bad = runs.filter((r) => r.code !== 0 || r.err);
+  const queued = runs.filter((r) => r.out.includes("سُجّلت الرسالة")).length;
+  assert.equal(sess(P, "same").count, 65, `abnormal runs: ${JSON.stringify(bad.map((r) => ({ i: r.i, code: r.code, err: r.err.slice(0, 300), out: r.out.slice(0, 200) })))}; queued while busy: ${queued}`);
 });
 
 // ---------------- fixes from the independent review ----------------

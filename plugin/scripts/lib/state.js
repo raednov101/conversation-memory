@@ -19,7 +19,7 @@ function lock() {
     const token = `${process.pid} ${os.hostname()} ${Date.now()} ${nonce(4)}`;
     try { const fd = fs.openSync(f, "wx", 0o600); fs.writeSync(fd, token); fs.closeSync(fd); lockFile = f; lockToken = token; return true; }
     catch (e) {
-      if (e.code !== "EEXIST") return false;
+      if (e.code !== "EEXIST") { if (process.env.CM_DEBUG) process.stderr.write(`lock: ${e.code}\n`); return false; }
       const s = lst(f); if (!s) continue;
       if (s.isSymbolicLink() || !s.isFile()) return false;
       let pid = 0, host = "", ts = 0, seen = null;
@@ -79,7 +79,8 @@ function saveState(state) {
   }
   state.sessions = Object.fromEntries(sorted.slice(0, MAX_SESSIONS));
   const json = JSON.stringify(state);
-  try { writeAtomic(path.join(PRIV, "state.json"), json); writeAtomic(path.join(PRIV, "state.json.bak"), json); } catch {}
+  try { writeAtomic(path.join(PRIV, "state.json"), json); writeAtomic(path.join(PRIV, "state.json.bak"), json); }
+  catch (e) { if (process.env.CM_DEBUG) process.stderr.write(`saveState: ${e.code || e.message}\n`); }
 }
 function session(state, id = sid) {
   const s = state.sessions[id] || (state.sessions[id] = normSession(null));
@@ -107,6 +108,6 @@ function writeStatus(s) {
 }
 
 // ---------------- events (queued when the lock can't be taken; replayed later) ----------------
-function queueEvent(ev) { try { writeAtomic(path.join(PRIV, "events", `${Date.now()}-${nonce(4)}.json`), JSON.stringify(ev)); return true; } catch { return false; } }
+function queueEvent(ev) { try { writeAtomic(path.join(PRIV, "events", `${Date.now()}-${nonce(4)}.json`), JSON.stringify(ev)); return true; } catch (e) { if (process.env.CM_DEBUG) process.stderr.write(`queueEvent: ${e.code || e.message}\n`); return false; } }
 
 module.exports = { lock, unlock, normSession, loadState, saveState, session, writeStatus, queueEvent, loadCfg, saveCfg };
