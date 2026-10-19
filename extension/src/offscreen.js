@@ -94,14 +94,17 @@ async function readMemory(r) {
 async function takeWriteLock(r) {
   const d = await dataDir(r), me = nonce(), until = Date.now() + 3000;
   while (Date.now() < until) {
-    let fh = null; try { fh = await d.getFileHandle("write.lock"); } catch {}
-    if (fh) {
-      const f = await fh.getFile(), at = +String(await f.text()).trim().split(" ")[1] || f.lastModified;
-      if (Date.now() - at < WLOCK_STALE) { await sleep(50); continue; }
-    }
-    await writeVerified(d, "write.lock", `${me} ${Date.now()}`);
+    // the other writer may be replacing the lock file while we read it: that read fails, which only means "busy, look again"
+    let held = false;
+    try {
+      const f = await (await d.getFileHandle("write.lock")).getFile(), at = +String(await f.text()).trim().split(" ")[1] || f.lastModified;
+      held = Date.now() - at < WLOCK_STALE;
+    } catch (e) { if (e && e.name !== "NotFoundError") { await sleep(50); continue; } }
+    if (held) { await sleep(50); continue; }
+    try { await writeVerified(d, "write.lock", `${me} ${Date.now()}`); } catch { await sleep(50); continue; }
     await sleep(40);
-    if (String(await readText(d, "write.lock")).startsWith(me + " ")) return { d, me };
+    let mine = false; try { mine = String(await readText(d, "write.lock")).startsWith(me + " "); } catch {}
+    if (mine) return { d, me };
   }
   return null;
 }

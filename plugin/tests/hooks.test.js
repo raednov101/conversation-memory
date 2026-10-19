@@ -237,6 +237,17 @@ test("lock: live holder respected (event queued, user told), dead or ancient hol
   const t0 = Date.now(); prompt(P, "a"); assert.ok(Date.now() - t0 < 4000 && sess(P, "a").count === 3, "pid reused (1 is alive) but older than 60 s → cleared at once, not after the 5 s wait");
 });
 
+test("lock: plain messages queued while busy are all counted later, with the project's settings (Windows CI found these lost)", () => {
+  const P = tmp(); prompt(P, "q", "/conversation-memory:settings every 3");
+  fs.writeFileSync(path.join(PRIV(P), "lock"), `${process.pid} ${os.hostname()} ${Date.now()}`);
+  for (let i = 0; i < 4; i++) assert.match(prompt(P, "q", `رسالة ${i}`).systemMessage, /سُجّلت الرسالة/);
+  fs.unlinkSync(path.join(PRIV(P), "lock"));
+  const j = prompt(P, "q");
+  assert.equal(sess(P, "q").count, 5, "the 4 queued messages and this one");
+  assert.ok(requests(j).length >= 1, "and the summary they made due is asked for");
+  assert.equal(fs.readdirSync(path.join(PRIV(P), "events")).length, 0, "no event left behind");
+});
+
 test("robustness: garbage input, missing HOME dir, crafted large files stay fast", () => {
   assert.equal(run("prompt", "garbage")._code, 0); assert.equal(run("stop", "")._code, 0); assert.equal(run("pretool", "{}")._code, 0);
   const P = tmp(); fs.writeFileSync(path.join(P, "CONVERSATION_MEMORY.json"), JSON.stringify({ log: [{ id: "x", raised: ["eyJ-".repeat(100000)] }] }));

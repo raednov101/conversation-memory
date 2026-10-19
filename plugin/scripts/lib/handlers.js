@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const C = require("../../core/memory-core.js");
 const { INJECT_BUDGET, CAPTURE_BUDGET, PART_CHARS, MAX_DRAFT, MAX_ATTEMPTS, ANCHOR_MIN, ANCHOR_MAX } = require("./config");
-const { lst, nonce, today, fullHash } = require("./util");
+const { lst, nonce, today, fullHash, int } = require("./util");
 const { readSafe, unlinkSafe } = require("./fsx");
 const { input, projectDir, sid, sid8, P, HOME, PRIV, notes, pubSafe, inboxOk } = require("./context");
 const { loadState, session, writeStatus, loadCfg, saveCfg } = require("./state");
@@ -22,7 +22,7 @@ function onPrompt(state, out) {
     if (r.err) notes.push(`⚠️ ذاكرة المحادثة: ${r.err}.`);
     else if (r.changed) { try { saveCfg(r.cfg); cfg = r.cfg; notes.push(`⚙️ ذاكرة المحادثة: ${cfg.mode === "manual" ? "التلخيص يدوي الآن (بالأمر /conversation-memory:save)" : `التلخيص التلقائي كل ${cfg.every} رسائل`}.`); } catch { notes.push("⚠️ ذاكرة المحادثة: تعذّر حفظ الإعداد."); } }
   }
-  const changed = recordPrompt(s, input.prompt_id, fullHash(input.prompt || ""), cmd, cfg);
+  const changed = recordPrompt(s, input.prompt_id, fullHash(input.prompt || ""), cmd, cfg) || replayedDue;
   const mem = readMemory(), ctx = [];
   const pending = s.batches.filter((b) => b.status === "pending" && (b.kind !== "recovered" || readCapture(b.id)));
   if (changed && pending.length) {
@@ -275,16 +275,23 @@ function onPreTool(out) {
   out.hookSpecificOutput = { hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: "conversation-memory: مسودة الذاكرة المطلوبة" };
 }
 
-// events queued while another hook held the lock
+// events queued while another hook held the lock (a batch they made due is asked for in this same turn)
+let replayedDue = false;
 function replayEvents(state) {
   let files = []; try { files = fs.readdirSync(path.join(PRIV, "events")).filter((f) => /^\d+-[a-f0-9]{8}\.json$/.test(f)).sort(); } catch { return; }
+  const cfg = loadCfg();
   for (const f of files) {
     const p = path.join(PRIV, "events", f);
     try {
       const r = readSafe(p, 64 * 1024); const ev = r.text ? JSON.parse(r.text) : null;
-      if (ev && ev.type === "prompt") recordPrompt(session(state, ev.sid), ev.pid, ev.h, ev.cmd || {});
+      if (ev && ev.type === "prompt" && recordPrompt(session(state, ev.sid), ev.pid, ev.h, ev.cmd || {}, cfg) && ev.sid === sid) replayedDue = true;
       else if (ev && ev.type === "capture") capture(session(state, ev.sid), ev.reason, ev.tp, ev.sid);
-    } catch {}
+    } catch (e) {
+      // a message that could not be counted now is kept and tried again by the next hook — never silently dropped
+      // (only a file older than a day, which can never succeed, is given up)
+      if (process.env.CM_DEBUG) process.stderr.write(String(e && e.stack) + "\n");
+      if (Date.now() - (int(f.split("-")[0]) || 0) < 86400000) continue;
+    }
     unlinkSafe(p);
   }
 }
