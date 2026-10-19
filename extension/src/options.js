@@ -20,11 +20,15 @@ const $ = (id) => document.getElementById(id);
 const inPopup = new URLSearchParams(location.search).has("popup");
 const openTab = () => { chrome.runtime.openOptionsPage(); window.close(); };
 
+// the memory's own sections mean nothing until a folder is chosen and writable: hide them until then
+function showMemorySections(ready) { for (const id of ["fixSec", "pinSec", "bkSec"]) $(id).hidden = !ready || (inPopup && id !== "bkSec"); }
 async function refresh() {
   const h = await kv("root");
   const s = $("folderState");
-  if (!h) { s.textContent = "لم يُختر بعد"; s.className = "state warn"; $("grant").hidden = true; return; }
+  if (!h) { s.textContent = "لم يُختر بعد"; s.className = "state warn"; $("grant").hidden = true; showMemorySections(false); return; }
   const p = await h.queryPermission({ mode: "readwrite" });
+  showMemorySections(p === "granted");
+  if (p === "granted" && !inPopup && !mem) { loadMemory(); loadBackups(); }
   s.textContent = p === "granted" ? `«${h.name}» — جاهز ✓` : `«${h.name}» — يلزم منح الإذن`;
   s.className = "state " + (p === "granted" ? "ok" : "warn");
   $("grant").hidden = p === "granted";

@@ -186,8 +186,27 @@
     let body = text.slice(i + START.length, j).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     const a = body.indexOf("{"), b = body.lastIndexOf("}");
     if (a < 0 || b < a) return { ok: false, error: "الملخص ليس JSON" };
-    try { return { ok: true, fields: JSON.parse(body.slice(a, b + 1)) }; }
-    catch (e) { return { ok: false, error: "الملخص ليس JSON صالحاً: " + e.message }; }
+    const raw = body.slice(a, b + 1);
+    try { return { ok: true, fields: JSON.parse(raw) }; }
+    catch (e) {
+      // seen on claude.ai: JSON written outside a code block is typeset — straight quotes become “ ”, and long strings
+      // get line breaks. Undo exactly that, and accept the reply only if it then parses.
+      try { return { ok: true, fields: JSON.parse(repairTypeset(raw)), repaired: true }; }
+      catch { return { ok: false, error: "الملخص ليس JSON صالحاً: " + e.message }; }
+    }
+  }
+  function repairTypeset(t) {
+    t = t.replace(/[\u201C\u201D\u201E\u201F\u2033\uFF02]/g, '"');
+    let out = "", inStr = false, esc = false;
+    for (const ch of t) {
+      if (inStr) {
+        if (esc) { esc = false; out += ch; continue; }
+        if (ch === "\\") { esc = true; out += ch; continue; }
+        if (ch === '"') inStr = false;
+        out += ch === "\n" || ch === "\r" || ch === "\t" ? " " : ch;
+      } else { if (ch === '"') inStr = true; out += ch; }
+    }
+    return out;
   }
 
   // ---------- rendering ----------

@@ -161,3 +161,14 @@ test("diff: changed, removed and added lines; huge inputs stay fast", () => {
   const big = Array.from({ length: 3000 }, (_, i) => "سطر " + i).join("\n");
   const t0 = Date.now(); const d = C.diffLines(big, big + "\nجديد"); assert.ok(Date.now() - t0 < 5000); assert.equal(d.filter((x) => x.op === "+").length, 1);
 });
+
+test("model reply typeset by claude.ai (curly quotes, line breaks inside strings) is repaired, and only if it then parses", () => {
+  // the exact shape captured from claude.ai on 2026-10-19, when the model wrote the JSON outside a code block
+  const real = "⟦ذاكرة:بداية⟧{“summary”:{“goal”:”تصميم هوية لمقهى اسمه «سُكّر وهيل»”,”status”:”اعتُمد اللون الأساسي (أخضر زيتوني \n#556B2F) والشعار «قهوتك… بلمسة هيل وحلاوة سُكّر»\",”next”:[\"استكمال بقية عناصر الهوية\"],”open”:[\"الألوان الثانوية\",”الخطوط\"]},”decisions”:{“add”:[{“text”:”اسم المقهى «سُكّر وهيل»”,”source”:”user”},{“text”:”اللون الأساسي أخضر زيتوني \n#556B2F”,”source”:”user”}],”revoke”:[]},”constraints”:{“add”:[\"الرد بسطر واحد فقط\"],”remove”:[]},”entry”:{“raised”:[\"تصميم هوية مقهى «سُكّر وهيل»\"],”decided”:[\"اللون الأساسي \n#556B2F\",”اعتماد الشعار «قهوتك… بلمسة هيل وحلاوة سُكّر»”],”changed”:[]}}⟦ذاكرة:نهاية⟧";
+  const r = C.parseModelReply(real);
+  assert.ok(r.ok, r.error); assert.equal(r.repaired, true);
+  assert.equal(r.fields.decisions.add[1].text, "اللون الأساسي أخضر زيتوني  #556B2F");
+  assert.ok(C.validateDraft({ ...r.fields, batch: "ext-x-1-6-aaaaaaaa", base: "" }, "ext-x-1-6-aaaaaaaa").ok, "and it validates as a draft");
+  assert.equal(C.parseModelReply(C.START + '{"a": 1}' + C.END).repaired, undefined, "a clean reply is taken as it is");
+  assert.equal(C.parseModelReply(C.START + "{“a”: “b” “c”}" + C.END).ok, false, "still broken after the repair → refused with the reason");
+});
