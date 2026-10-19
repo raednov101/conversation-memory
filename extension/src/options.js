@@ -21,7 +21,17 @@ const inPopup = new URLSearchParams(location.search).has("popup");
 const openTab = () => { chrome.runtime.openOptionsPage(); window.close(); };
 
 // the memory's own sections mean nothing until a folder is chosen and writable: hide them until then
-function showMemorySections(ready) { for (const id of ["fixSec", "pinSec", "bkSec"]) $(id).hidden = !ready || (inPopup && id !== "bkSec"); }
+if (inPopup) document.body.classList.add("popup");
+// the memory tools mean nothing until a folder is chosen and writable; the toolbar popup shows only folder and settings
+function showMemorySections(ready) {
+  $("tools").hidden = !ready || inPopup;
+  const c = $("folderChip"); c.textContent = ready ? "✓ جاهز" : "يلزم مجلد"; c.className = "chip " + (ready ? "ok" : "warn");
+}
+document.querySelector(".tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tab]"); if (!b) return;
+  for (const x of document.querySelectorAll(".tabs button")) x.classList.toggle("on", x === b);
+  for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === b.dataset.tab);
+});
 async function refresh() {
   const h = await kv("root");
   const s = $("folderState");
@@ -29,7 +39,7 @@ async function refresh() {
   const p = await h.queryPermission({ mode: "readwrite" });
   showMemorySections(p === "granted");
   if (p === "granted" && !inPopup && !mem) { loadMemory(); loadBackups(); }
-  s.textContent = p === "granted" ? `«${h.name}» — جاهز ✓` : `«${h.name}» — يلزم منح الإذن`;
+  s.textContent = p === "granted" ? `«${h.name}»` : `«${h.name}» — يلزم منح الإذن`;
   s.className = "state " + (p === "granted" ? "ok" : "warn");
   $("grant").hidden = p === "granted";
 }
@@ -143,9 +153,11 @@ function renderMemory() {
   const entries = m.log.slice(-15).reverse();
   if (!entries.length) lg.append(el("li", { className: "muted", textContent: "السجل فارغ." }));
   for (const e of entries) {
-    const head = `${MemoryCore.PLATFORMS[e.platform] || e.platform}${e.chat ? " · " + e.chat : ""}${e.range ? " · الرسائل " + e.range : ""}${e.date ? " · " + e.date : ""}`;
+    // no "·" next to a number (it reads as a zero in Arabic text): parts are separated by a long dash, the date kept left-to-right
+    const range = (e.range || "").split(/[–-]/), where = [e.chat, range.length === 2 ? `الرسائل من ${range[0]} إلى ${range[1]}` : e.range].filter(Boolean).join(" — ");
     const first = e.raised[0] || e.decided[0] || e.changed[0] || "";
-    lg.append(el("li", {}, el("div", { className: "txt" }, el("b", { textContent: head }), el("br"), el("span", { className: "muted", textContent: first })),
+    const meta = el("span", { className: "muted" }, where + (e.date ? " — " : ""), e.date ? el("bdi", { dir: "ltr", textContent: e.date }) : "");
+    lg.append(el("li", {}, el("div", { className: "txt" }, el("b", { textContent: MemoryCore.PLATFORMS[e.platform] || e.platform }), " ", meta, el("br"), el("span", { textContent: first })),
       el("div", { className: "acts" }, btn("🗑️ حذف الدفعة", () => applyFix({ log: { remove: [e.id] } })))));
   }
   renderPins();
@@ -200,5 +212,5 @@ async function showPin(name, keep) {
   if (!keep) { if (vs.length > 1) showDiff(vs, vs[vs.length - 2].v, vs[vs.length - 1].v); else if (vs.length) showDiff(vs, vs[0].v, vs[0].v); }
 }
 
-if (inPopup) { $("fixSec").hidden = true; $("pinSec").hidden = true; } else loadMemory();
+if (!inPopup) loadMemory();
 chrome.storage.onChanged.addListener((ch) => { if (ch.folderAt && !inPopup) { loadMemory(); loadBackups(); } });

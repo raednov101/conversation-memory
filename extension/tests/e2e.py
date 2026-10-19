@@ -487,6 +487,7 @@ with sync_playwright() as pw:
     ok(len(ls(proj, ".conversation-memory/backups")) >= 8, "every correction left a backup", len(ls(proj, ".conversation-memory/backups")))
 
     print("— pinned texts: versions, comparison, restore —")
+    opt.locator(".tabs button[data-tab=pinSec]").click()
     opt.locator("#pins li").filter(has_text="الشعار").locator("text=🕘 السجل والمقارنة").click()
     ok(wait(lambda: opt.locator("#pinVers li").count() == 2, 8), "the history lists both versions", opt.locator("#pinHist").inner_text())
     dt = opt.locator("#diff").inner_text()

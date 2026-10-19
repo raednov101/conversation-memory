@@ -2,108 +2,157 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ذاكرة المحادثة — الإعدادات</title>
 <style>
-  :root{--fg:#1f2328;--muted:#57606a;--line:#d0d7de;--bg:#fff;--soft:#f6f8fa;--ok:#1a7f37;--warn:#9a6700;--err:#cf222e;--accent:#0969da}
-  @media (prefers-color-scheme:dark){:root{--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--bg:#0d1117;--soft:#161b22;--ok:#3fb950;--warn:#d29922;--err:#f85149;--accent:#4493f8}}
-  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;min-width:340px}
-  main{max-width:560px;margin:0 auto;padding:20px 16px}
-  h1{font-size:18px;margin:0 0 4px} .sub{color:var(--muted);margin:0 0 18px;font-size:13px}
-  section{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--soft)}
-  h2{font-size:14px;margin:0 0 8px}
-  button{font:inherit;padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  .state{font-weight:600}.ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
-  label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0}
-  select,input{font:inherit;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
-  input[type=number]{width:70px} input[type=checkbox]{width:18px;height:18px}
-  .muted{color:var(--muted);font-size:12px} code{font-size:12px}
+  /* IBM Plex Sans Arabic, bundled with the extension (SIL Open Font License, fonts/OFL.txt) — nothing is loaded from the network */
+  @font-face{font-family:"PlexAr";font-weight:400;src:url(../fonts/plex-arabic-400.woff2) format("woff2")}
+  @font-face{font-family:"PlexAr";font-weight:700;src:url(../fonts/plex-arabic-700.woff2) format("woff2")}
+  :root{--bg1:#F3F6FC;--bg2:#E6ECF8;--card:#FFFFFF;--line:#D9E0EE;--fg:#0B1B3F;--muted:#5B6787;--soft:#F1F4FA;
+    --primary:#1E3991;--primary2:#0952A8;--gold:#A8761F;--ok:#1A7F37;--warn:#9A6700;--err:#C62828;--add:#1A7F37;--del:#C62828}
+  @media (prefers-color-scheme:dark){:root{--bg1:#05072B;--bg2:#00144F;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.10);--fg:#EAF0FF;
+    --muted:#9AA7C7;--soft:rgba(255,255,255,.04);--primary:#1E3991;--primary2:#0952A8;--gold:#C9922F;--ok:#4CC38A;--warn:#E3B341;--err:#FF6B6B;--add:#4CC38A;--del:#FF8A8A}}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--fg);font:14px/1.7 "PlexAr",system-ui,"Segoe UI",Tahoma,sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2)) fixed}
+  main{max-width:760px;margin:0 auto;padding:22px 16px 28px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,var(--primary),var(--primary2));box-shadow:0 6px 18px rgba(9,82,168,.35)}
+  h1{font-size:19px;margin:0;font-weight:700}
+  .sub{margin:0;color:var(--muted);font-size:12.5px}
+  .chip{font-size:12.5px;font-weight:700;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);white-space:nowrap}
+  .chip.ok{color:var(--ok)}.chip.warn{color:var(--warn)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:640px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;backdrop-filter:blur(6px)}
+  h2{font-size:14px;margin:0 0 8px;color:var(--gold);font-weight:700}
+  h3{font-size:13px;margin:14px 0 4px;font-weight:700}
+  .muted{color:var(--muted);font-size:12.5px}
+  .state{font-weight:700}.state.ok{color:var(--ok)}.state.warn{color:var(--warn)}.state.err{color:var(--err)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  button{font:inherit;font-size:13px;padding:6px 12px;border-radius:9px;border:1px solid var(--line);background:var(--soft);color:var(--fg);cursor:pointer}
+  button:hover{border-color:var(--primary2)}
+  button.primary{background:linear-gradient(135deg,var(--primary),var(--primary2));border-color:transparent;color:#fff;font-weight:700}
+  .field{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0}
+  select,input,textarea{font:inherit;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--fg)}
+  input[type=number]{width:64px;text-align:center}
+  .check{display:flex;align-items:center;gap:8px;margin:8px 0 0;cursor:pointer}
+  .check input{width:17px;height:17px;accent-color:var(--primary2)}
+  details{margin-top:8px}
+  summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+  details p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+  code{font-size:11.5px;direction:ltr;unicode-bidi:isolate}
+  .tools{margin-top:12px}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:-4px -4px 10px;padding:0 4px 8px;overflow-x:auto}
+  .tabs button{border:0;background:none;color:var(--muted);font-weight:700;padding:6px 10px;border-radius:8px}
+  .tabs button.on{color:var(--fg);background:var(--soft);box-shadow:inset 0 -2px 0 var(--gold)}
+  .pane{display:none}.pane.on{display:block}
+  .items{list-style:none;margin:0;padding:0}
+  .items li{border-top:1px solid var(--line);padding:8px 0;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+  .items li:first-child{border-top:0}
+  .items .txt{flex:1;overflow-wrap:anywhere}
+  .items .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:55%}
+  .items button,.small{padding:3px 9px;font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:0 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-inline-start:4px}
+  .tag.sug{color:var(--gold);border-color:var(--gold)}
+  textarea{width:100%;min-height:46px;resize:vertical}
+  .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media (max-width:640px){.sumgrid{grid-template-columns:1fr}}
+  .sumgrid label{font-size:12.5px;color:var(--muted)}
+  .diff{margin:6px 0 0;padding:8px;border-radius:8px;background:var(--soft);border:1px solid var(--line);font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto}
+  .diff .del{color:var(--del);text-decoration:line-through}.diff .add{color:var(--add)}
+  .msg{margin:0 0 8px;font-size:13px}.msg:empty{display:none}.msg button{margin-inline-start:6px}
   .backups{margin:0;padding:0 18px 0 0}.backups li{margin:6px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}
-  .backups button{padding:4px 10px;font-size:13px}
-  .items{list-style:none;margin:0;padding:0}.items li{border-top:1px solid var(--line);padding:8px 0;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
-  .items li:first-child{border-top:0}.items .txt{flex:1;overflow-wrap:anywhere}.items .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:52%}
-  .items button,.small{padding:3px 8px;font-size:12px}
-  .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-inline-start:4px}
-  .tag.sug{color:var(--warn);border-color:var(--warn)}
-  textarea{font:inherit;width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-height:54px}
-  h3{font-size:13px;margin:12px 0 4px}
-  .diff{margin:6px 0 0;padding:8px;border-radius:6px;background:var(--bg);border:1px solid var(--line);font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto;direction:rtl}
-  .diff .del{color:var(--err);text-decoration:line-through}.diff .add{color:var(--ok)}
-  .msg{min-height:1.4em}.msg button{margin-inline-start:6px}
+  footer{margin-top:12px}
+  body.popup main{padding:12px;min-width:340px}body.popup .grid{grid-template-columns:1fr}body.popup footer{display:none}
 </style>
 </head>
 <body>
 <main>
-  <h1>🧠 ذاكرة المحادثة</h1>
-  <p class="sub">يعمل في chatgpt.com و claude.ai. الملفات تُحفظ في مجلد مشروعك بنفس صيغة بلقن Claude Code، فيمكن أن يشترك الاثنان في مجلد واحد.</p>
-
-  <section>
-    <h2>مجلد المشروع</h2>
-    <p>الحالة: <span id="folderState" class="state">…</span></p>
-    <button id="pick" class="primary">📁 اختيار مجلد المشروع</button>
-    <button id="grant" hidden>🔓 منح إذن الكتابة</button>
-    <p class="muted">عند منح الإذن اختر «السماح في كل زيارة» إن ظهر لك، حتى لا يُطلب منك كل مرة.<br>
-      يُكتب فيه: <code>CONVERSATION_MEMORY.json</code> (المصدر) و<code>CONVERSATION_MEMORY.md</code> (نسخة للقراءة تُولَّد منه)، و<code>CONVERSATION_PINS/</code>، و<code>.conversation-memory/</code> (نص المحادثات الكامل، ونسخ احتياطية؛ مستثنى من git).</p>
-  </section>
-
-  <section>
-    <h2>الحفظ</h2>
-    <label>لخّص كل <span><input id="every" type="number" min="1" max="50"> رسائل</span></label>
-    <label>الطريقة
-      <select id="mode">
-        <option value="auto">تلقائي: يطلب الملخص من النموذج عند الاستحقاق</option>
-        <option value="manual">يدوي: يظهر زر «لخّص واحفظ» فقط</option>
-      </select>
-    </label>
-    <label>اربط المحادثات الجديدة بالمشروع تلقائياً <input id="autoLink" type="checkbox"></label>
-    <p class="muted">المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة 🧠 «🔗 اربط بالمشروع»، حتى لا يختلط بالمشروع نقاشٌ لا يخصه.</p>
-    <p class="muted">في الوضع التلقائي ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» عندما تكون خانة الكتابة فارغة والنموذج متوقفاً، ومعها خلاصة الذاكرة الحالية ليحدّثها، وتلتقط رده (JSON) وتتحقق منه قبل الحفظ. هذه الرسائل لا تُحتسب ضمن رسائلك ولا تُحفظ في نص المحادثة. نص المحادثة الكامل يُحفظ بعد كل رد في الوضعين.</p>
-    <p id="saved" class="muted"></p>
-  </section>
-
-  <section id="fixSec">
-    <h2>تصحيح الذاكرة</h2>
-    <p class="muted">صحّح ما حُفظ خطأً، أو اعتمد اقتراحاً، أو ألغِ قراراً لم يعد سارياً، أو احذف معلومة خاطئة أو حساسة. كل تغيير تُحفظ قبله نسخة احتياطية، ويمكن التراجع عنه بزر واحد.</p>
-    <p id="fixMsg" class="msg" role="status"></p>
-    <h3>الخلاصة الحالية</h3>
-    <label style="display:block">الهدف<textarea id="sGoal" rows="2"></textarea></label>
-    <label style="display:block">الوضع الآن<textarea id="sStatus" rows="2"></textarea></label>
-    <button id="sSave" type="button" class="small">حفظ الخلاصة</button>
-    <h3>القرارات السارية والمقترحات</h3>
-    <ul id="decisions" class="items"><li class="muted">…</li></ul>
-    <h3>القيود</h3>
-    <ul id="constraints" class="items"><li class="muted">…</li></ul>
-    <h3>السجل (أحدث 15 دفعة)</h3>
-    <ul id="log" class="items"><li class="muted">…</li></ul>
-  </section>
-
-  <section id="pinSec">
-    <h2>النصوص المعتمدة</h2>
-    <p class="muted">كل تعديل لنص معتمد يُحفظ نسخة جديدة، ولا تُحذف النسخ السابقة. قارن بين نسختين، أو أعد نصاً إلى نسخة سابقة (يُحفظ نسخةً جديدة).</p>
-    <ul id="pins" class="items"><li class="muted">…</li></ul>
-    <div id="pinHist" hidden>
-      <h3 id="pinTitle"></h3>
-      <ul id="pinVers" class="items"></ul>
-      <p class="muted" id="diffLabel"></p>
-      <div id="diff" class="diff" dir="auto"></div>
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">🧠</div>
+      <div><h1>ذاكرة المحادثة</h1><p class="sub">لمحادثاتك في ChatGPT وClaude، في مجلد مشروعك</p></div>
     </div>
-    <p id="pinMsg" class="msg" role="status"></p>
+    <span id="folderChip" class="chip">…</span>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>مجلد المشروع</h2>
+      <p style="margin:0">الحالة: <span id="folderState" class="state">…</span></p>
+      <div class="row">
+        <button id="pick" class="primary" type="button">📁 اختيار المجلد</button>
+        <button id="grant" type="button" hidden>🔓 منح إذن الكتابة</button>
+      </div>
+      <details><summary>ماذا يُكتب فيه؟</summary>
+        <p><code>CONVERSATION_MEMORY.json</code> المرجع، و<code>.md</code> نسخة للقراءة، و<code>CONVERSATION_PINS/</code> النصوص المعتمدة، و<code>.conversation-memory/</code> نص المحادثات والنسخ الاحتياطية (مستثنى من git). عند طلب الإذن اختر «السماح في كل زيارة».</p>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>الحفظ</h2>
+      <div class="field"><label for="mode">الطريقة</label>
+        <select id="mode"><option value="auto">تلقائي</option><option value="manual">يدوي (بالزر فقط)</option></select></div>
+      <div class="field"><label for="every">لخّص كل</label><span><input id="every" type="number" min="1" max="50"> رسائل</span></div>
+      <label class="check"><input id="autoLink" type="checkbox"> اربط المحادثات الجديدة بالمشروع تلقائياً</label>
+      <p id="saved" class="muted" style="margin:4px 0 0"></p>
+      <details><summary>كيف يعمل؟</summary>
+        <p>عند الاستحقاق ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» والخانة فارغة والنموذج متوقف، وتتحقق من رده قبل الحفظ. هذه الرسائل لا تُحتسب ولا تُحفظ في نص المحادثة، والنص الكامل يُحفظ بعد كل رد. المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة.</p>
+      </details>
+    </section>
+  </div>
+
+  <section class="card tools" id="tools" hidden>
+    <nav class="tabs" role="tablist">
+      <button type="button" data-tab="fixSec" class="on">✏️ الذاكرة</button>
+      <button type="button" data-tab="pinSec">📌 النصوص المعتمدة</button>
+      <button type="button" data-tab="bkSec">↩️ النسخ السابقة</button>
+    </nav>
+
+    <div id="fixSec" class="pane on">
+      <p id="fixMsg" class="msg" role="status"></p>
+      <div class="sumgrid">
+        <label>الهدف<textarea id="sGoal" rows="2"></textarea></label>
+        <label>الوضع الآن<textarea id="sStatus" rows="2"></textarea></label>
+      </div>
+      <button id="sSave" type="button" class="small">حفظ الخلاصة</button>
+      <h3>القرارات والمقترحات</h3>
+      <ul id="decisions" class="items"><li class="muted">…</li></ul>
+      <h3>القيود</h3>
+      <ul id="constraints" class="items"><li class="muted">…</li></ul>
+      <h3>السجل <span class="muted">(أحدث 15 دفعة)</span></h3>
+      <ul id="log" class="items"><li class="muted">…</li></ul>
+      <p class="muted">كل تغيير تُحفظ قبله نسخة احتياطية، ويُتراجع عنه بزر واحد.</p>
+    </div>
+
+    <div id="pinSec" class="pane">
+      <ul id="pins" class="items"><li class="muted">…</li></ul>
+      <div id="pinHist" hidden>
+        <h3 id="pinTitle"></h3>
+        <ul id="pinVers" class="items"></ul>
+        <p class="muted" id="diffLabel"></p>
+        <div id="diff" class="diff" dir="auto"></div>
+      </div>
+      <p id="pinMsg" class="msg" role="status"></p>
+      <p class="muted">كل تعديل نسخة جديدة، ولا تُحذف السابقة. التثبيت: حدّد نصاً في المحادثة ثم «📌 ثبّت النص المحدد» من قائمة الزر الأيمن.</p>
+    </div>
+
+    <div id="bkSec" class="pane">
+      <ol id="backups" class="backups"><li class="muted">…</li></ol>
+      <p id="restoreMsg" class="muted" role="status"></p>
+      <p class="muted">آخر 20 نسخة، مشتركة مع بلقن Claude Code. الاسترجاع يحفظ الحالية أولاً فيمكن التراجع عنه.</p>
+    </div>
   </section>
 
-  <section id="bkSec">
-    <h2>النسخ السابقة من الذاكرة</h2>
-    <p class="muted">قبل كل تغيير تُحفظ النسخة السابقة (آخر 20 نسخة، مشتركة مع بلقن Claude Code). الاسترجاع يحفظ النسخة الحالية أولاً، فيمكن التراجع عنه.</p>
-    <ol id="backups" class="backups"><li class="muted">…</li></ol>
-    <p id="restoreMsg" class="muted" role="status"></p>
-  </section>
-
-  <section>
-    <h2>الاستخدام</h2>
-    <p class="muted">• الشارة 🧠 في أسفل يسار الصفحة تعرض عدد رسائلك حتى الحفظ القادم، ووقت آخر حفظ، أو ⚠️ مع السبب.<br>
-      • لتثبيت نص حرفياً: حدّده بالماوس، ثم انقر بالزر الأيمن واختر «📌 ثبّت النص المحدد»، واكتب له اسماً.<br>
-      • في محادثة جديدة: من الشارة اختر «📥 أدرج الذاكرة» لتضيف نسخة مختصرة منها (حتى 5 آلاف حرف) في خانة الرسالة، فتراجعها ثم ترسلها.<br>
-      • لنقل معلومات بعينها إلى محادثة أخرى: افتحها، ومن الشارة اختر «📤 انقل معلومات مختارة»، وحدّد ما تريد، وراجع المعاينة، ثم تُدرج في خانة الرسالة دون إرسال.</p>
-  </section>
+  <footer class="card">
+    <details><summary>طريقة الاستخدام</summary>
+      <p>• الشارة 🧠 أسفل يسار الصفحة: عدد رسائلك حتى الحفظ القادم، و📝 حُفظ النص، و✓ حُدّث الملخص، و⚠️ مع السبب.<br>
+        • في محادثة جديدة: «📥 أدرج الذاكرة» تضع نسخة مختصرة في خانة الرسالة.<br>
+        • «📤 انقل معلومات مختارة»: تختار، وتعاين، ثم تُدرج دون إرسال.</p>
+    </details>
+  </footer>
 </main>
 <script src="memory-core.js"></script>
 <script src="options.js"></script>
