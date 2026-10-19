@@ -304,3 +304,67 @@ test("review: a memory that outgrows 3 MB moves its oldest log to an archive ins
   assert.equal(archivedIds.length, mm.archived); assert.equal(archivedIds[0], "old-0", "nothing lost: the archive holds what left the file");
   assert.match(memMd(P), /نُقلت إلى الأرشيف/); assert.match(all(out), /الأرشيف/, JSON.stringify(out).slice(0, 600));
 });
+
+// ---------------- phase 2: reliability ----------------
+const saveBatch = (P, sid, goal) => { const j = prompts(P, sid, 5)[4]; draft(requests(j)[0], goal ? { summary: { goal } } : {}); return run("stop", { session_id: sid, cwd: P }); };
+const BK = (P) => path.join(P, ".conversation-memory", "backups");
+
+test("reliability: undo restores the version before the last change; undo again brings it back; restore N picks from the list", () => {
+  const P = tmp();
+  saveBatch(P, "a", "الهدف الأول");
+  saveBatch(P, "a", "الهدف الثاني");
+  assert.equal(memJson(P).summary.goal, "الهدف الثاني");
+  assert.ok(fs.readdirSync(BK(P)).length >= 1, "backups live in the project's data folder, shared with the extension");
+  const u = prompt(P, "a", "/conversation-memory:undo");
+  assert.equal(memJson(P).summary.goal, "الهدف الأول"); assert.match(ctx(u), /استرجع النظام نسخة/); assert.match(u.systemMessage, /استُرجعت نسخة/);
+  assert.equal(C.hash(memMd(P)), memJson(P).mdHash, "the view is regenerated with it");
+  prompt(P, "a", "/conversation-memory:undo");
+  assert.equal(memJson(P).summary.goal, "الهدف الثاني", "undoing the undo");
+  const list = ctx(prompt(P, "a", "/conversation-memory:restore"));
+  assert.match(list, /1\. \d{4}-\d\d-\d\d \d\d:\d\d — /); assert.match(list, /الهدف الأول/);
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:restore 99")), /لا توجد نسخة رقم 99/);
+  assert.equal(sess(P, "a").count, 10, "these commands are not counted as messages");
+});
+
+test("reliability: nothing is replaced without a backup — a blocked backup keeps the draft, spends no attempt, and saves later", () => {
+  const P = tmp();
+  saveBatch(P, "a");
+  fs.rmSync(BK(P), { recursive: true, force: true }); fs.writeFileSync(BK(P), "not a folder");
+  const before = fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8");
+  const j = prompts(P, "a", 5)[4], r = requests(j)[0]; draft(r);
+  const out = run("stop", { session_id: "a", cwd: P });
+  assert.equal(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8"), before, "memory untouched");
+  assert.ok(fs.existsSync(r.path), "draft kept"); assert.match(out.systemMessage, /المسودة باقية/); assert.equal(out.decision, undefined, "Claude is not asked to redo it");
+  const b = sess(P, "a").batches.find((x) => x.id === r.id); assert.equal(b.status, "pending"); assert.equal(b.attempts, 0);
+  run("stop", { session_id: "a", cwd: P }); run("stop", { session_id: "a", cwd: P });
+  assert.equal(sess(P, "a").batches.find((x) => x.id === r.id).status, "pending", "a kept draft never turns into 'stuck'");
+  fs.unlinkSync(BK(P)); run("stop", { session_id: "a", cwd: P });
+  assert.equal(memJson(P).log.length, 2, "saved once the backup can be written");
+});
+
+test("reliability: 500 kills at random moments while writing — the memory is always whole, and no hand edit is invented", async () => {
+  const P = tmp(); saveBatch(P, "a");
+  const helper = path.join(__dirname, "helpers", "write-loop.js");
+  let bad = 0, changes = 0, last = "";
+  for (let k = 0; k < 500; k++) {
+    const child = spawn(process.execPath, [helper], { env: { ...ENV, CLAUDE_PROJECT_DIR: P }, stdio: ["pipe", "ignore", "ignore"] });
+    child.stdin.end();
+    await new Promise((res) => setTimeout(res, 40 + Math.floor(Math.random() * 260)));   // start-up takes ~60 ms, one write cycle ~50 ms
+    child.kill("SIGKILL"); await new Promise((res) => child.on("exit", res));
+    try { const t = fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8"); const m = JSON.parse(t); if (m.format !== C.FORMAT) bad++; if (t !== last) changes++; last = t; } catch { bad++; }
+  }
+  assert.equal(bad, 0, `${bad} of 500 left a broken file`);
+  assert.ok(changes > 100, `the kills really landed during writing (${changes} of 500 runs had written)`);
+  run("stop", { session_id: "a", cwd: P }); saveBatch(P, "a");
+  assert.equal(fs.readdirSync(P).filter((f) => f.startsWith("CONVERSATION_MEMORY.edited-")).length, 0, "a cut-off write is not mistaken for a hand edit");
+  assert.equal(C.hash(memMd(P)), memJson(P).mdHash, "view and memory agree again after the next save");
+});
+
+test("reliability: a session that crashed without SessionEnd still has its unsummarized messages copied at the next session", () => {
+  const P = tmp(); const js = prompts(P, "dead", 3); const tp = tfrom(P, js);
+  run("stop", { session_id: "dead", cwd: P, transcript_path: tp });
+  const st = state(P); st.sessions.dead.t = Date.now() - 20 * 60000; fs.writeFileSync(path.join(PRIV(P), "state.json"), JSON.stringify(st));
+  assert.equal(caps(P).length, 0);
+  run("start", { session_id: "fresh", cwd: P, source: "startup" });
+  assert.ok(caps(P).length > 0 && capText(P).includes(js[0]._text), "the crashed session's messages were copied in full");
+});

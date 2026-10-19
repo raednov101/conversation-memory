@@ -63,3 +63,24 @@ $("every").addEventListener("change", saveSettings);
 $("mode").addEventListener("change", saveSettings);
 $("autoLink").addEventListener("change", saveSettings);
 loadSettings(); refresh();
+
+// earlier versions of the memory, newest first; restoring one keeps the current version as a backup
+async function loadBackups() {
+  const ol = $("backups");
+  const r = await chrome.runtime.sendMessage({ cmd: "fs", op: "listBackups" }).catch(() => null);
+  ol.textContent = "";
+  if (!r || !r.ok || !r.list.length) { const li = document.createElement("li"); li.className = "muted"; li.textContent = r && !r.ok ? "اختر مجلد المشروع وامنح الإذن أولاً." : "لا توجد نسخ سابقة بعد."; ol.append(li); return; }
+  r.list.slice(0, 10).forEach((b, i) => {
+    const li = document.createElement("li"), span = document.createElement("span"), btn = document.createElement("button");
+    span.textContent = `${b.when} — ${b.decisions} قرار، ${b.log} دفعة${b.goal ? ` — «${b.goal}»` : ""}`;
+    btn.type = "button"; btn.textContent = "استرجاع"; btn.dataset.n = String(i + 1);
+    li.append(span, btn); ol.append(li);
+  });
+}
+$("backups").addEventListener("click", async (e) => {
+  const n = e.target && e.target.dataset && e.target.dataset.n; if (!n) return;
+  const r = await chrome.runtime.sendMessage({ cmd: "fs", op: "restore", args: { n: +n } }).catch((err) => ({ ok: false, error: String(err) }));
+  $("restoreMsg").textContent = r.ok ? `استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.` : `لم يُسترجع شيء: ${r.error}`;
+  loadBackups();
+});
+if (!inPopup) loadBackups();

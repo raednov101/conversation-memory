@@ -151,6 +151,8 @@ with sync_playwright() as pw:
         req2 = requests(p)[-1] if len(requests(p)) > 1 else ""
         ok("d1 [user] اعتماد اللون الأزرق الداكن للمشروع" in req2 and "الميزانية 40 ألف ريال" in req2, f"{name}: the request carries the current memory (decision ids) so the model can update it", req2[:300])
         ok("لم أجد الملخص" in panel_text(p), f"{name}: the reason is shown in the panel")
+        rawf2 = f".conversation-memory/chats/{platform}-chat-one.md"
+        ok(wait(lambda: "رسالة 10" in (read(proj, rawf2) or ""), 8), f"{name}: the summary failed, but the full text of message 10 is saved")
         p.wait_for_timeout(5000)
         ok(len(requests(p)) == 2, f"{name}: no automatic retry storm — it waits for your next message", len(requests(p)))
         p.evaluate("() => { window.__summaryOverride = (t) => { window.__summaryOverride = null; return '⟦ذاكرة:بداية⟧ {\"entry\": {\"raised\": [\"قوس ناقص\" ⟦ذاكرة:نهاية⟧'; }; }")
@@ -336,6 +338,59 @@ with sync_playwright() as pw:
     wait(lambda: (lambda m: m and len(m["log"]) >= 2)(mem(proj)), 20)
     ok(read(proj, ".conversation-memory/write.lock") is None, "a stale lock is taken over and released after writing")
     p.close()
+
+    print("— reliability: undo, folder access lost and back, unreadable messages named —")
+    proj = "proj-rel"; use_folder(proj)
+    p = ctx.new_page(); p.goto(BASE + new_chat("claude", "/chat/chat-rel/", "موثوقية - Claude"))
+    wait(lambda: "🧠" in pill(p), 10)
+    for i in range(1, 6): say(p, f"موثوقية {i}")
+    wait(lambda: (lambda m: m and len(m["log"]) == 1)(mem(proj)), 20)
+    for i in range(6, 11): say(p, f"موثوقية {i}")
+    wait(lambda: (lambda m: m and len(m["log"]) == 2)(mem(proj)), 20)
+    ok(mem(proj)["summary"]["goal"].endswith("10)"), "two saves, the newest summary is current")
+    def click(p, action):
+        p.locator("#cm-memory-indicator .pill").click(); p.locator(f"#cm-memory-indicator .panel button[data-a={action}]").click()
+    click(p, "undo")
+    ok(wait(lambda: (lambda m: m and m["summary"]["goal"].endswith("5)") and len(m["log"]) == 1)(mem(proj)), 10), "↩️ undo restores the version before the last save", (mem(proj) or {}).get("summary"))
+    ok("استُرجعت نسخة" in p.locator("#cm-memory-indicator .toast").inner_text(), "…and says which version")
+    md = read(proj, "CONVERSATION_MEMORY.md") or ""
+    ok("حتى الرسالة 5)" in md and "حتى الرسالة 10)" not in md, "the readable .md follows the restored version")
+    click(p, "undo")
+    ok(wait(lambda: (lambda m: m and m["summary"]["goal"].endswith("10)"))(mem(proj)), 10), "undo again brings back what was undone")
+    lst_ = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'listBackups' })")
+    ok(lst_.get("ok") and len(lst_.get("list", [])) >= 2 and re.match(r"\d{4}-\d\d-\d\d \d\d:\d\d", lst_["list"][0]["when"]), "the settings page lists the earlier versions", lst_)
+    # the folder becomes unreachable (moved, deleted, access withdrawn): visible, and nothing is lost when it comes back
+    opt.evaluate(f"""async () => {{ const kv = {KV}; const r = await navigator.storage.getDirectory(); const d = await r.getDirectoryHandle('gone-dir', {{create: true}}); await kv('root', d); await r.removeEntry('gone-dir', {{recursive: true}}); await chrome.storage.local.set({{ folderAt: Date.now() }}); }}""")
+    say(p, "موثوقية 11 أثناء انقطاع المجلد")
+    ok(wait(lambda: "⚠️" in pill(p) or "المجلد" in pill(p) or "اختر" in pill(p), 15), "folder unreachable → the indicator says so at once", pill(p))
+    use_folder(proj); opt.evaluate("() => chrome.storage.local.set({ folderAt: Date.now() })")
+    raw = wait(lambda: (lambda t: t if t and "موثوقية 11 أثناء انقطاع المجلد" in t else None)(read(proj, ".conversation-memory/chats/claude-chat-rel.md")), 20) or ""
+    ok("موثوقية 11 أثناء انقطاع المجلد" in raw, "folder back → the message written meanwhile is saved; nothing lost")
+    for i in range(12, 16): say(p, f"موثوقية {i}")
+    ok(wait(lambda: (lambda m: m and any(x["range"] == "11–15" for x in m["log"]))(mem(proj)), 20), "…and summaries resume where they stopped (11–15)", [x["range"] for x in (mem(proj) or {}).get("log", [])])
+    # a message with no readable text (an image only) is named, not silently skipped
+    p.evaluate("() => { const t = document.getElementById('thread'); const u = document.createElement('div'); u.setAttribute('data-testid', 'user-message'); t.appendChild(u); const a = document.createElement('div'); a.setAttribute('data-is-streaming', 'false'); a.className = 'font-claude-response'; a.innerText = 'رد على صورة'; t.appendChild(a); }")
+    ok(wait(lambda: "بلا نص مقروء" in panel_text(p), 10), "a message with only an image or a file is named in the panel", panel_text(p))
+    p.close()
+
+    print("— reliability: the writer closed mid-write, 40 times — the memory is always whole —")
+    proj = "proj-kill"; use_folder(proj)
+    pid_ = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status' })")["projectId"]
+    broken = 0
+    for k in range(40):
+        reply = "⟦ذاكرة:بداية⟧" + json.dumps({"summary": {"goal": f"هدف {k}"}, "entry": {"raised": [f"دفعة اختبار رقم {k} " + "ن" * 3000], "decided": [], "changed": []}}, ensure_ascii=False) + "⟦ذاكرة:نهاية⟧"
+        opt.evaluate("""([pid, reply, k]) => { chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { project: pid } }).then((p) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'commit', args: { project: pid, reply, batch: 'kill-' + k, base: p.base, platform: 'chatgpt', chat: 'x', range: String(k) } })).catch(() => {}); }""", [pid_, reply, k])
+        time.sleep(0.01 + (k % 7) * 0.012)
+        try: sw.evaluate("() => chrome.offscreen.closeDocument().catch(() => {})")
+        except Exception: pass
+        time.sleep(0.15)
+        t = read(proj, "CONVERSATION_MEMORY.json")
+        if t is not None:
+            try: json.loads(t)
+            except Exception: broken += 1
+    m_ = mem(proj) or {}
+    ok(broken == 0 and len(m_.get("log", [])) > 0, f"40 closes mid-write: never a broken file ({len(m_.get('log', []))} writes landed)", broken)
+    ok(not [n for n in ls(proj) if n.startswith("CONVERSATION_MEMORY.edited-")], "…and a cut-off write is never mistaken for a hand edit")
 
     print("— compatibility & safety —")
     proj = "proj-compat"; use_folder(proj)

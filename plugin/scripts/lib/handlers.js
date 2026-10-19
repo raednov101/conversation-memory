@@ -8,9 +8,9 @@ const { lst, nonce, today, fullHash } = require("./util");
 const { readSafe, unlinkSafe } = require("./fsx");
 const { input, projectDir, sid, sid8, P, HOME, PRIV, notes, pubSafe, inboxOk } = require("./context");
 const { loadState, session, writeStatus } = require("./state");
-const { readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin } = require("./store");
+const { listBackups, describeBackup, restoreBackup, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin } = require("./store");
 const { readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture } = require("./transcript");
-const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, parseCommand, recordPrompt } = require("./requests");
+const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt } = require("./requests");
 
 function onPrompt(state, out) {
   const s = session(state);
@@ -23,7 +23,18 @@ function onPrompt(state, out) {
     else if (!inboxOk()) notes.push("⚠️ ذاكرة المحادثة: مجلد .conversation-memory في المشروع غير صالح (رابط رمزي؟)، فلا يمكن استقبال المسودات.");
     else ctx.push(batchRequest(pending, mem.token));
   } else if (cmd.save) ctx.push("[conversation-memory] كل رسائل هذه الجلسة محفوظة سلفاً؛ أخبر المستخدم بذلك.");
-  if (cmd.status) ctx.push(statusText(s, mem));
+  // backups the user can restore: the same numbering in the status list and in /conversation-memory:restore N
+  const restorable = () => listBackups().map(describeBackup).filter((b) => b.ok && b.text !== mem.jsonText);
+  if (cmd.status) ctx.push(statusText(s, mem, restorable()));
+  if (cmd.listOnly) ctx.push(`[conversation-memory] النسخ السابقة من الذاكرة (من النظام؛ اعرضها للمستخدم كما هي، والاسترجاع بالأمر /conversation-memory:restore ورقم النسخة):\n${backupsText(restorable())}`);
+  else if (cmd.restore) {
+    let r;
+    if (!holdWriteLock(5000)) r = { err: "برنامج آخر يكتب في الذاكرة الآن؛ أعد الأمر بعد لحظات" };
+    else try { r = restoreBackup(cmd.restore); } finally { releaseWriteLock(); }
+    if (r.ok) notes.push(`↩️ ذاكرة المحادثة: استُرجعت نسخة ${r.when}.`);
+    ctx.push(r.ok ? `[conversation-memory] استرجع النظام نسخة الذاكرة المحفوظة في ${r.when} (${r.decisions} قرار سارٍ، ${r.log} دفعة في السجل)، وحفظ النسخة التي كانت قبلها احتياطياً. أخبر المستخدم بذلك في سطر، وأن تكرار /conversation-memory:undo يعيد ما تراجع عنه.`
+      : `[conversation-memory] لم يُسترجع شيء: ${r.err}. أخبر المستخدم بذلك في سطر.`);
+  }
   const pins = s.pins.filter((p) => p.status === "pending");
   if (pins.length) {
     if (!pinsDirOk() || !inboxOk()) { for (const p of pins) p.status = "expired"; notes.push("⚠️ ذاكرة المحادثة: لا يمكن تثبيت نصوص لأن CONVERSATION_PINS أو .conversation-memory غير صالح (رابط رمزي؟)."); }
@@ -80,7 +91,7 @@ function stopWork(s, out) {
   const okBases = new Set([mem0.token || "none"]);
   // 1) summary drafts
   for (const b of s.batches.filter((x) => x.status === "pending" || x.status === "stuck").sort((x, y) => x.created - y.created)) {
-    let err = null, d = null;
+    let err = null, d = null, keep = false;
     try {
       if (b.kind === "recovered" && !readCapture(b.id)) {
         // gone entirely: another session already saved it (or it was undone on resume) — nothing to report.
@@ -106,7 +117,8 @@ function stopWork(s, out) {
               const r = C.applyDraft(m, v.draft, { platform: "claude-code", chat: "", range: labelOf(b).replace(/^الرسائل |^رسائل منسوخة /, ""), date: today(), allowSummary: allowSummary && okBases.has(tok) });
               applied = r; return r.memory;
             }, (mm) => mm.log.some((e) => e.id === b.id));
-            if (w.err) err = w.err;
+            if (w.err && w.writeFailed) { keep = true; err = w.err; }
+            else if (w.err) err = w.err;
             else {
               okBases.add(w.token);
               if (applied && applied.redacted) notes.push("🔒 ذاكرة المحادثة: حُذفت بيانات حساسة من الملخص تلقائياً قبل حفظه.");
@@ -116,6 +128,9 @@ function stopWork(s, out) {
         }
       }
     } catch (e) { if (!d) continue; err = "خطأ داخلي أثناء الحفظ (" + (e.code || e.name || "?") + ")"; }
+    // the file system refused the write (permissions, disk full): the draft itself is fine — keep it and retry, never ask Claude to redo it
+    if (keep) { s.lastError = err.slice(0, 300); notes.push(`⚠️ ذاكرة المحادثة: تعذّر حفظ ${labelOf(b)}: ${err}. المسودة باقية وتُعاد المحاولة بعد ردك القادم؛ لم يُفقد شيء.`); continue; }
+    if (d && d.path) unlinkSafe(d.path);
     if (err) { s.lastError = err.slice(0, 300); asks.push(`- ${labelOf(b)}: رُفض الملف — ${err}.`); continue; }
     b.status = "saved";
     for (const i of b.idx) s.done[i] = 1;
@@ -128,6 +143,7 @@ function stopWork(s, out) {
     let d = null, r;
     try { d = readDraft(p.id, p.created); if (!d) continue; r = d.err ? { err: d.err } : commitPin(p, d.json); }
     catch (e) { if (!d) continue; r = { err: "خطأ داخلي أثناء التثبيت (" + (e.code || e.name || "?") + ")" }; }
+    if (d && d.path) unlinkSafe(d.path);
     if (r.cancelled) { p.status = "expired"; continue; }
     if (r.ok) { p.status = "saved"; notes.push(`📌 ذاكرة المحادثة: ثُبّت «${r.ok.name}» — النسخة ${r.ok.v}${r.ok.unchanged ? " (مطابق للسابقة، لا نسخة جديدة)" : ` · بصمة ${r.ok.sha.slice(0, 12)}`}.`); continue; }
     p.attempts += 1;
@@ -135,7 +151,7 @@ function stopWork(s, out) {
     else asks.push(`- التثبيت: ${r.err}. أعد كتابة "${draftPath(p.id)}".`);
   }
   // 3) still pending → ask again once per turn; give up visibly after MAX_ATTEMPTS turns
-  const still = s.batches.filter((b) => b.status === "pending");
+  const still = s.batches.filter((b) => b.status === "pending" && !lst(draftPath(b.id)));   // (a kept draft is not "missing")
   const mem = readMemory();
   if (still.length && mem.bad) {
     for (const b of still) b.status = "stuck";
@@ -174,6 +190,11 @@ function onStart(state, out, locked) {
   if (locked) {
     const existed = !!state.sessions[sid];
     const s = session(state);
+    // sessions that ended without a SessionEnd (crash, killed terminal) still hold unsummarized messages: copy them now
+    if (!resume) for (const [id, x] of Object.entries(state.sessions)) {
+      if (id === sid || Date.now() - x.t < 10 * 60000 || !x.tp || !Object.keys(x.msgs).some((i) => !x.done[i])) continue;
+      try { capture(x, "recovered", x.tp, id); } catch {}
+    }
     let budget = CAPTURE_BUDGET; const blocks = [], more = [];
     for (const id of captureIds()) {
       const c = readCapture(id);

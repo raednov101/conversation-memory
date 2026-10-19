@@ -15,10 +15,9 @@ function readDraft(id, created) {
   if (!pubSafe()) return { err: "مجلد .conversation-memory في المشروع رابط رمزي أو غير صالح" };
   const p = draftPath(id), r = readSafe(p, MAX_DRAFT);
   if (r.text == null && !r.bad) return null;
-  unlinkSafe(p); // consumed now, whatever happens next
-  if (r.bad) return { err: `ملف المسودة ${r.bad}` };
-  if (created && r.stat.mtimeMs < created - 2000) return { err: "مسودة أقدم من الطلب (تُجوهلت)" };
-  try { return { json: JSON.parse(r.text) }; } catch (e) { return { err: "المسودة ليست JSON صالحاً: " + e.message }; }
+  if (r.bad) { unlinkSafe(p); return { err: `ملف المسودة ${r.bad}` }; }
+  if (created && r.stat.mtimeMs < created - 2000) { unlinkSafe(p); return { err: "مسودة أقدم من الطلب (تُجوهلت)" }; }
+  try { return { json: JSON.parse(r.text), path: p }; } catch (e) { unlinkSafe(p); return { err: "المسودة ليست JSON صالحاً: " + e.message }; }
 }
 function batchRequest(list, token) {
   const items = list.map((b) => {
@@ -35,7 +34,11 @@ function pinRequest(p) {
     `{"name": "${p.name || "اسم قصير"}", "start": "أول 20–80 حرفاً من النص منسوخة حرفياً", "end": "آخر 20–80 حرفاً منسوخة حرفياً"}\n` +
     `النظام يستخرج النص كاملاً من المحادثة نفسها حرفاً بحرف (لا تكتب النص كاملاً، ولا تقتبس البداية والنهاية في ردك). للإلغاء: {"cancel": true}.`;
 }
-function statusText(s, mem) {
+// the backups the user can restore, newest first, numbered as /conversation-memory:restore expects
+function backupsText(list) {
+  return list.length ? list.slice(0, 10).map((b, i) => `  ${i + 1}. ${b.when} — ${b.decisions} قرار سارٍ، ${b.log} دفعة في السجل${b.goal ? `، الهدف: «${b.goal}»` : ""}`).join("\n") : "  لا توجد نسخ سابقة بعد";
+}
+function statusText(s, mem, backups) {
   const by = (st) => s.batches.filter((b) => b.status === st).map(labelOf).join("، ") || "لا شيء";
   const m = mem.memory;
   return `[conversation-memory] حالة الذاكرة (من النظام؛ انقلها للمستخدم بإيجاز ولا تخمّن):\n` +
@@ -43,6 +46,7 @@ function statusText(s, mem) {
     `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}/${EVERY}، آخر حفظ: ${s.lastSave || "لا يوجد بعد"}\n` +
     `- بانتظار الحفظ: ${by("pending")}\n- متعثرة: ${by("stuck")}${s.lastError ? ` (آخر خطأ: ${s.lastError})` : ""}\n- نُسخت قبل الضغط/الإغلاق: ${by("captured")}\n` +
     (m ? `- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => `${p.name} (ن${p.version})`).join("، ") || "لا شيء"}، دفعات السجل: ${m.log.length}\n` : "") +
+    `- النسخ السابقة (للاسترجاع: /conversation-memory:restore رقم، أو /conversation-memory:undo للأحدث):\n${backupsText(backups || [])}\n` +
     `- البيانات الخاصة: ${PRIV}`;
 }
 
@@ -54,6 +58,8 @@ function parseCommand(prompt) {
   if (t.startsWith(CMD + "save") || t === "احفظ الذاكرة") return { save: true, slash };
   if (t.startsWith(CMD + "status") || t === "حالة الذاكرة") return { status: true, slash };
   if (t.startsWith(CMD + "pin")) return { pin: true, name: C.slug(t.slice((CMD + "pin").length)), slash };
+  if (t.startsWith(CMD + "undo")) return { restore: 1, slash };
+  if (t.startsWith(CMD + "restore")) { const n = parseInt(t.slice((CMD + "restore").length), 10); return { restore: n >= 1 && n <= 99 ? n : 0, listOnly: !(n >= 1), slash }; }
   return { slash };
 }
 function recordPrompt(s, pid, h, cmd) {
@@ -77,4 +83,4 @@ function recordPrompt(s, pid, h, cmd) {
   return changed;
 }
 
-module.exports = { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, parseCommand, recordPrompt };
+module.exports = { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt };

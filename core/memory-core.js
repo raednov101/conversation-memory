@@ -279,6 +279,14 @@
     return { ok: false, error: "لم أجد نصاً في المحادثة يبدأ وينتهي بما كُتب. انسخ البداية والنهاية حرفياً" };
   }
 
+  // Is this Markdown just a generated view (of the current memory, or of the version before it)? Then it is not a hand edit.
+  // The second case is a write cut off between the two files: the JSON was replaced, the view not yet.
+  function isGeneratedView(mdText, current, previous) {
+    const h = hash(String(mdText));
+    for (const m of [current, previous]) if (m && (h === m.mdHash || h === hash(render(normalizeMemory(m))))) return true;
+    return false;
+  }
+
   // keep the JSON under maxBytes: the oldest log entries move to an archive (returned for the writer to store), then the imported v0 text is cut
   const utf8Len = (s) => { let n = 0; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); n += c < 0x80 ? 1 : c < 0x800 ? 2 : c >= 0xd800 && c < 0xdc00 ? (i++, 4) : 3; } return n; };
   function trimForSize(memory, maxBytes) {
@@ -294,5 +302,5 @@
   function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: String(mdText).slice(0, LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
-    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len };
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, isGeneratedView };
 });

@@ -62,7 +62,7 @@
       if (seen.url !== location.pathname) seen = { url: location.pathname, at: Date.now() };
       const key = chatKey(id);
       const st = await chatState(key);
-      const { turns, hk, userCount, total, uh, rh } = M.reader.read(A, HK);
+      const { turns, hk, userCount, total, uh, rh, empty } = M.reader.read(A, HK);
       const gen = A.generating();
       const c = A.composer();
       const label = A.title() || id.slice(0, 8);
@@ -148,7 +148,7 @@
         }
       }
       await saveChat(key, st);
-      view = { phase: "chat", key, st, userCount, due: d.isDue, fsSt, fsOk, unreadable, noComposer: !c };
+      view = { phase: "chat", key, st, userCount, due: d.isDue, fsSt, fsOk, unreadable, noComposer: !c, empty };
     } catch (e) {
       view = { ...view, crash: String((e && e.message) || e) };
     } finally {
@@ -167,6 +167,11 @@
       const key = chatKey(id), st = await chatState(key);
       Object.assign(st, a === "link" ? { linked: true, summarizedUpTo: 0, hashes: [], rhashes: [], rewound: null, attempts: 0, failedAt: -1, status: "idle", error: "", note: "" } : { linked: false, pending: null, expired: null });
       await saveChat(key, st); if (busy) await sleep(300); tick(); return;
+    }
+    if (a === "undo") {
+      const r = await B.fs("restore", { n: 1 });
+      ui.toast(r.ok ? `↩️ استُرجعت نسخة ${r.when} (${r.decisions} قرار، ${r.log} دفعة). التراجع مرة أخرى يعيد ما تراجعت عنه.` : `لم يُسترجع شيء: ${B.why(r.error)}`);
+      return;
     }
     if (a === "summarize") {
       if (!id) return;

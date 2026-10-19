@@ -18,6 +18,8 @@
   select,input{font:inherit;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
   input[type=number]{width:70px} input[type=checkbox]{width:18px;height:18px}
   .muted{color:var(--muted);font-size:12px} code{font-size:12px}
+  .backups{margin:0;padding:0 18px 0 0}.backups li{margin:6px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .backups button{padding:4px 10px;font-size:13px}
 </style>
 </head>
 <body>
@@ -47,6 +49,13 @@
     <p class="muted">المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة 🧠 «🔗 اربط بالمشروع»، حتى لا يختلط بالمشروع نقاشٌ لا يخصه.</p>
     <p class="muted">في الوضع التلقائي ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» عندما تكون خانة الكتابة فارغة والنموذج متوقفاً، ومعها خلاصة الذاكرة الحالية ليحدّثها، وتلتقط رده (JSON) وتتحقق منه قبل الحفظ. هذه الرسائل لا تُحتسب ضمن رسائلك ولا تُحفظ في نص المحادثة. نص المحادثة الكامل يُحفظ بعد كل رد في الوضعين.</p>
     <p id="saved" class="muted"></p>
+  </section>
+
+  <section>
+    <h2>النسخ السابقة من الذاكرة</h2>
+    <p class="muted">قبل كل تغيير تُحفظ النسخة السابقة (آخر 20 نسخة، مشتركة مع بلقن Claude Code). الاسترجاع يحفظ النسخة الحالية أولاً، فيمكن التراجع عنه.</p>
+    <ol id="backups" class="backups"><li class="muted">…</li></ol>
+    <p id="restoreMsg" class="muted" role="status"></p>
   </section>
 
   <section>

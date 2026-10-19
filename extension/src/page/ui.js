@@ -41,6 +41,7 @@
       else if (s.status === "error") { cls = "err"; text = `🧠 ⚠️ ${prog} · تعثّر الحفظ`; info = `تعثّر الحفظ: ${esc(s.error)}` + (s.attempts >= maxAttempts ? " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)" : " (يعيد المحاولة بعد رسالتك القادمة)"); }
       else { cls = s.lastSave ? "ok" : "idle"; text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : ""); info = s.lastSave ? `آخر حفظ ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحفظ ملخص بعد."; }
       if (s.note && !v.unreadable) info += `<br><span class="muted">${esc(s.note)}</span>`;
+      if (v.empty && v.empty.length && !v.unreadable) info += `<br><span class="muted">${v.empty.length === 1 ? `رسالتك رقم ${v.empty[0]}` : `رسائلك رقم ${v.empty.join("، ")}`} بلا نص مقروء (صورة أو ملف)؛ لا يُحفظ منها إلا ما يذكره الرد عنها.</span>`;
       if (!v.unreadable) {
         const left = Math.max(0, settings.every - since);
         info += `<br><span class="muted">${left ? `الحفظ القادم بعد ${left} ${left === 1 ? "رسالة" : "رسائل"}.` : "الحفظ مستحق."} النص الكامل يُحفظ بعد كل رد.` +
@@ -49,6 +50,7 @@
         if (settings.mode === "auto") btns.push([settings.paused ? "▶️ تشغيل الحفظ التلقائي" : "⏸️ إيقاف الحفظ التلقائي", "pause"]);
       }
       btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"]);
+      btns.push(["↩️ تراجع عن آخر تغيير في الذاكرة", "undo"]);
       btns.push(["⛓️ فك ربط المحادثة بالمشروع", "unlink"]);
     }
     if (v.crash) { cls = "err"; info = "خطأ داخلي: " + esc(v.crash); }

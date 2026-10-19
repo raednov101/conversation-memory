@@ -29,7 +29,7 @@ function privateDirOk() {
     if (!safeDir(HOME, 0o700, true)) return false;
     for (const d of ["projects", "status"]) if (!safeDir(path.join(HOME, d), 0o700, true)) return false;
     if (!safeDir(PRIV, 0o700, true)) return false;
-    for (const d of ["captures", "backups", "events"]) if (!safeDir(path.join(PRIV, d), 0o700, true)) return false;
+    for (const d of ["captures", "events"]) if (!safeDir(path.join(PRIV, d), 0o700, true)) return false;
     return true;
   } catch { return false; }
 }

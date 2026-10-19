@@ -3,7 +3,7 @@
 "use strict";
 const C = self.MemoryCore;
 const JSON_FILE = "CONVERSATION_MEMORY.json", MD_FILE = "CONVERSATION_MEMORY.md", PINS = "CONVERSATION_PINS", DATA = ".conversation-memory";
-const MAX_JSON = 4 * 1024 * 1024, TRIM_AT = 3 * 1024 * 1024, MAX_BACKUPS = 10, STATE_BUDGET = 3000, COMPACT_BUDGET = 5000, WLOCK_STALE = 15000;
+const MAX_JSON = 4 * 1024 * 1024, TRIM_AT = 3 * 1024 * 1024, MAX_BACKUPS = 20, STATE_BUDGET = 3000, COMPACT_BUDGET = 5000, WLOCK_STALE = 15000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nonce = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const today = () => new Date().toLocaleString("sv-SE").slice(0, 16);
@@ -43,18 +43,43 @@ async function dataDir(r) {
   if ((await readText(d, ".gitignore")) === null) await writeVerified(d, ".gitignore", "*\n");
   return d;
 }
-async function backupJson(r, text) {
-  if (!text) return;
+// Backups in .conversation-memory/backups/, shared with the Claude Code plugin (same names, same folder), so "undo"
+// reverts the last change whoever made it. A version is never replaced without its backup.
+const BACKUP_RE = /^\d{8}-\d{6}-\d{3}(-[a-z0-9]{1,8})?\.json$/;
+async function backupNames(r) {
   const b = await dir(await dataDir(r), ["backups"]);
   const names = [];
-  for await (const [n, h] of b.entries()) if (h.kind === "file" && /^\d{8}-\d{6}-\d{3}\.json$/.test(n)) names.push(n);
-  names.sort();
-  if (names.length && (await readText(b, names[names.length - 1])) === text) return;
+  for await (const [n, h] of b.entries()) if (h.kind === "file" && BACKUP_RE.test(n)) names.push(n);
+  return { b, names: names.sort().reverse() };   // newest first
+}
+async function backupJson(r, text) {
+  if (!text) return;
+  const { b, names } = await backupNames(r);
+  if (names.length && (await readText(b, names[0])) === text) return;
   let name = `${stamp()}.json`;
-  while (names.includes(name)) { await new Promise((s) => setTimeout(s, 2)); name = `${stamp()}.json`; }
-  await writeVerified(b, name, text);
-  names.push(name); names.sort();
-  for (const n of names.slice(0, Math.max(0, names.length - MAX_BACKUPS))) await b.removeEntry(n).catch(() => {});
+  while (names.includes(name)) name = `${stamp()}-${nonce().slice(0, 4)}.json`;
+  await writeVerified(b, name, text);   // throws if it can't be written: then nothing else is written either
+  names.unshift(name);
+  for (const n of names.slice(MAX_BACKUPS)) await b.removeEntry(n).catch(() => {});
+}
+// The .md is a view of the current memory or of an earlier version (writes cut off between the two files can leave it
+// several versions behind): then it is not a hand edit and is simply regenerated. Only real edits are kept aside.
+async function isSomeGeneratedView(r, mdText, current) {
+  if (C.isGeneratedView(mdText, current, null)) return true;
+  const h = C.hash(String(mdText)), { b, names } = await backupNames(r);
+  for (const n of names) { const p = C.parseMemory(await readText(b, n)); if (p.ok && (p.memory.mdHash === h || C.isGeneratedView(mdText, p.memory, null))) return true; }
+  return false;
+}
+async function describeBackups(r, currentText) {
+  const { b, names } = await backupNames(r), out = [];
+  for (const n of names) {
+    const text = await readText(b, n), p = C.parseMemory(text);
+    if (!p.ok || text === currentText) continue;
+    const m = p.memory;
+    out.push({ name: n, when: `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6, 8)} ${n.slice(9, 11)}:${n.slice(11, 13)}`, text, memory: m,
+      log: m.log.length, decisions: m.decisions.filter((d) => d.status === "active").length, goal: m.summary.goal.slice(0, 60) });
+  }
+  return out;
 }
 
 // ---------- the memory (the only writer in the extension) ----------
@@ -99,7 +124,7 @@ async function writeMemory(r, mutate, confirm, held) {
       if (cur.bad) return { err: cur.bad + " — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة" };
       let m = cur.memory;
       if (!cur.exists && cur.mdText) { m = C.importLegacy(m, cur.mdText, today()); if (!attempt) notes.push("نُقل محتوى CONVERSATION_MEMORY.md القديم كما هو تحت «من الإصدار السابق»."); }
-      else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && C.hash(cur.mdText) !== m.mdHash) {
+      else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !(await isSomeGeneratedView(r, cur.mdText, m))) {
         const name = `CONVERSATION_MEMORY.edited-${stamp()}.md`;
         await writeVerified(r, name, cur.mdText);
         keptEdit = true; notes.push(`عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${name} قبل إعادة توليده.`);
@@ -114,7 +139,7 @@ async function writeMemory(r, mutate, confirm, held) {
       const json = C.serialize(next);
       if (new Blob([json]).size > MAX_JSON) return { err: "ملف الذاكرة سيتجاوز 4 ميجا" };
       if ((await readText(r, JSON_FILE)) !== cur.jsonText) continue;   // someone else wrote meanwhile: start over on their version
-      await backupJson(r, cur.jsonText);
+      try { await backupJson(r, cur.jsonText); } catch { return { err: "تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها" }; }
       await writeVerified(r, JSON_FILE, json);
       await writeVerified(r, MD_FILE, md);
       const after = C.parseMemory(await readText(r, JSON_FILE));        // confirm from the file itself
@@ -195,6 +220,31 @@ const ops = {
     if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
     const r = w.extra;
     return { ok: true, already: !r.applied, redacted: r.redacted, summarySkipped: r.skipped.includes("summary"), notes: w.notes };
+  },
+  // the backups the user can restore (newest first; the same numbering as the plugin's /conversation-memory:restore)
+  async listBackups() {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    const cur = await readMemory(h);
+    if (cur.bad) return { ok: false, error: cur.bad };
+    return { ok: true, list: (await describeBackups(h, cur.jsonText)).map(({ when, log, decisions, goal }) => ({ when, log, decisions, goal })) };
+  },
+  // restore backup n (1 = the newest one that differs from the current file); the current version is backed up first
+  async restore({ n }) {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    const lk = await takeWriteLock(h);
+    if (!lk) return { ok: false, busy: true, error: "برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات" };
+    try {
+      const cur = await readMemory(h);
+      if (cur.bad) return { ok: false, error: cur.bad };
+      const list = await describeBackups(h, cur.jsonText), b = list[(Math.floor(+n) || 1) - 1];
+      if (!b) return { ok: false, error: list.length ? `لا توجد نسخة رقم ${n}` : "لا توجد نسخة سابقة للاسترجاع بعد" };
+      await backupJson(h, cur.jsonText);
+      const m = b.memory, md = C.render(m);
+      m.mdHash = C.hash(md);
+      await writeVerified(h, JSON_FILE, C.serialize(m));
+      await writeVerified(h, MD_FILE, md);
+      return { ok: true, when: b.when, log: b.log, decisions: b.decisions };
+    } finally { await dropWriteLock(lk); }
   },
   // full transcript of one conversation, every message complete
   async saveRaw({ project, chatKey, label, url, turns }) {
