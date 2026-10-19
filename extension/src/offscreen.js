@@ -180,6 +180,41 @@ async function rootFor(project) {
   return { h };
 }
 
+// ---------- pinned texts ----------
+async function withLock(h, fn) {
+  const lk = await takeWriteLock(h);   // before writing anything
+  if (!lk) return { ok: false, busy: true, error: "برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات" };
+  try { return await fn(lk); } finally { await dropWriteLock(lk); }
+}
+async function versionsOf(h, name) {
+  let d; try { d = await dir(h, [PINS, name], false); } catch { return []; }
+  const out = [];
+  for await (const [n, fh] of d.entries()) {
+    const m = n.match(/^v(\d+)\.md$/); if (!m || fh.kind !== "file") continue;
+    const f = await fh.getFile(); if (f.size > 400000) continue;
+    const text = await f.text();
+    out.push({ v: +m[1], text, sha: await sha256(text), date: new Date(f.lastModified).toISOString().slice(0, 16).replace("T", " ") });
+  }
+  return out.sort((a, b) => a.v - b.v);
+}
+// write text as the next version of a pin (or report it unchanged) and index it; the caller holds the lock
+async function pinWrite(h, name, text, lk) {
+  const d = await dir(h, [PINS, name]);
+  let last = 0;
+  for await (const [n, fh] of d.entries()) { const m = n.match(/^v(\d+)\.md$/); if (m && fh.kind === "file") last = Math.max(last, +m[1]); }
+  const sha = await sha256(text);
+  let v = last, unchanged = false;
+  if (last && (await readText(d, `v${last}.md`)) === text) unchanged = true;
+  else {
+    v = last + 1;
+    await writeVerified(d, `v${v}.md`, text);
+    if ((await sha256(await readText(d, `v${v}.md`))) !== sha) { await d.removeEntry(`v${v}.md`).catch(() => {}); return { ok: false, error: "فشل التحقق من البصمة" }; }
+  }
+  const w = await writeMemory(h, (m) => ({ memory: C.upsertPin(m, { name, version: v, path: C.pinPath(name, v), sha, date: today() }) }), (mm) => mm.pins.some((x) => x.name === name && x.version === v), lk);
+  if (w.err) return { ok: false, error: "حُفظ النص لكن لم يُحدَّث فهرسه: " + w.err };
+  return { ok: true, name, v, unchanged, hash: sha.slice(0, 12), notes: w.notes };
+}
+
 // ---------- operations ----------
 const ops = {
   async status() {
@@ -265,24 +300,42 @@ const ops = {
     if (!text.trim()) return { ok: false, error: "لا يوجد نص محدد" };
     if (text.length > 200000) return { ok: false, error: "النص طويل جداً" };
     if (C.hasSecret(text)) return { ok: false, error: "النص يحتوي بيانات حساسة؛ لن يُحفظ" };
-    const lk = await takeWriteLock(h);   // before writing anything
-    if (!lk) return { ok: false, busy: true, error: "برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات" };
-    try {
-    const d = await dir(h, [PINS, name]);
-    let last = 0;
-    for await (const [n, fh] of d.entries()) { const m = n.match(/^v(\d+)\.md$/); if (m && fh.kind === "file") last = Math.max(last, +m[1]); }
-    const sha = await sha256(text);
-    let v = last, unchanged = false;
-    if (last && (await readText(d, `v${last}.md`)) === text) unchanged = true;
-    else {
-      v = last + 1;
-      await writeVerified(d, `v${v}.md`, text);
-      if ((await sha256(await readText(d, `v${v}.md`))) !== sha) { await d.removeEntry(`v${v}.md`).catch(() => {}); return { ok: false, error: "فشل التحقق من البصمة" }; }
-    }
-    const w = await writeMemory(h, (m) => ({ memory: C.upsertPin(m, { name, version: v, path: C.pinPath(name, v), sha, date: today() }) }), (mm) => mm.pins.some((x) => x.name === name && x.version === v), lk);
-    if (w.err) return { ok: false, error: "حُفظ النص لكن لم يُحدَّث فهرسه: " + w.err };
-    return { ok: true, name, v, unchanged, hash: sha.slice(0, 12), notes: w.notes };
-    } finally { await dropWriteLock(lk); }
+    return withLock(h, (lk) => pinWrite(h, name, text, lk));
+  },
+  // the whole memory, for the correction page and the share panel (read only)
+  async readFull() {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    const cur = await readMemory(h);
+    if (cur.bad) return { ok: false, error: cur.bad };
+    const m = !cur.exists && cur.mdText ? C.importLegacy(cur.memory, cur.mdText, "") : cur.memory;
+    return { ok: true, memory: m, exists: cur.exists };
+  },
+  // a correction made by the user (same shape as the plugin's /conversation-memory:fix), backed up and undoable
+  async fix({ fix }) {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    const v = C.validateFix(fix);
+    if (!v.ok) return { ok: false, error: v.error };
+    let res = null;
+    const w = await writeMemory(h, (m) => { res = C.applyFix(m, v.fix, today()); return res.changes.length ? { memory: res.memory } : { err: res.missing.length ? `لم أجد ${res.missing.join("، ")} في الذاكرة` : "لا تغيير: الذاكرة مطابقة أصلاً" }; });
+    if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
+    return { ok: true, changes: res.changes, missing: res.missing, redacted: res.redacted, notes: w.notes };
+  },
+  // every saved version of a pinned text, oldest first: { v, text, sha, date }
+  async pinVersions({ name }) {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    name = String(name || "").trim().replace(/\s+/g, " ");
+    if (!C.pinNameOk(name)) return { ok: false, error: "اسم غير صالح" };
+    return { ok: true, name, versions: await versionsOf(h, name) };
+  },
+  // bring back version v of a pinned text: saved as a new version, the older ones stay
+  async pinRestore({ name, v }) {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    name = String(name || "").trim().replace(/\s+/g, " ");
+    if (!C.pinNameOk(name)) return { ok: false, error: "اسم غير صالح" };
+    const src = (await versionsOf(h, name)).find((x) => x.v === +v);
+    if (!src) return { ok: false, error: `لا توجد النسخة ${v} من «${name}»` };
+    const r = await withLock(h, (lk) => pinWrite(h, name, src.text, lk));
+    return r.ok ? { ...r, from: +v } : r;
   },
 };
 

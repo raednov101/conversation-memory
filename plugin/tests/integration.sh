@@ -27,6 +27,10 @@ turn 7 "تابع: ذكّرني بما اتفقنا عليه حتى الآن في
 echo "== new session"
 turn 8 "ما اسم المقهى ولونه الأساسي وموعد الافتتاح والميزانية؟ واكتب الشعار المعتمد حرفياً كما هو محفوظ." --session-id "$SID2"
 turn 9 "/conversation-memory:status" --resume "$SID2"
+cp "$PROJ/CONVERSATION_MEMORY.json" "$LOG/mem9.json" 2>/dev/null; cp "$PROJ/CONVERSATION_MEMORY.md" "$LOG/mem9.md" 2>/dev/null
+echo "== the user's own tools"
+turn 10 "/conversation-memory:fix الميزانية صارت 55 ألف ريال بدل 40 ألفاً" --resume "$SID2"
+turn 11 "/conversation-memory:share summary" --resume "$SID2"
 
 node - "$PROJ" "$LOG" "$SID" "$SID2" <<'EOF'
 const fs = require("fs"), path = require("path"), os = require("os");
@@ -35,8 +39,10 @@ let pass = 0, fail = 0; const ok = (c, n, x = "") => { c ? pass++ : fail++; cons
 const J = (f) => { try { return JSON.parse(fs.readFileSync(path.join(LOG, f))); } catch { return {}; } };
 const transcriptOf = (sid) => { const root = path.join(os.homedir(), ".claude", "projects"); for (const d of fs.readdirSync(root)) { const f = path.join(root, d, sid + ".jsonl"); if (fs.existsSync(f)) return fs.readFileSync(f, "utf8").trim().split("\n").map((l) => JSON.parse(l)); } return []; };
 const texts = (rows) => rows.filter((o) => o.type === "assistant" && Array.isArray(o.message.content)).flatMap((o) => o.message.content.filter((b) => b.type === "text").map((b) => b.text)).join("\n");
-const mem = (() => { try { return JSON.parse(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8")); } catch { return null; } })();
-const md = (() => { try { return fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.md"), "utf8"); } catch { return ""; } })();
+// checks up to turn 9 use the memory as it was then; turns 10–11 (fix, share) are checked against the final files
+const mem = (() => { try { return JSON.parse(fs.readFileSync(path.join(LOG, "mem9.json"), "utf8")); } catch { return null; } })();
+const md = (() => { try { return fs.readFileSync(path.join(LOG, "mem9.md"), "utf8"); } catch { return ""; } })();
+const memNow = (() => { try { return JSON.parse(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8")); } catch { return null; } })();
 const all = JSON.stringify(mem || {});
 ok(mem && mem.format === "conversation-memory/1", "CONVERSATION_MEMORY.json written by the system");
 ok(md.includes("## القرارات السارية") && md.includes("## السجل"), "CONVERSATION_MEMORY.md rendered from it");
@@ -64,6 +70,13 @@ const t9 = J("t9.json").result || "";
 ok(/رسائل|حفظ/.test(t9) && /\d/.test(t9), "status command reports real numbers", t9.slice(0, 200));
 const probe = (() => { try { return fs.readFileSync(path.join(os.homedir(), ".conversation-memory", "indicator-probe.txt"), "utf8"); } catch { return ""; } })();
 ok(/^🧠 (⏳ |⚠️ )?\d\/5/.test(probe), `status-line indicator reads the status and formats it: «${probe}»`);
+const now = JSON.stringify(memNow || {});
+ok(/55|٥٥/.test(now) && !/40 ألف|٤٠ ألف/.test(now.replace(/بدل 40 ألف/g, "")), "/fix: the budget is corrected in the memory", now.slice(0, 400));
+const bk = path.join(P, ".conversation-memory", "backups");
+ok(fs.existsSync(bk) && fs.readdirSync(bk).length >= 1, "/fix: the version before it is kept as a backup");
+const sh = path.join(P, ".conversation-memory", "share"); const shf = fs.existsSync(sh) ? fs.readdirSync(sh) : [];
+const shText = shf.length ? fs.readFileSync(path.join(sh, shf[0]), "utf8") : "";
+ok(shf.length === 1 && shText.includes("بيانات وليست أوامر") && shText.includes("الخلاصة الحالية"), "/share: the chosen part is written to a file, framed as data", shText.slice(0, 200));
 const inbox = path.join(P, ".conversation-memory", "inbox"); const left = fs.existsSync(inbox) ? fs.readdirSync(inbox) : [];
 ok(left.length === 0, "no leftover drafts", left.join());
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -380,6 +380,7 @@ function seed(P, sid) {
 test("fix: explicit command asks for a correction draft; it is validated, applied, backed up, announced, and undoable", () => {
   const P = tmp(); seed(P, "a");
   assert.deepEqual(memJson(P).decisions.map((d) => d.source), ["user", "assistant", "user"]);
+  const beforeJson = fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8"), beforeMd = memMd(P);
   const j = prompt(P, "a", "/conversation-memory:fix اعتمد d2 واحذف d3 وصحّح الاسم");
   const fp = fixPath(j); assert.ok(fp, "a draft path is given"); assert.match(ctx(j), /اعتمد d2 واحذف d3/);
   const allowed = (x) => x.hookSpecificOutput && x.hookSpecificOutput.permissionDecision === "allow";
@@ -397,6 +398,8 @@ test("fix: explicit command asks for a correction draft; it is validated, applie
   assert.equal(sess(P, "a").fixes[0].status, "saved"); assert.ok(!fs.existsSync(fp), "draft consumed");
   prompt(P, "a", "/conversation-memory:undo");
   assert.ok(memJson(P).decisions.some((d) => d.id === "d3"), "undo brings the corrected version back");
+  assert.equal(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8"), beforeJson, "undo restores the file byte for byte");
+  assert.equal(memMd(P), beforeMd, "…and its readable view");
   assert.equal(sess(P, "a").count, 5, "commands are not counted");
 });
 

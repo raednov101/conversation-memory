@@ -1,4 +1,5 @@
 "use strict";
+/* global MemoryCore */
 function idb() {
   return new Promise((res, rej) => {
     const r = indexedDB.open("cm", 1);
@@ -84,3 +85,116 @@ $("backups").addEventListener("click", async (e) => {
   loadBackups();
 });
 if (!inPopup) loadBackups();
+
+// ---------- correcting the memory ----------
+// Every change is one "fix" (the same shape as the plugin's /conversation-memory:fix): validated, backed up, undoable.
+const fsOp = (op, args) => chrome.runtime.sendMessage({ cmd: "fs", op, args }).catch((err) => ({ ok: false, error: String(err) }));
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) e.append(k); return e; };
+const btn = (text, onclick, title) => el("button", { type: "button", textContent: text, onclick, title: title || "" });
+const SRC = { user: "قرارك", "assistant-approved": "اقتراح اعتمدته", assistant: "اقتراح لم يُعتمد" };
+let mem = null;
+
+function say(where, text, withUndo) {
+  const p = $(where); p.textContent = text;
+  if (withUndo) p.append(btn("↩️ تراجع", async () => { const r = await fsOp("restore", { n: 1 }); say(where, r.ok ? `تراجعت: عادت نسخة ${r.when}.` : `لم يُسترجع شيء: ${r.error}`); loadMemory(); loadBackups(); }));
+}
+async function applyFix(fix) {
+  const r = await fsOp("fix", { fix });
+  if (r.ok) say("fixMsg", `✓ ${r.changes.join("، ")}${r.redacted ? " (وحُذفت بيانات حساسة)" : ""}.`, true);
+  else say("fixMsg", `لم يتغيّر شيء: ${r.error}`);
+  await loadMemory(); loadBackups();
+  return r.ok;
+}
+function editRow(li, current, onSave) {
+  const ta = el("textarea", { value: current, rows: 2 });
+  li.replaceChildren(el("div", { className: "txt" }, ta), el("div", { className: "acts" }, btn("حفظ", () => { const t = ta.value.trim(); if (t && t !== current) onSave(t); else loadMemory(); }), btn("إلغاء", () => loadMemory())));
+  ta.focus();
+}
+function renderMemory() {
+  const m = mem;
+  $("sGoal").value = m.summary.goal || ""; $("sStatus").value = m.summary.status || "";
+  const ds = $("decisions"); ds.textContent = "";
+  const act = m.decisions.filter((d) => d.status === "active");
+  if (!act.length) ds.append(el("li", { className: "muted", textContent: "لا توجد قرارات محفوظة." }));
+  for (const d of act) {
+    const li = el("li");
+    const txt = el("div", { className: "txt" }, el("b", { textContent: d.id + " " }), d.text, el("span", { className: "tag" + (d.source === "assistant" ? " sug" : ""), textContent: SRC[d.source] || d.source }));
+    const acts = el("div", { className: "acts" });
+    if (d.source === "assistant") acts.append(btn("✅ اعتماد", () => applyFix({ decisions: { approve: [d.id] } }), "اعتمد هذا الاقتراح قراراً"));
+    acts.append(btn("✏️ تعديل", () => editRow(li, d.text, (t) => applyFix({ decisions: { edit: [{ id: d.id, text: t }] } }))),
+      btn("🚫 إلغاء", () => applyFix({ decisions: { revoke: [d.id] } }), "لم يعد سارياً؛ يبقى في سجل الملغى"),
+      btn("🗑️ حذف", () => applyFix({ decisions: { remove: [d.id] } }), "حذف نهائي لمعلومة خاطئة أو حساسة"));
+    li.append(txt, acts); ds.append(li);
+  }
+  const cs = $("constraints"); cs.textContent = "";
+  if (!m.constraints.length) cs.append(el("li", { className: "muted", textContent: "لا توجد قيود محفوظة." }));
+  for (const c of m.constraints) {
+    const li = el("li");
+    li.append(el("div", { className: "txt", textContent: c }), el("div", { className: "acts" },
+      btn("✏️ تعديل", () => editRow(li, c, (t) => applyFix({ constraints: { remove: [c], add: [t] } }))),
+      btn("🗑️ حذف", () => applyFix({ constraints: { remove: [c] } }))));
+    cs.append(li);
+  }
+  const lg = $("log"); lg.textContent = "";
+  const entries = m.log.slice(-15).reverse();
+  if (!entries.length) lg.append(el("li", { className: "muted", textContent: "السجل فارغ." }));
+  for (const e of entries) {
+    const head = `${MemoryCore.PLATFORMS[e.platform] || e.platform}${e.chat ? " · " + e.chat : ""}${e.range ? " · الرسائل " + e.range : ""}${e.date ? " · " + e.date : ""}`;
+    const first = e.raised[0] || e.decided[0] || e.changed[0] || "";
+    lg.append(el("li", {}, el("div", { className: "txt" }, el("b", { textContent: head }), el("br"), el("span", { className: "muted", textContent: first })),
+      el("div", { className: "acts" }, btn("🗑️ حذف الدفعة", () => applyFix({ log: { remove: [e.id] } })))));
+  }
+  renderPins();
+}
+$("sSave").addEventListener("click", () => {
+  const goal = $("sGoal").value.trim(), status = $("sStatus").value.trim();
+  if (!goal && !status) { say("fixMsg", "اكتب الهدف أو الوضع على الأقل."); return; }
+  applyFix({ summary: { goal, status, next: mem.summary.next, open: mem.summary.open } });
+});
+async function loadMemory() {
+  const r = await fsOp("readFull");
+  if (!r || !r.ok) {
+    for (const id of ["decisions", "constraints", "log", "pins"]) $(id).replaceChildren(el("li", { className: "muted", textContent: r && r.error === "noFolder" ? "اختر مجلد المشروع أولاً." : r && r.error === "needPermission" ? "امنح إذن الكتابة للمجلد أولاً." : `تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.` }));
+    return;
+  }
+  mem = r.memory; renderMemory();
+}
+
+// ---------- pinned texts: versions, comparison, restore ----------
+let openPin = null;
+function renderPins() {
+  const ul = $("pins"); ul.textContent = "";
+  if (!mem.pins.length) ul.append(el("li", { className: "muted", textContent: "لا توجد نصوص معتمدة بعد. حدّد نصاً في المحادثة ثم «📌 ثبّت النص المحدد» من قائمة الزر الأيمن." }));
+  for (const p of mem.pins) ul.append(el("li", {}, el("div", { className: "txt" }, el("b", { textContent: p.name }), ` — النسخة المعتمدة ${p.version} (${p.date})`),
+    el("div", { className: "acts" }, btn("🕘 السجل والمقارنة", () => showPin(p.name)))));
+  if (openPin && mem.pins.some((p) => p.name === openPin)) showPin(openPin, true); else $("pinHist").hidden = true;
+}
+function showDiff(vs, a, b) {
+  const A = vs.find((x) => x.v === a), B = vs.find((x) => x.v === b), box = $("diff");
+  box.textContent = "";
+  if (!A || !B) { $("diffLabel").textContent = ""; return; }
+  $("diffLabel").textContent = a === b ? `نص النسخة ${a}:` : `الفرق بين النسخة ${a} والنسخة ${b} (الأحمر حُذف، والأخضر أُضيف):`;
+  const lines = a === b ? A.text.split("\n").map((line) => ({ op: " ", line })) : MemoryCore.diffLines(A.text, B.text);
+  for (const d of lines) box.append(el("div", { className: d.op === "-" ? "del" : d.op === "+" ? "add" : "", textContent: (d.op === " " ? "  " : d.op + " ") + d.line }));
+}
+async function showPin(name, keep) {
+  const r = await fsOp("pinVersions", { name });
+  if (!r.ok) { say("pinMsg", `تعذّرت قراءة النسخ: ${r.error}`); return; }
+  openPin = name; $("pinHist").hidden = false; $("pinTitle").textContent = `سجل «${name}» — ${r.versions.length} ${r.versions.length === 1 ? "نسخة" : "نسخ"}`;
+  const ul = $("pinVers"); ul.textContent = "";
+  const vs = r.versions, cur = (mem.pins.find((p) => p.name === name) || {}).version;
+  for (const x of vs.slice().reverse()) {
+    const acts = el("div", { className: "acts" }, btn("عرض", () => showDiff(vs, x.v, x.v)));
+    if (x.v > 1) acts.append(btn("قارن بالسابقة", () => showDiff(vs, vs[vs.indexOf(x) - 1].v, x.v)));
+    if (x.v !== cur) acts.append(btn("↩️ استرجاع", async () => {
+      const w = await fsOp("pinRestore", { name, v: x.v });
+      say("pinMsg", w.ok ? (w.unchanged ? `«${name}» مطابق للنسخة ${x.v} أصلاً.` : `أُعيد «${name}» إلى نص النسخة ${x.v}، وحُفظ نسخةً جديدة رقم ${w.v}. النسخ السابقة باقية.`) : `لم يُسترجع: ${w.error}`);
+      await loadMemory();
+    }));
+    ul.append(el("li", {}, el("div", { className: "txt" }, el("b", { textContent: `النسخة ${x.v}` }), `${x.v === cur ? " (المعتمدة)" : ""} — ${x.date} — ${x.text.length} حرفاً`, el("br"), el("span", { className: "muted", textContent: "بصمة " + x.sha.slice(0, 12) })), acts));
+  }
+  if (!keep) { if (vs.length > 1) showDiff(vs, vs[vs.length - 2].v, vs[vs.length - 1].v); else if (vs.length) showDiff(vs, vs[0].v, vs[0].v); }
+}
+
+if (inPopup) { $("fixSec").hidden = true; $("pinSec").hidden = true; } else loadMemory();
+chrome.storage.onChanged.addListener((ch) => { if (ch.folderAt && !inPopup) { loadMemory(); loadBackups(); } });

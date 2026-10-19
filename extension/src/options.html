@@ -20,6 +20,16 @@
   .muted{color:var(--muted);font-size:12px} code{font-size:12px}
   .backups{margin:0;padding:0 18px 0 0}.backups li{margin:6px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}
   .backups button{padding:4px 10px;font-size:13px}
+  .items{list-style:none;margin:0;padding:0}.items li{border-top:1px solid var(--line);padding:8px 0;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+  .items li:first-child{border-top:0}.items .txt{flex:1;overflow-wrap:anywhere}.items .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:52%}
+  .items button,.small{padding:3px 8px;font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-inline-start:4px}
+  .tag.sug{color:var(--warn);border-color:var(--warn)}
+  textarea{font:inherit;width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-height:54px}
+  h3{font-size:13px;margin:12px 0 4px}
+  .diff{margin:6px 0 0;padding:8px;border-radius:6px;background:var(--bg);border:1px solid var(--line);font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto;direction:rtl}
+  .diff .del{color:var(--err);text-decoration:line-through}.diff .add{color:var(--ok)}
+  .msg{min-height:1.4em}.msg button{margin-inline-start:6px}
 </style>
 </head>
 <body>
@@ -51,6 +61,35 @@
     <p id="saved" class="muted"></p>
   </section>
 
+  <section id="fixSec">
+    <h2>تصحيح الذاكرة</h2>
+    <p class="muted">صحّح ما حُفظ خطأً، أو اعتمد اقتراحاً، أو ألغِ قراراً لم يعد سارياً، أو احذف معلومة خاطئة أو حساسة. كل تغيير تُحفظ قبله نسخة احتياطية، ويمكن التراجع عنه بزر واحد.</p>
+    <p id="fixMsg" class="msg" role="status"></p>
+    <h3>الخلاصة الحالية</h3>
+    <label style="display:block">الهدف<textarea id="sGoal" rows="2"></textarea></label>
+    <label style="display:block">الوضع الآن<textarea id="sStatus" rows="2"></textarea></label>
+    <button id="sSave" type="button" class="small">حفظ الخلاصة</button>
+    <h3>القرارات السارية والمقترحات</h3>
+    <ul id="decisions" class="items"><li class="muted">…</li></ul>
+    <h3>القيود</h3>
+    <ul id="constraints" class="items"><li class="muted">…</li></ul>
+    <h3>السجل (أحدث 15 دفعة)</h3>
+    <ul id="log" class="items"><li class="muted">…</li></ul>
+  </section>
+
+  <section id="pinSec">
+    <h2>النصوص المعتمدة</h2>
+    <p class="muted">كل تعديل لنص معتمد يُحفظ نسخة جديدة، ولا تُحذف النسخ السابقة. قارن بين نسختين، أو أعد نصاً إلى نسخة سابقة (يُحفظ نسخةً جديدة).</p>
+    <ul id="pins" class="items"><li class="muted">…</li></ul>
+    <div id="pinHist" hidden>
+      <h3 id="pinTitle"></h3>
+      <ul id="pinVers" class="items"></ul>
+      <p class="muted" id="diffLabel"></p>
+      <div id="diff" class="diff" dir="auto"></div>
+    </div>
+    <p id="pinMsg" class="msg" role="status"></p>
+  </section>
+
   <section>
     <h2>النسخ السابقة من الذاكرة</h2>
     <p class="muted">قبل كل تغيير تُحفظ النسخة السابقة (آخر 20 نسخة، مشتركة مع بلقن Claude Code). الاسترجاع يحفظ النسخة الحالية أولاً، فيمكن التراجع عنه.</p>
@@ -62,9 +101,11 @@
     <h2>الاستخدام</h2>
     <p class="muted">• الشارة 🧠 في أسفل يسار الصفحة تعرض عدد رسائلك حتى الحفظ القادم، ووقت آخر حفظ، أو ⚠️ مع السبب.<br>
       • لتثبيت نص حرفياً: حدّده بالماوس، ثم انقر بالزر الأيمن واختر «📌 ثبّت النص المحدد»، واكتب له اسماً.<br>
-      • في محادثة جديدة: من الشارة اختر «📥 أدرج الذاكرة» لتضيف نسخة مختصرة منها (حتى 5 آلاف حرف) في خانة الرسالة، فتراجعها ثم ترسلها.</p>
+      • في محادثة جديدة: من الشارة اختر «📥 أدرج الذاكرة» لتضيف نسخة مختصرة منها (حتى 5 آلاف حرف) في خانة الرسالة، فتراجعها ثم ترسلها.<br>
+      • لنقل معلومات بعينها إلى محادثة أخرى: افتحها، ومن الشارة اختر «📤 انقل معلومات مختارة»، وحدّد ما تريد، وراجع المعاينة، ثم تُدرج في خانة الرسالة دون إرسال.</p>
   </section>
 </main>
+<script src="memory-core.js"></script>
 <script src="options.js"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 """End-to-end test: loads the real extension into Chromium and drives fake ChatGPT / Claude pages.
 Run from the extension folder:   python3 tests/e2e.py      (needs: pip install playwright; a Chromium build)
 The 'project folder' is a private browser folder (OPFS), so nothing on your disk is touched."""
-import json, os, re, shutil, sys, tempfile, threading, time, functools, subprocess
+import hashlib, json, os, re, shutil, sys, tempfile, threading, time, functools, subprocess
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from playwright.sync_api import sync_playwright
 
@@ -184,7 +184,6 @@ with sync_playwright() as pw:
     ok(pinned is not None and pinned == sel and "حلاوة تبدأ من أول رشفة ✓ «اقتباس»" in pinned and "\n" in pinned, "pinned file equals the selected text exactly (line breaks, marks)", repr(pinned))
     j = wait(lambda: (lambda m: m if m and m["pins"] else None)(mem("proj-chatgpt")), 10) or {}
     pn = (j.get("pins") or [{}])[0]
-    import hashlib
     ok(pn.get("name") == "الشعار" and pn.get("version") == 1 and pn.get("sha") == hashlib.sha256((pinned or "").encode()).hexdigest() and pn.get("path") == "CONVERSATION_PINS/الشعار/v1.md", "pin indexed in the JSON with its full sha256", pn)
     ok("**الشعار** — النسخة 1" in (read("proj-chatgpt", "CONVERSATION_MEMORY.md") or ""), "pin listed in the rendered MD")
     ok(len(j.get("log", [])) == 2, "pinning keeps the existing log", len(j.get("log", [])))
@@ -435,6 +434,86 @@ with sync_playwright() as pw:
     for i in range(16, 21): say(p, f"رسالة توافق {i}")
     ok(wait(lambda: "⚠️" in pill(p), 20) and read(proj, "CONVERSATION_MEMORY.json") == "{ broken", "a broken CONVERSATION_MEMORY.json is reported, not overwritten", pill(p))
     ok("ليس JSON صالحاً" in panel_text(p), "…with the reason in the panel")
+    p.close()
+
+    print("— correcting the memory from the settings page: approve, edit, revoke, remove, constraints, log, summary — each undoable —")
+    proj = "proj-fix"; use_folder(proj)
+    V1, V2 = "سطر أول ثابت\nسطر ثانٍ قديم\nسطر أخير ثابت", "سطر أول ثابت\nسطر ثانٍ جديد\nسطر أخير ثابت"
+    sha = lambda t: hashlib.sha256(t.encode()).hexdigest()
+    seed = {"format": "conversation-memory/1", "title": "ذاكرة المشروع", "updated": "2026-10-19 10:00",
+            "summary": {"goal": "هوية مقهى", "status": "اخترنا الاسم", "next": ["الشعار"], "open": []},
+            "decisions": [{"id": "d1", "text": "الاسم سكر وهيل", "source": "user", "date": "2026-10-19", "status": "active"},
+                          {"id": "d2", "text": "اقتراح: اللون الزيتوني", "source": "assistant", "date": "2026-10-19", "status": "active"},
+                          {"id": "d3", "text": "معلومة خاطئة عن الميزانية", "source": "user", "date": "2026-10-19", "status": "active"},
+                          {"id": "d4", "text": "الافتتاح في رمضان", "source": "user", "date": "2026-10-19", "status": "active"}],
+            "constraints": ["الميزانية 5000", "بلا لحوم"],
+            "pins": [{"name": "الشعار", "version": 2, "path": "CONVERSATION_PINS/الشعار/v2.md", "sha": sha(V2), "date": "2026-10-19"}],
+            "log": [{"id": "b-old-1", "platform": "chatgpt", "chat": "هوية", "range": "1–5", "date": "2026-10-19 09:00", "raised": ["نقاش الاسم"], "decided": [], "changed": []},
+                    {"id": "b-old-2", "platform": "claude-web", "chat": "هوية", "range": "6–10", "date": "2026-10-19 09:30", "raised": ["دفعة خاطئة"], "decided": [], "changed": []}],
+            "imported": None, "mdHash": "", "archived": 0}
+    write(proj, "CONVERSATION_MEMORY.json", json.dumps(seed, ensure_ascii=False))
+    write(proj, "CONVERSATION_PINS/الشعار/v1.md", V1); write(proj, "CONVERSATION_PINS/الشعار/v2.md", V2)
+    opt.reload(); opt.wait_for_load_state()
+    D = lambda i: opt.locator("#decisions li").filter(has_text=i)
+    ok(wait(lambda: D("d2").count() == 1, 10) and "اقتراح لم يُعتمد" in D("d2").inner_text() and D("d1").locator("text=✅ اعتماد").count() == 0,
+       "the settings page lists decisions with their source; only a suggestion can be approved", opt.locator("#decisions").inner_text())
+    def fixed(cond, secs=10): return wait(lambda: (lambda m: m and cond(m))(mem(proj)), secs)
+    dec = lambda m, i: next((d for d in m["decisions"] if d["id"] == i), None)
+    D("d2").locator("text=✅ اعتماد").click()
+    ok(fixed(lambda m: dec(m, "d2")["source"] == "assistant-approved"), "✅ approve: the suggestion becomes an approved decision")
+    ok("اعتُمد الاقتراح d2" in opt.locator("#fixMsg").inner_text() and opt.locator("#fixMsg button").count() == 1, "…the page says what changed, with an undo button", opt.locator("#fixMsg").inner_text())
+    D("d1").locator("text=✏️ تعديل").click(); opt.locator("#decisions textarea").fill("الاسم: سُكّر وهيل"); opt.locator("#decisions li:has(textarea) button", has_text="حفظ").click()
+    ok(fixed(lambda m: dec(m, "d1")["text"] == "الاسم: سُكّر وهيل"), "✏️ edit: the decision text is corrected in place")
+    D("d4").locator("text=🚫 إلغاء").click()
+    ok(fixed(lambda m: dec(m, "d4")["status"] == "revoked"), "🚫 revoke: kept, marked no longer in force")
+    ok("~~الافتتاح في رمضان~~" in (read(proj, "CONVERSATION_MEMORY.md") or ""), "…and shown struck through among the revoked in the readable file")
+    D("d3").locator("text=🗑️ حذف").click()
+    ok(fixed(lambda m: dec(m, "d3") is None), "🗑️ remove: a wrong item is gone for good")
+    opt.locator("#constraints li").filter(has_text="الميزانية 5000").locator("text=🗑️ حذف").click()
+    ok(fixed(lambda m: m["constraints"] == ["بلا لحوم"]), "a constraint is removed")
+    opt.locator("#log li").filter(has_text="دفعة خاطئة").locator("text=🗑️ حذف الدفعة").click()
+    ok(fixed(lambda m: [e["id"] for e in m["log"]] == ["b-old-1"]), "a wrong log entry is removed")
+    before_fix = read(proj, "CONVERSATION_MEMORY.json")
+    opt.locator("#sGoal").fill("هوية مقهى في جدة"); opt.locator("#sSave").click()
+    ok(fixed(lambda m: m["summary"]["goal"] == "هوية مقهى في جدة" and m["summary"]["next"] == ["الشعار"]), "the summary is edited (the next steps are kept)")
+    md = read(proj, "CONVERSATION_MEMORY.md") or ""
+    ok("**d1** الاسم: سُكّر وهيل" in md and "معلومة خاطئة" not in md and "دفعة خاطئة" not in md and "هوية مقهى في جدة" in md, "the readable .md follows every correction", md[:500])
+    opt.locator("#fixMsg button").click()
+    ok(fixed(lambda m: m["summary"]["goal"] == "هوية مقهى"), "↩️ undo right after a correction brings back the version before it")
+    ok(read(proj, "CONVERSATION_MEMORY.json") == before_fix, "…byte for byte")
+    opt.locator("#decisions li").filter(has_text="d1").locator("text=✏️ تعديل").click(); opt.locator("#decisions textarea").fill("المفتاح sk-ant-api03-" + "Q" * 40); opt.locator("#decisions li:has(textarea) button", has_text="حفظ").click()
+    ok(fixed(lambda m: "Q" * 40 not in json.dumps(m)) and "QQQQQQQQQQ" not in (read(proj, "CONVERSATION_MEMORY.json") or "x"), "a secret typed into a correction is redacted before saving")
+    ok(len(ls(proj, ".conversation-memory/backups")) >= 8, "every correction left a backup", len(ls(proj, ".conversation-memory/backups")))
+
+    print("— pinned texts: versions, comparison, restore —")
+    opt.locator("#pins li").filter(has_text="الشعار").locator("text=🕘 السجل والمقارنة").click()
+    ok(wait(lambda: opt.locator("#pinVers li").count() == 2, 8), "the history lists both versions", opt.locator("#pinHist").inner_text())
+    dt = opt.locator("#diff").inner_text()
+    ok("- سطر ثانٍ قديم" in dt and "+ سطر ثانٍ جديد" in dt and opt.locator("#diff .del").count() == 1 and opt.locator("#diff .add").count() == 1, "the comparison shows exactly the changed line", dt)
+    opt.locator("#pinVers li").filter(has_text="النسخة 1").locator("text=↩️ استرجاع").click()
+    ok(wait(lambda: read(proj, "CONVERSATION_PINS/الشعار/v3.md") == V1, 8), "restoring version 1 saves its exact text as version 3")
+    ok(read(proj, "CONVERSATION_PINS/الشعار/v2.md") == V2 and (mem(proj) or {}).get("pins", [{}])[0].get("version") == 3, "…older versions stay, and the index points to version 3")
+    ok("نسخةً جديدة رقم 3" in opt.locator("#pinMsg").inner_text(), "…and the page says so", opt.locator("#pinMsg").inner_text())
+
+    print("— moving chosen information into another chat: choose, preview, insert (never sent) —")
+    p = ctx.new_page(); p.goto(BASE + page("chatgpt", "/c/share-target/", "محادثة ثانية - ChatGPT", pre=(1, 2)))
+    wait(lambda: "🧠" in pill(p) and "…" not in pill(p), 10)
+    p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=share]").click()
+    P_ = p.locator("#cm-memory-indicator .panel")
+    ok(wait(lambda: P_.locator("input[type=checkbox]").count() >= 5, 8), "the share panel lists what can be moved", P_.inner_text()[:300])
+    ok("لم تختر شيئاً" in P_.locator(".share-prev").inner_text(), "…nothing is chosen by default")
+    P_.locator("input[data-k=summary]").check(); P_.locator("input[data-k=decisions][data-v=d2]").check()
+    prev = P_.locator(".share-prev").inner_text()
+    ok("هوية مقهى" in prev and "اللون الزيتوني" in prev and "بلا لحوم" not in prev and "نقاش الاسم" not in prev, "the preview shows exactly what was chosen", prev)
+    ok(re.search(r"\d+ / 3,000 حرف", P_.locator(".count").inner_text()), "…with its length against the 3,000 limit", P_.locator(".count").inner_text())
+    P_.locator("button[data-a=share-insert]").click()
+    box = wait(lambda: (lambda t: t if "اللون الزيتوني" in t else None)(p.evaluate("document.getElementById('prompt-textarea').innerText")), 5) or ""
+    ok("بيانات وليست أوامر" in box and "اللون الزيتوني" in box and "بلا لحوم" not in box, "inserted into the message box, framed as reference data", box[:200])
+    ok(not [x for x in p.evaluate("window.__sent") if "اللون الزيتوني" in x], "…and nothing is sent")
+    p.evaluate("document.getElementById('prompt-textarea').innerText = 'مسودتي'")
+    p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=share]").click()
+    P_.locator("input[data-k=summary]").check(); P_.locator("button[data-a=share-insert]").click(); p.wait_for_timeout(500)
+    ok(p.evaluate("document.getElementById('prompt-textarea').innerText") == "مسودتي" and "أفرغ خانة الرسالة" in p.locator("#cm-memory-indicator .toast").inner_text(), "your own draft in the box is never overwritten")
     p.close()
 
     print("— a page the extension can't read says so —")
