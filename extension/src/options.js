@@ -100,80 +100,19 @@ $("backups").addEventListener("click", async (e) => {
 });
 if (!inPopup) loadBackups();
 
-// ---------- correcting the memory ----------
-// Every change is one "fix" (the same shape as the plugin's /conversation-memory:fix): validated, backed up, undoable.
+// ---------- the memory as read from the folder (for the pinned texts) ----------
 const fsOp = (op, args) => chrome.runtime.sendMessage({ cmd: "fs", op, args }).catch((err) => ({ ok: false, error: String(err) }));
 const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) e.append(k); return e; };
 const btn = (text, onclick, title) => el("button", { type: "button", textContent: text, onclick, title: title || "" });
-const SRC = { user: "قرارك", "assistant-approved": "اقتراح اعتمدته", assistant: "اقتراح لم يُعتمد" };
 let mem = null;
-
-function say(where, text, withUndo) {
-  const p = $(where); p.textContent = text;
-  if (withUndo) p.append(btn("↩️ تراجع", async () => { const r = await fsOp("restore", { n: 1 }); say(where, r.ok ? `تراجعت: عادت نسخة ${r.when}.` : `لم يُسترجع شيء: ${r.error}`); loadMemory(); loadBackups(); }));
-}
-async function applyFix(fix) {
-  const r = await fsOp("fix", { fix });
-  if (r.ok) say("fixMsg", `✓ ${r.changes.join("، ")}${r.redacted ? " (وحُذفت بيانات حساسة)" : ""}.`, true);
-  else say("fixMsg", `لم يتغيّر شيء: ${r.error}`);
-  await loadMemory(); loadBackups();
-  return r.ok;
-}
-function editRow(li, current, onSave) {
-  const ta = el("textarea", { value: current, rows: 2 });
-  li.replaceChildren(el("div", { className: "txt" }, ta), el("div", { className: "acts" }, btn("حفظ", () => { const t = ta.value.trim(); if (t && t !== current) onSave(t); else loadMemory(); }), btn("إلغاء", () => loadMemory())));
-  ta.focus();
-}
-function renderMemory() {
-  const m = mem;
-  $("sGoal").value = m.summary.goal || ""; $("sStatus").value = m.summary.status || "";
-  const ds = $("decisions"); ds.textContent = "";
-  const act = m.decisions.filter((d) => d.status === "active");
-  if (!act.length) ds.append(el("li", { className: "muted", textContent: "لا توجد قرارات محفوظة." }));
-  for (const d of act) {
-    const li = el("li");
-    const txt = el("div", { className: "txt" }, el("b", { textContent: d.id + " " }), d.text, el("span", { className: "tag" + (d.source === "assistant" ? " sug" : ""), textContent: SRC[d.source] || d.source }));
-    const acts = el("div", { className: "acts" });
-    if (d.source === "assistant") acts.append(btn("✅ اعتماد", () => applyFix({ decisions: { approve: [d.id] } }), "وافقت عليه: يصير قراراً معتمداً"));
-    acts.append(btn("✏️ تعديل", () => editRow(li, d.text, (t) => applyFix({ decisions: { edit: [{ id: d.id, text: t }] } })), "صحّح نصه"),
-      btn("🚫 إلغاء", () => applyFix({ decisions: { revoke: [d.id] } }), "لم يعد سارياً؛ يبقى في سجل الملغى"),
-      btn("🗑️ حذف", () => applyFix({ decisions: { remove: [d.id] } }), "حذف نهائي لمعلومة خاطئة أو حساسة"));
-    li.append(txt, acts); ds.append(li);
-  }
-  const cs = $("constraints"); cs.textContent = "";
-  if (!m.constraints.length) cs.append(el("li", { className: "muted", textContent: "لا توجد قيود محفوظة." }));
-  for (const c of m.constraints) {
-    const li = el("li");
-    li.append(el("div", { className: "txt", textContent: c }), el("div", { className: "acts" },
-      btn("✏️ تعديل", () => editRow(li, c, (t) => applyFix({ constraints: { remove: [c], add: [t] } }))),
-      btn("🗑️ حذف", () => applyFix({ constraints: { remove: [c] } }))));
-    cs.append(li);
-  }
-  const lg = $("log"); lg.textContent = "";
-  const entries = m.log.slice(-15).reverse();
-  if (!entries.length) lg.append(el("li", { className: "muted", textContent: "السجل فارغ." }));
-  for (const e of entries) {
-    // no "·" next to a number (it reads as a zero in Arabic text): parts are separated by a long dash, the date kept left-to-right
-    const range = (e.range || "").split(/[–-]/), where = [e.chat, range.length === 2 ? `الرسائل من ${range[0]} إلى ${range[1]}` : e.range].filter(Boolean).join(" — ");
-    const first = e.raised[0] || e.decided[0] || e.changed[0] || "";
-    const meta = el("span", { className: "muted" }, where + (e.date ? " — " : ""), e.date ? el("bdi", { dir: "ltr", textContent: e.date }) : "");
-    lg.append(el("li", {}, el("div", { className: "txt" }, el("b", { textContent: MemoryCore.PLATFORMS[e.platform] || e.platform }), " ", meta, el("br"), el("span", { textContent: first })),
-      el("div", { className: "acts" }, btn("🗑️ حذف الدفعة", () => applyFix({ log: { remove: [e.id] } })))));
-  }
-  renderPins();
-}
-$("sSave").addEventListener("click", () => {
-  const goal = $("sGoal").value.trim(), status = $("sStatus").value.trim();
-  if (!goal && !status) { say("fixMsg", "اكتب الهدف أو الوضع على الأقل."); return; }
-  applyFix({ summary: { goal, status, next: mem.summary.next, open: mem.summary.open } });
-});
+function say(where, text) { $(where).textContent = text; }
 async function loadMemory() {
   const r = await fsOp("readFull");
   if (!r || !r.ok) {
-    for (const id of ["decisions", "constraints", "log", "pins"]) $(id).replaceChildren(el("li", { className: "muted", textContent: r && r.error === "noFolder" ? "اختر مجلد المشروع أولاً." : r && r.error === "needPermission" ? "امنح إذن الكتابة للمجلد أولاً." : `تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.` }));
+    $("pins").replaceChildren(el("li", { className: "muted", textContent: r && r.error === "noFolder" ? "اختر مجلد المشروع أولاً." : r && r.error === "needPermission" ? "امنح إذن الكتابة للمجلد أولاً." : `تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.` }));
     return;
   }
-  mem = r.memory; renderMemory();
+  mem = r.memory; renderPins();
 }
 
 // ---------- pinned texts: versions, comparison, restore ----------

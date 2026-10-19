@@ -313,16 +313,6 @@ const ops = {
     const m = !cur.exists && cur.mdText ? C.importLegacy(cur.memory, cur.mdText, "") : cur.memory;
     return { ok: true, memory: m, exists: cur.exists };
   },
-  // a correction made by the user (same shape as the plugin's /conversation-memory:fix), backed up and undoable
-  async fix({ fix }) {
-    const { h, err } = await root(); if (err) return { ok: false, error: err };
-    const v = C.validateFix(fix);
-    if (!v.ok) return { ok: false, error: v.error };
-    let res = null;
-    const w = await writeMemory(h, (m) => { res = C.applyFix(m, v.fix, today()); return res.changes.length ? { memory: res.memory } : { err: res.missing.length ? `لم أجد ${res.missing.join("، ")} في الذاكرة` : "لا تغيير: الذاكرة مطابقة أصلاً" }; });
-    if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
-    return { ok: true, changes: res.changes, missing: res.missing, redacted: res.redacted, notes: w.notes };
-  },
   // every saved version of a pinned text, oldest first: { v, text, sha, date }
   async pinVersions({ name }) {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
