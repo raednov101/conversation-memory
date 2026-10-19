@@ -34,11 +34,13 @@
   async function chatState(key) {
     const raw = await B.get(`chat:${PID}:${key}`, null);
     const fresh = !raw || typeof raw !== "object" || !Object.keys(raw).length;
-    return { linked: false, summarizedUpTo: 0, hashes: [], rhashes: [], rewound: null, suspect: null, rewinds: [], rawCount: 0, rawSig: "", pending: null, expired: null, lastSave: 0, status: "idle", error: "", attempts: 0, failedAt: -1, note: "", ...(fresh ? {} : raw), fresh };
+    return { linked: false, summarizedUpTo: 0, hashes: [], rhashes: [], rewound: null, suspect: null, rewinds: [], rawCount: 0, rawSig: "", pending: null, expired: null, lastSave: 0, rawAt: 0, lastCost: null, costTotal: { n: 0, chars: 0 }, status: "idle", error: "", attempts: 0, failedAt: -1, note: "", ...(fresh ? {} : raw), fresh };
   }
   const saveChat = (key, st) => { const { fresh, ...rest } = st; return B.set(`chat:${PID}:${key}`, rest); };
   const fail = (st, error, userCount) => Object.assign(st, { status: "error", error, attempts: st.attempts + 1, failedAt: userCount, pending: null });
-  const saved = (st, w, note) => Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note });
+  // what a summary cost: the request we typed and the reply it produced, in characters (tokens are estimated from them)
+  const costOf = (st, w, replyLen) => { const c = { req: w.reqLen || 0, rep: replyLen || 0 }; const t = st.costTotal || { n: 0, chars: 0 }; return { lastCost: c, costTotal: { n: t.n + 1, chars: t.chars + c.req + c.rep } }; };
+  const saved = (st, w, note, replyLen) => Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen));
 
   // ---------- proof that you created a chat here (see linking.js): a real send from a new-chat page ----------
   let sentOnNew = null;
@@ -99,7 +101,7 @@
           const e = st.expired; st.expired = null;
           if (e.to > st.summarizedUpTo) {
             const r = await B.fs("commit", { project: e.project, reply: late.reply, batch: e.batch, base: e.base, platform: A.platform, chat: label, range: `${e.from}–${e.to}` });
-            if (r.ok) saved(st, e, "وصل الملخص متأخراً وحُفظ.");
+            if (r.ok) saved(st, e, "وصل الملخص متأخراً وحُفظ.", late.reply.length);
             else if (r.busy) { st.expired = e; schedule(4000); }
           }
         }
@@ -112,7 +114,7 @@
           else {
             const p = st.pending;
             const r = await B.fs("commit", { project: p.project, reply: mine.reply, batch: p.batch, base: p.base, platform: A.platform, chat: label, range: `${p.from}–${p.to}` });
-            if (r.ok) { saved(st, p, [r.redacted ? "حُذفت بيانات حساسة من الملخص." : "", r.summarySkipped ? "لم تُستبدل الخلاصة لأن الذاكرة تغيّرت أثناء التلخيص؛ حُفظ السجل والقرارات." : "", ...(r.notes || [])].filter(Boolean).join(" ")); st.pending = null; }
+            if (r.ok) { saved(st, p, [r.redacted ? "حُذفت بيانات حساسة من الملخص." : "", r.summarySkipped ? "لم تُستبدل الخلاصة لأن الذاكرة تغيّرت أثناء التلخيص؛ حُفظ السجل والقرارات." : "", ...(r.notes || [])].filter(Boolean).join(" "), mine.reply.length); st.pending = null; }
             else if (r.busy) { st.note = "برنامج آخر (بلقن Claude Code؟) يكتب في الذاكرة الآن؛ سأحفظ بعد لحظات."; schedule(4000); }   // nothing written, nothing counted
             else fail(st, B.why(r.error), userCount);
           }
@@ -124,7 +126,7 @@
       const sig = `${userCount}:${turns.reduce((s, t) => s + t.text.length, 0)}`;
       if (lastDone && !loading && sig !== st.rawSig && userCount >= st.rawCount) {
         const r = await B.fs("saveRaw", { project: PID, chatKey: key, label: `${A.name} · ${label}`, url: location.origin + location.pathname, turns });
-        if (r.ok) Object.assign(st, { rawSig: sig, rawCount: userCount });
+        if (r.ok) Object.assign(st, { rawSig: sig, rawCount: userCount, rawAt: Date.now() });
         else Object.assign(st, { status: "error", error: "تعذّر حفظ نص المحادثة: " + B.why(r.error) });
       }
 
@@ -137,13 +139,14 @@
         if (!claim.ok) { /* another tab on this chat is sending it */ }
         else if (!prep.ok) fail(st, B.why(prep.error), userCount);
         else {
+          let reqText = "";
           const from = st.summarizedUpTo + 1, to = userCount, batch = `ext-${key.slice(0, 24)}-${from}-${to}-${nonce()}`;
           const first = turns.find((t) => t.role === "user" && t.n === from);
           const c2 = A.composer();   // you may have started typing while the files were read: then don't touch the box
           if (!c2 || CP.text(c2) || A.generating()) { /* try again on a later pass */ }
-          else if (await CP.typeInto(c2, M.summarizer.prompt(batch, from, to, first && first.text, prep.state, st.rewound))) {
+          else if (await CP.typeInto(c2, (reqText = M.summarizer.prompt(batch, from, to, first && first.text, prep.state, st.rewound)))) {
             await CP.send(A, c2);
-            Object.assign(st, { pending: { batch, base: prep.base, project: PID, from, to, hashes: uh.slice(0, to), rhashes: rh.slice(0, to), sentAt: Date.now(), len: -1, seenAt: 0 }, expired: null, status: "saving", error: "" });
+            Object.assign(st, { pending: { batch, base: prep.base, project: PID, from, to, reqLen: reqText.length, hashes: uh.slice(0, to), rhashes: rh.slice(0, to), sentAt: Date.now(), len: -1, seenAt: 0 }, expired: null, status: "saving", error: "" });
           } else fail(st, "تعذّرت الكتابة في خانة الرسالة", userCount);
         }
       }

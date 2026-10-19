@@ -7,7 +7,7 @@
     .pill{position:fixed;left:12px;bottom:96px;z-index:2147483646;font:12px/1.4 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;direction:rtl;
       background:#1f2328;color:#f6f8fa;border-radius:999px;padding:6px 12px;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;user-select:none;opacity:.92;border:0}
     .pill:hover,.pill:focus-visible{opacity:1;outline:2px solid #fff3}
-    .ok{background:#1a7f37}.warn{background:#9a6700}.err{background:#cf222e}.busy{background:#0969da}.idle{background:#57606a}
+    .ok{background:#1a7f37}.txt{background:#1b7c83}.warn{background:#9a6700}.err{background:#cf222e}.busy{background:#0969da}.idle{background:#57606a}
     .panel{position:fixed;left:12px;bottom:132px;z-index:2147483647;direction:rtl;font:13px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
       background:#fff;color:#1f2328;border:1px solid #d0d7de;border-radius:10px;padding:12px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none}
     .panel.open{display:block}.panel p{margin:0 0 8px;overflow-wrap:anywhere}
@@ -22,6 +22,8 @@
     .share-prev{max-height:150px}.count{font-size:11px;color:#57606a;text-align:left}
     .toast{position:fixed;left:12px;bottom:56px;z-index:2147483647;direction:rtl;font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+  const tokens = (chars) => root.MemoryCore.estTokens(chars);   // the shared core's estimate (≈ 3 characters per token)
   const hhmm = (t) => (t ? new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 
   const SHARE = ["📤 انقل معلومات مختارة إلى هذه المحادثة", "share"];
@@ -41,17 +43,22 @@
     }
     else if (v.phase === "new") { text = "🧠 محادثة جديدة"; info = `المجلد: ${esc(v.fsSt.folder)}`; btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE); }
     else if (v.phase === "chat") {
-      const since = Math.max(0, v.userCount - s.summarizedUpTo), prog = `${Math.min(since, settings.every)}/${settings.every}`;
+      const since = Math.max(0, v.userCount - s.summarizedUpTo), manual = settings.mode === "manual";
+      const prog = manual ? `${since} · يدوي` : `${Math.min(since, settings.every)}/${settings.every}`;
+      const cost = s.lastCost ? tokens(s.lastCost.req + s.lastCost.rep) : 0;
       if (v.unreadable) { cls = "err"; text = "🧠 ⚠️ لا أقرأ الرسائل"; info = "لا أستطيع قراءة رسائل هذه الصفحة؛ ربما تغيّر تصميم الموقع. الحفظ متوقف هنا، ولم يُفقد شيء محفوظ."; }
       else if (s.pending) { cls = "busy"; text = `🧠 ⏳ ${prog} · يحفظ`; info = "طُلب الملخص من النموذج؛ يُحفظ عند اكتمال الرد."; }
       else if (s.status === "error") { cls = "err"; text = `🧠 ⚠️ ${prog} · تعثّر الحفظ`; info = `تعثّر الحفظ: ${esc(s.error)}` + (s.attempts >= maxAttempts ? " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)" : " (يعيد المحاولة بعد رسالتك القادمة)"); }
-      else { cls = s.lastSave ? "ok" : "idle"; text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : ""); info = s.lastSave ? `آخر حفظ ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحفظ ملخص بعد."; }
+      // three outcomes, never confused: 📝 the full text is saved (summary later) · ✓ the summary was updated · ⚠️ failed
+      else if (s.rawAt && s.rawAt > (s.lastSave || 0)) { cls = "txt"; text = `🧠 ${prog} · 📝 ${hhmm(s.rawAt)}`; info = `📝 النص الكامل محفوظ ${hhmm(s.rawAt)}.<br>${s.lastSave ? `✓ آخر تحديث للملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحدَّث الملخص بعد."}`; }
+      else { cls = s.lastSave ? "ok" : "idle"; text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "") + (s.lastSave && cost ? ` · ≈${fmt(cost)} توكن` : ""); info = s.lastSave ? `✓ حُدّث الملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحفظ ملخص بعد."; }
+      if (s.lastCost && !v.unreadable) info += `<br><span class="muted">كلفة آخر تلخيص: الطلب ${fmt(s.lastCost.req)} حرفاً والرد ${fmt(s.lastCost.rep)} ≈ ${fmt(cost)} توكن${s.costTotal && s.costTotal.n > 1 ? `؛ في هذه المحادثة ${s.costTotal.n} تلخيصات ≈ ${fmt(tokens(s.costTotal.chars))} توكن` : ""} (تقدير). ويبقى الطلب ورده في سياق المحادثة.</span>`;
       if (s.note && !v.unreadable) info += `<br><span class="muted">${esc(s.note)}</span>`;
       if (v.empty && v.empty.length && !v.unreadable) info += `<br><span class="muted">${v.empty.length === 1 ? `رسالتك رقم ${v.empty[0]}` : `رسائلك رقم ${v.empty.join("، ")}`} بلا نص مقروء (صورة أو ملف)؛ لا يُحفظ منها إلا ما يذكره الرد عنها.</span>`;
       if (!v.unreadable) {
         const left = Math.max(0, settings.every - since);
-        info += `<br><span class="muted">${left ? `الحفظ القادم بعد ${left} ${left === 1 ? "رسالة" : "رسائل"}.` : "الحفظ مستحق."} النص الكامل يُحفظ بعد كل رد.` +
-          `${settings.mode === "manual" ? " (الوضع اليدوي)" : settings.paused ? " (التلقائي متوقف)" : ""}${v.noComposer ? " لا أجد خانة الكتابة." : ""}</span>`;
+        info += `<br><span class="muted">${manual ? "الوضع اليدوي: لا يُطلب ملخص إلا بالزر." : `${left ? `الحفظ القادم بعد ${left} ${left === 1 ? "رسالة" : "رسائل"}.` : "الحفظ مستحق."}`} النص الكامل يُحفظ بعد كل رد.` +
+          `${!manual && settings.paused ? " (التلقائي متوقف)" : ""}${v.noComposer ? " لا أجد خانة الكتابة." : ""}</span>`;
         if (v.userCount > s.summarizedUpTo && !s.pending) btns.push(["💾 لخّص واحفظ الآن", "summarize"]);
         if (settings.mode === "auto") btns.push([settings.paused ? "▶️ تشغيل الحفظ التلقائي" : "⏸️ إيقاف الحفظ التلقائي", "pause"]);
       }

@@ -69,9 +69,12 @@ ok(!/مشبوه|لم يصدر منك|لم أنفذه|suspicious/.test(a8), "hous
 const t9 = J("t9.json").result || "";
 ok(/رسائل|حفظ/.test(t9) && /\d/.test(t9), "status command reports real numbers", t9.slice(0, 200));
 const probe = (() => { try { return fs.readFileSync(path.join(os.homedir(), ".conversation-memory", "indicator-probe.txt"), "utf8"); } catch { return ""; } })();
-ok(/^🧠 (⏳ |⚠️ )?\d\/5/.test(probe), `status-line indicator reads the status and formats it: «${probe}»`);
-const now = JSON.stringify(memNow || {});
-ok(/55|٥٥/.test(now) && !/40 ألف|٤٠ ألف/.test(now.replace(/بدل 40 ألف/g, "")), "/fix: the budget is corrected in the memory", now.slice(0, 400));
+ok(/^🧠 (⏳ |⚠️ )?\d\/5( · (✓ \d\d:\d\d( · ≈[\d,]+ توكن)?|📝 \d\d:\d\d|يحفظ|تعثّر الحفظ))?$/.test(probe), `status-line indicator reads the status and formats it: «${probe}»`);
+// the correction applies to what is in force (decisions, summary); the log stays a faithful history of what was said.
+// Mentioning the old figure as context («كانت 40 ألفاً») is fine; stating the budget as 40 without the new figure is not.
+const inForce = memNow ? [...memNow.decisions.filter((d) => d.status === "active").map((d) => d.text), memNow.summary.status, memNow.summary.goal] : [];
+const stale = inForce.filter((t) => /ميزانية/.test(t) && /(40|٤٠) ألف/.test(t) && !/(55|٥٥) ألف/.test(t));
+ok(inForce.some((t) => /(55|٥٥) ألف/.test(t)) && !stale.length, "/fix: the budget is corrected in the decisions and the summary", stale.join(" | ") || inForce.join(" | ").slice(0, 300));
 const bk = path.join(P, ".conversation-memory", "backups");
 ok(fs.existsSync(bk) && fs.readdirSync(bk).length >= 1, "/fix: the version before it is kept as a backup");
 const sh = path.join(P, ".conversation-memory", "share"); const shf = fs.existsSync(sh) ? fs.readdirSync(sh) : [];

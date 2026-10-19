@@ -1,0 +1,13 @@
+{
+  "name": "conversation-memory",
+  "owner": { "name": "Raed" },
+  "metadata": { "description": "ذاكرة المحادثة: ملخص موثوق لمحادثاتك الطويلة داخل مجلد مشروعك." },
+  "plugins": [
+    {
+      "name": "conversation-memory",
+      "source": "./plugin",
+      "description": "يلخّص المحادثة كل بضع رسائل في ملف داخل مشروعك، مع نصوص معتمدة حرفية، وتصحيح وتراجع، ونقل معلومات مختارة، ومؤشر بحالة الحفظ وكلفته.",
+      "category": "productivity"
+    }
+  ]
+}

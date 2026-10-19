@@ -2,7 +2,7 @@
 // What is due and what Claude is asked: batches, pin requests, status text, commands.
 const path = require("path");
 const C = require("../../core/memory-core.js");
-const { EVERY, MAX_DRAFT, KEEP_MSGS, MAX_UNDONE, PIN_TURNS, CMD } = require("./config");
+const { MAX_DRAFT, KEEP_MSGS, MAX_UNDONE, PIN_TURNS, CMD } = require("./config");
 const { nonce, int } = require("./util");
 const { readSafe, unlinkSafe } = require("./fsx");
 const { sid8, P, PRIV, notes, pubSafe } = require("./context");
@@ -38,12 +38,23 @@ function pinRequest(p) {
 function backupsText(list) {
   return list.length ? list.slice(0, 10).map((b, i) => `  ${i + 1}. ${b.when} — ${b.decisions} قرار سارٍ، ${b.log} دفعة في السجل${b.goal ? `، الهدف: «${b.goal}»` : ""}`).join("\n") : "  لا توجد نسخ سابقة بعد";
 }
-function statusText(s, mem, backups) {
+const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+// what summarizing costs, measured from the text actually sent and written (an estimate in tokens, said to be one)
+function costText(s) {
+  const L = [];
+  if (s.lastCost.chars) L.push(`آخر تلخيص ${fmt(s.lastCost.chars)} حرفاً (الطلب والمسودة) ≈ ${fmt(C.estTokens(s.lastCost.chars))} توكن`);
+  if (s.costTotal.n) L.push(`في هذه الجلسة ${s.costTotal.n} ${s.costTotal.n === 1 ? "تلخيص" : "تلخيصات"} ≈ ${fmt(C.estTokens(s.costTotal.chars))} توكن`);
+  if (s.injected) L.push(`الذاكرة المحمّلة عند بداية الجلسة ${fmt(s.injected)} حرفاً ≈ ${fmt(C.estTokens(s.injected))} توكن`);
+  return L.length ? L.join("؛ ") + " (تقدير من عدد الحروف؛ لا يشمل ما قد يقرؤه Claude من ملف الذاكرة)" : "لم يُلخَّص شيء في هذه الجلسة بعد";
+}
+function statusText(s, mem, backups, cfg) {
   const by = (st) => s.batches.filter((b) => b.status === st).map(labelOf).join("، ") || "لا شيء";
   const m = mem.memory;
   return `[conversation-memory] حالة الذاكرة (من النظام؛ انقلها للمستخدم بإيجاز ولا تخمّن):\n` +
     `- الملف: ${P.json}${mem.bad ? ` (${mem.bad})` : mem.exists ? "" : " (لم يُنشأ بعد)"}\n` +
-    `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}/${EVERY}، آخر حفظ: ${s.lastSave || "لا يوجد بعد"}\n` +
+    `- طريقة التلخيص: ${cfg.mode === "manual" ? "يدوي (بالأمر /conversation-memory:save فقط)" : `تلقائي كل ${cfg.every} رسائل`} — للتغيير: /conversation-memory:settings\n` +
+    `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}${cfg.mode === "manual" ? "" : "/" + cfg.every}، آخر تحديث للملخص: ${s.lastSave || "لا يوجد بعد"}${s.lastCapture ? `، آخر نسخ للنص: ${s.lastCapture}` : ""}\n` +
+    `- الكلفة: ${costText(s)}\n` +
     `- بانتظار الحفظ: ${by("pending")}\n- متعثرة: ${by("stuck")}${s.lastError ? ` (آخر خطأ: ${s.lastError})` : ""}\n- نُسخت قبل الضغط/الإغلاق: ${by("captured")}\n` +
     (m ? `- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => `${p.name} (ن${p.version})`).join("، ") || "لا شيء"}، دفعات السجل: ${m.log.length}\n` : "") +
     `- النسخ السابقة (للاسترجاع: /conversation-memory:restore رقم، أو /conversation-memory:undo للأحدث):\n${backupsText(backups || [])}\n` +
@@ -62,10 +73,11 @@ function parseCommand(prompt) {
   if (t.startsWith(CMD + "fix")) return { fix: true, ask: t.slice((CMD + "fix").length).trim().slice(0, 500), slash };
   if (t.startsWith(CMD + "pins")) return { pins: true, args: t.slice((CMD + "pins").length).trim(), slash };
   if (t.startsWith(CMD + "share")) return { share: true, args: t.slice((CMD + "share").length).trim(), slash };
+  if (t.startsWith(CMD + "settings")) return { settings: true, args: t.slice((CMD + "settings").length).trim(), slash };
   if (t.startsWith(CMD + "restore")) { const n = parseInt(t.slice((CMD + "restore").length), 10); return { restore: n >= 1 && n <= 99 ? n : 0, listOnly: !(n >= 1), slash }; }
   return { slash };
 }
-function recordPrompt(s, pid, h, cmd) {
+function recordPrompt(s, pid, h, cmd, cfg) {
   if (!cmd.slash) { s.count += 1; s.msgs[s.count] = { p: String(pid || "").slice(0, 80), h: h || "" }; }
   let dropped = 0;
   for (const k of Object.keys(s.msgs)) {
@@ -76,7 +88,7 @@ function recordPrompt(s, pid, h, cmd) {
   if (dropped) notes.push(`⚠️ ذاكرة المحادثة: ${dropped} رسالة قديمة لم تُلخّص خرجت من نطاق التتبع.`);
   let changed = false;
   if (cmd.save) for (const b of s.batches) if (b.status === "stuck") { b.status = "pending"; b.attempts = 0; b.created = Date.now(); changed = true; }
-  if ((cmd.save && s.count > s.lastBatchEnd) || s.count - s.lastBatchEnd >= EVERY) {
+  if ((cmd.save && s.count > s.lastBatchEnd) || (cfg.mode === "auto" && s.count - s.lastBatchEnd >= cfg.every)) {
     const idx = []; for (let i = s.lastBatchEnd + 1; i <= s.count; i++) if (!s.done[i]) idx.push(i);
     if (idx.length) { s.batches.push({ id: `${sid8}-${idx[0]}-${idx[idx.length - 1]}-${nonce(4)}`, idx, label: "", kind: cmd.save ? "manual" : "auto", status: "pending", attempts: 0, created: Date.now(), base: "" }); changed = true; }
     s.lastBatchEnd = s.count;
@@ -88,4 +100,15 @@ function recordPrompt(s, pid, h, cmd) {
   return changed;
 }
 
-module.exports = { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt };
+// /conversation-memory:settings [every N | auto | manual] → { cfg, changed } | { err }
+function parseSettings(args, cfg) {
+  const a = String(args || "").trim();
+  if (!a) return { cfg, changed: false };
+  const n = a.match(/^(?:every|كل)\s*(\d{1,3})(?:\s*رسائل|\s*رسالة)?$/i) || a.match(/^(\d{1,3})$/);
+  if (n) { const every = +n[1]; if (every < 1 || every > 100) return { err: "العدد بين 1 و100" }; return { cfg: { every, mode: "auto" }, changed: true }; }
+  if (/^(manual|يدوي)$/i.test(a)) return { cfg: { ...cfg, mode: "manual" }, changed: true };
+  if (/^(auto|تلقائي)$/i.test(a)) return { cfg: { ...cfg, mode: "auto" }, changed: true };
+  return { err: `لم أفهم «${a.slice(0, 40)}». الصيغ: every 10 (أو كل 10)، manual (يدوي)، auto (تلقائي)` };
+}
+
+module.exports = { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, costText, backupsText, parseCommand, recordPrompt, parseSettings };

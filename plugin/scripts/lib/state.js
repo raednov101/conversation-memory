@@ -8,6 +8,7 @@ const { sleep, lst, nonce, int } = require("./util");
 const { readSafe, writeAtomic, unlinkSafe } = require("./fsx");
 const { input, sid, HOME, PRIV, notes } = require("./context");
 const { capture } = require("./transcript");
+const C = require("../../core/memory-core.js");
 
 // ---------------- lock (every state change happens under it) ----------------
 let lockFile = null;
@@ -43,7 +44,7 @@ function normSession(v) {
   const batches = (Array.isArray(o.batches) ? o.batches : []).filter((b) => b && typeof b.id === "string" && /^[a-z0-9-]{1,80}$/.test(b.id)).map((b) => ({
     id: b.id, idx: (Array.isArray(b.idx) ? b.idx : []).map(int).filter((x) => x >= 1 && x <= count).slice(0, 1000), label: String(b.label || "").slice(0, 40),
     kind: ["auto", "manual", "recovered"].includes(b.kind) ? b.kind : "auto", status: STATUSES.includes(b.status) ? b.status : "pending",
-    attempts: int(b.attempts), created: int(b.created), base: String(b.base || "").slice(0, 20),
+    attempts: int(b.attempts), created: int(b.created), base: String(b.base || "").slice(0, 20), req: int(b.req),
   })).slice(-200);
   const pins = (Array.isArray(o.pins) ? o.pins : []).filter((p) => p && /^pin-[a-f0-9]{8}$/.test(p.id)).map((p) => ({
     id: p.id, status: ["pending", "saved", "stuck", "expired"].includes(p.status) ? p.status : "pending", attempts: int(p.attempts), created: int(p.created),
@@ -53,7 +54,9 @@ function normSession(v) {
     id: f.id, status: ["pending", "saved", "stuck", "expired"].includes(f.status) ? f.status : "pending", attempts: int(f.attempts), created: int(f.created),
     at: int(f.at), ask: String(f.ask || "").slice(0, 500),
   })).slice(-20);
-  return { count, t: int(o.t), msgs, done, lastBatchEnd: Math.min(int(o.lastBatchEnd), count), batches, pins, fixes, tp: String(o.tp || "").slice(0, 4096), lastSave: String(o.lastSave || "").slice(0, 40), lastError: String(o.lastError || "").slice(0, 300) };
+  const cost = (c) => ({ n: int(c && c.n), chars: int(c && c.chars) });
+  return { count, t: int(o.t), msgs, done, lastBatchEnd: Math.min(int(o.lastBatchEnd), count), batches, pins, fixes, tp: String(o.tp || "").slice(0, 4096), lastSave: String(o.lastSave || "").slice(0, 40), lastError: String(o.lastError || "").slice(0, 300),
+    lastCapture: String(o.lastCapture || "").slice(0, 40), lastCost: cost(o.lastCost), costTotal: cost(o.costTotal), injected: int(o.injected) };
 }
 function loadState() {
   for (const f of ["state.json", "state.json.bak"]) {
@@ -82,11 +85,21 @@ function session(state, id = sid) {
   if (id === sid && typeof input.transcript_path === "string" && input.transcript_path) s.tp = input.transcript_path.slice(0, 4096);
   return s;
 }
+// the user's choice for this project: summarize every N messages, or only on /conversation-memory:save (manual)
+function loadCfg() {
+  const r = readSafe(path.join(PRIV, "settings.json"), 4096);
+  let o = {}; try { o = JSON.parse(r.text || "{}") || {}; } catch {}
+  const every = Math.min(100, Math.max(1, Math.floor(Number(o.every)) || EVERY));
+  return { every, mode: o.mode === "manual" ? "manual" : "auto" };
+}
+function saveCfg(c) { writeAtomic(path.join(PRIV, "settings.json"), JSON.stringify({ every: c.every, mode: c.mode })); }
 // what the status-line indicator reads
 function writeStatus(s) {
   try {
-    const pend = s.batches.filter((b) => b.status === "pending").length, stuck = s.batches.filter((b) => b.status === "stuck").length;
-    const st = { v: 1, every: EVERY, since: Math.min(Math.max(0, s.count - s.lastBatchEnd), EVERY), pending: pend, stuck, lastSave: s.lastSave, error: s.lastError, updated: Date.now() };
+    const pend = s.batches.filter((b) => b.status === "pending").length, stuck = s.batches.filter((b) => b.status === "stuck").length, cfg = loadCfg();
+    const since = Math.max(0, s.count - s.lastBatchEnd);
+    const st = { v: 1, every: cfg.every, mode: cfg.mode, since: cfg.mode === "manual" ? since : Math.min(since, cfg.every), pending: pend, stuck, lastSave: s.lastSave, lastCapture: s.lastCapture,
+      cost: s.lastCost.chars ? C.estTokens(s.lastCost.chars) : 0, error: s.lastError, updated: Date.now() };
     writeAtomic(path.join(HOME, "status", `${sid.replace(/[^A-Za-z0-9-]/g, "").slice(0, 80) || "default"}.json`), JSON.stringify(st));
   } catch {}
 }
@@ -94,4 +107,4 @@ function writeStatus(s) {
 // ---------------- events (queued when the lock can't be taken; replayed later) ----------------
 function queueEvent(ev) { try { writeAtomic(path.join(PRIV, "events", `${Date.now()}-${nonce(4)}.json`), JSON.stringify(ev)); return true; } catch { return false; } }
 
-module.exports = { lock, unlock, normSession, loadState, saveState, session, writeStatus, queueEvent };
+module.exports = { lock, unlock, normSession, loadState, saveState, session, writeStatus, queueEvent, loadCfg, saveCfg };

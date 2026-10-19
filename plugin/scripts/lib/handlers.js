@@ -7,26 +7,34 @@ const { INJECT_BUDGET, CAPTURE_BUDGET, PART_CHARS, MAX_DRAFT, MAX_ATTEMPTS, ANCH
 const { lst, nonce, today, fullHash } = require("./util");
 const { readSafe, unlinkSafe } = require("./fsx");
 const { input, projectDir, sid, sid8, P, HOME, PRIV, notes, pubSafe, inboxOk } = require("./context");
-const { loadState, session, writeStatus } = require("./state");
+const { loadState, session, writeStatus, loadCfg, saveCfg } = require("./state");
 const { listBackups, describeBackup, restoreBackup, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin } = require("./store");
 const { readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture } = require("./transcript");
 const { fixRequest, commitFix, pinsCommand, shareCommand } = require("./features");
-const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt } = require("./requests");
+const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt, parseSettings, costText } = require("./requests");
 
 function onPrompt(state, out) {
   const s = session(state);
   const cmd = parseCommand(input.prompt);
-  const changed = recordPrompt(s, input.prompt_id, fullHash(input.prompt || ""), cmd);
+  let cfg = loadCfg();
+  if (cmd.settings) {
+    const r = parseSettings(cmd.args, cfg);
+    if (r.err) notes.push(`⚠️ ذاكرة المحادثة: ${r.err}.`);
+    else if (r.changed) { try { saveCfg(r.cfg); cfg = r.cfg; notes.push(`⚙️ ذاكرة المحادثة: ${cfg.mode === "manual" ? "التلخيص يدوي الآن (بالأمر /conversation-memory:save)" : `التلخيص التلقائي كل ${cfg.every} رسائل`}.`); } catch { notes.push("⚠️ ذاكرة المحادثة: تعذّر حفظ الإعداد."); } }
+  }
+  const changed = recordPrompt(s, input.prompt_id, fullHash(input.prompt || ""), cmd, cfg);
   const mem = readMemory(), ctx = [];
   const pending = s.batches.filter((b) => b.status === "pending" && (b.kind !== "recovered" || readCapture(b.id)));
   if (changed && pending.length) {
     if (mem.bad) notes.push(`⚠️ ذاكرة المحادثة: لا يمكن الحفظ لأن ${mem.bad}.`);
     else if (!inboxOk()) notes.push("⚠️ ذاكرة المحادثة: مجلد .conversation-memory في المشروع غير صالح (رابط رمزي؟)، فلا يمكن استقبال المسودات.");
-    else ctx.push(batchRequest(pending, mem.token));
+    else { const req = batchRequest(pending, mem.token); ctx.push(req); for (const b of pending) b.req = (b.req || 0) + Math.ceil(req.length / pending.length); }   // measured cost
   } else if (cmd.save) ctx.push("[conversation-memory] كل رسائل هذه الجلسة محفوظة سلفاً؛ أخبر المستخدم بذلك.");
   // backups the user can restore: the same numbering in the status list and in /conversation-memory:restore N
   const restorable = () => listBackups().map(describeBackup).filter((b) => b.ok && b.text !== mem.jsonText);
-  if (cmd.status) ctx.push(statusText(s, mem, restorable()));
+  if (cmd.status) ctx.push(statusText(s, mem, restorable(), cfg));
+  if (cmd.settings) ctx.push(`[conversation-memory] إعداد التلخيص لهذا المشروع (من النظام؛ أخبر المستخدم بإيجاز): ${cfg.mode === "manual" ? "يدوي: لا يُطلب تلخيص إلا بالأمر /conversation-memory:save" : `تلقائي كل ${cfg.every} رسائل`}. ` +
+    `الكلفة: ${costText(s)}. للتغيير: /conversation-memory:settings every 10، أو manual، أو auto. والرسائل لا تضيع في الوضعين: تُنسخ كاملة قبل ضغط السياق وعند الإغلاق.`);
   if (cmd.listOnly) ctx.push(`[conversation-memory] النسخ السابقة من الذاكرة (من النظام؛ اعرضها للمستخدم كما هي، والاسترجاع بالأمر /conversation-memory:restore ورقم النسخة):\n${backupsText(restorable())}`);
   else if (cmd.restore) {
     let r;
@@ -141,7 +149,9 @@ function stopWork(s, out) {
     for (const i of b.idx) s.done[i] = 1;
     if (b.kind === "recovered") deleteCapture(b.id);
     s.lastSave = today(); s.lastError = "";
-    notes.push(`💾 ذاكرة المحادثة: حُفظت ${labelOf(b)}.`);
+    const chars = (b.req || 0) + (d && d.json ? JSON.stringify(d.json).length : 0);
+    s.lastCost = { n: 1, chars }; s.costTotal = { n: s.costTotal.n + 1, chars: s.costTotal.chars + chars };
+    notes.push(`💾 ذاكرة المحادثة: حُفظت ${labelOf(b)} (الكلفة ≈ ${C.estTokens(chars).toLocaleString("en-US")} توكن تقديراً).`);
   }
   // 2) pins
   for (const p of s.pins.filter((x) => x.status === "pending")) {
@@ -180,7 +190,7 @@ function stopWork(s, out) {
     for (const b of gone) b.status = "stuck";
     if (gone.length) { s.lastError = "لم تُكتب المسودة بعد 3 محاولات"; notes.push(`⚠️ ذاكرة المحادثة: تعذّر حفظ ${gone.map(labelOf).join("، ")} بعد ${MAX_ATTEMPTS} محاولات. اكتب /conversation-memory:save لإعادة المحاولة؛ والرسائل لا تضيع: تُنسخ كاملة قبل ضغط السياق أو عند الإغلاق.`); }
     const left = still.filter((b) => b.status === "pending");
-    if (left.length && inboxOk()) asks.push(batchRequest(left, mem.token));
+    if (left.length && inboxOk()) { const req = batchRequest(left, mem.token); asks.push(req); for (const b of left) b.req = (b.req || 0) + Math.ceil(req.length / left.length); }
   }
   if (asks.length && !input.stop_hook_active) { out.decision = "block"; out.reason = `[conversation-memory]\n${asks.join("\n")}`; }
   // 4) orphaned drafts older than a day
@@ -234,6 +244,7 @@ function onStart(state, out, locked) {
     writeStatus(s);
   } else notes.push("⚠️ ذاكرة المحادثة: النظام مشغول بجلسة أخرى؛ حُمّلت الذاكرة، والرسائل المنسوخة تُعرض في الجلسة القادمة.");
   if (parts.length) out.hookSpecificOutput = { hookEventName: "SessionStart", additionalContext: parts.join("\n\n") };
+  if (locked && !resume) { const s = state.sessions[sid]; if (s) { s.injected = parts.join("\n\n").length; writeStatus(s); } }
 }
 
 // approve, without prompting, exactly two things: writing Claude's own pending draft file in the inbox,

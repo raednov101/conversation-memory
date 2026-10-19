@@ -49,7 +49,7 @@ function main() {
             else if (mode === "stop") onStop(state, out);
             else if (mode === "precompact" || mode === "end") { const s = session(state); capture(s, mode === "end" ? "end" : "compact", input.transcript_path); writeStatus(s); }
             else if (mode === "start") onStart(state, out, true);
-          } catch (e) { notes.push(`⚠️ ذاكرة المحادثة: خطأ داخلي (${e.code || e.name || "?"}). المحادثة لم تتأثر، وما حُفظ قبله محفوظ.`); }
+          } catch (e) { if (process.env.CM_DEBUG) process.stderr.write(String(e && e.stack) + "\n"); notes.push(`⚠️ ذاكرة المحادثة: خطأ داخلي (${e.code || e.name || "?"}). المحادثة لم تتأثر، وما حُفظ قبله محفوظ.`); }
           finally { saveState(state); }
         }
       } finally { unlock(); }

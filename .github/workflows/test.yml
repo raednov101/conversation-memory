@@ -1,0 +1,30 @@
+# Every push: the plugin and the shared core on Linux, macOS and Windows (Node 18 and 22),
+# and the browser extension end to end in Chromium on Linux.
+name: tests
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  node:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ matrix.node }}" }
+      - run: npm install --no-audit --no-fund
+      - run: npm run check-core
+      - run: npm run lint
+      - name: unit and hook tests
+        shell: bash
+        run: node --no-warnings --test plugin/tests/*.test.js extension/tests/*.test.js
+  extension-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - run: python extension/tests/e2e.py

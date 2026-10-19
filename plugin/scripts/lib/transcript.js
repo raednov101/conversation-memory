@@ -71,6 +71,7 @@ function capture(s, reason, tp, forSid = sid) {
     chunks.forEach((body, k) => { const f = path.join(PRIV, "captures", `${id}.p${k + 1}.json`); writeAtomic(f, JSON.stringify({ id, part: k + 1, of: chunks.length, idx: matched.map((m) => m.i), session: sid8of(forSid), reason, date: today(), body })); written.push(f); });
   } catch { written.forEach(unlinkSafe); notes.push("⚠️ ذاكرة المحادثة: فشل حفظ الرسائل غير الملخّصة؛ ستُعاد المحاولة."); return; }
   for (const { i } of matched) s.done[i] = 1;
+  s.lastCapture = today();   // the indicator shows 📝: the text is safe, its summary comes later
   for (const b of s.batches) if ((b.status === "pending" || b.status === "stuck") && b.kind !== "recovered" && b.idx.length && b.idx.every((i) => s.done[i])) b.status = "captured";
 }
 // all parts 1..n present, consistent, file names matching their content — else null (never half a capture)

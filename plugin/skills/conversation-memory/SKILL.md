@@ -84,7 +84,8 @@ description: Keeps long conversations from being forgotten. Every few messages C
 | نسخة أقدم من الذاكرة | `/conversation-memory:restore` (يعرض النسخ)، ثم مع رقمها |
 | سجل نسخ نص معتمد، أو مقارنته، أو العودة لنسخة سابقة | `/conversation-memory:pins` |
 | نقل معلومات مختارة إلى محادثة أخرى | `/conversation-memory:share` |
-| الحالة | `/conversation-memory:status` |
+| الحالة والكلفة | `/conversation-memory:status` |
+| تغيير عدد الرسائل بين كل تلخيص، أو جعله يدوياً | `/conversation-memory:settings` (مثل `every 10` أو `manual`) |
 
 إن طلب أحدها بكلامه («صحّح القرار الثالث»، «ارجع للنسخة السابقة») فاذكر له الأمر المناسب في سطر.
 

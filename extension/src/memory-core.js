@@ -376,6 +376,8 @@
   }
 
   // keep the JSON under maxBytes: the oldest log entries move to an archive (returned for the writer to store), then the imported v0 text is cut
+  // a rough, honest estimate of model tokens from characters (Arabic and English mixed ≈ 3 characters per token); shown as "≈"
+  const estTokens = (chars) => Math.ceil(Math.max(0, +chars || 0) / 3);
   const utf8Len = (s) => { let n = 0; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); n += c < 0x80 ? 1 : c < 0x800 ? 2 : c >= 0xd800 && c < 0xdc00 ? (i++, 4) : 3; } return n; };
   function trimForSize(memory, maxBytes) {
     const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
@@ -390,5 +392,5 @@
   function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: String(mdText).slice(0, LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
-    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, isGeneratedView, validateFix, applyFix, renderSelection, diffLines };
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines };
 });

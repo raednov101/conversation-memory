@@ -458,3 +458,48 @@ test("share: lists what can be moved, writes only the chosen parts to a file, pr
   assert.match(ctx(prompt(P, "a", "/conversation-memory:share xyz")), /لم يُختر شيء صالح/);
   assert.equal(sess(P, "a").count, 5, "not counted");
 });
+
+// ---------- phase 4: control, cost, and three distinct indicator states ----------
+test("settings: every N and manual mode per project; /save still works; the choice is reported", () => {
+  const P = tmp();
+  const j = prompt(P, "a", "/conversation-memory:settings every 3");
+  assert.match(j.systemMessage, /كل 3 رسائل/); assert.match(ctx(j), /تلقائي كل 3 رسائل/);
+  const hits = []; for (let i = 1; i <= 6; i++) if (requests(prompt(P, "a")).length) hits.push(i);
+  assert.equal(hits.join(), "3,6", "a request every 3 messages");
+  const M = tmp();
+  prompt(M, "m", "/conversation-memory:settings manual");
+  assert.equal(status("m").mode, "manual");
+  for (let i = 0; i < 7; i++) assert.equal(requests(prompt(M, "m")).length, 0, "manual: never asked by itself");
+  assert.equal(status("m").since, 7, "the indicator shows how many messages wait");
+  const sv = requests(prompt(M, "m", "/conversation-memory:save"));
+  assert.equal(sv.length, 1, "manual: /save asks for the summary"); assert.match(sv[0].id, /-1-7-/, "…of all 7 waiting messages");
+  assert.match(ctx(prompt(M, "m", "/conversation-memory:status")), /يدوي \(بالأمر/);
+  assert.match(prompt(P, "a", "/conversation-memory:settings كل 500").systemMessage, /بين 1 و100/);
+  assert.match(prompt(P, "a", "/conversation-memory:settings أحياناً").systemMessage, /لم أفهم/);
+  assert.equal(requests(prompts(tmp(), "b", 5)[4]).length, 1, "another project keeps the default");
+});
+
+test("cost: measured from the request and the draft, announced after saving, shown in status and the indicator", () => {
+  const P = tmp(); const j = prompts(P, "a", 5)[4]; const r = requests(j)[0];
+  draft(r, { summary: { goal: "هوية مقهى" } });
+  const s = run("stop", { session_id: "a", cwd: P });
+  assert.match(s.systemMessage, /الكلفة ≈ [\d,]+ توكن تقديراً/);
+  const st = status("a"); assert.ok(st.cost > 50 && st.cost < 3000, `plausible estimate (${st.cost})`);
+  assert.ok(sess(P, "a").lastCost.chars >= ctx(j).length, "the request text is counted");
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:status")), /الكلفة: آخر تلخيص [\d,]+ حرفاً .* ≈ [\d,]+ توكن؛ في هذه الجلسة 1 تلخيص/);
+  run("start", { session_id: "n", cwd: P, source: "startup" });
+  assert.ok(sess(P, "n").injected > 100, "the memory loaded at session start is measured too");
+});
+
+test("indicator: text copied (📝) vs summary updated (✓) vs failure (⚠️) are distinct states", { skip: !(process.features && process.features.typescript) && "this Node cannot load TypeScript (needs 22.18+); Claude Code loads it itself" }, async () => {
+  const { format } = await import("../hooks/indicator.ts");
+  const base = { v: 1, every: 5, since: 2, pending: 0, stuck: 0, lastSave: "2026-10-19 10:00", error: "", updated: 0 };
+  assert.equal(format({ ...base, cost: 612 }), "🧠 2/5 · ✓ 10:00 · ≈612 توكن");
+  assert.equal(format({ ...base, lastCapture: "2026-10-19 10:05" }), "🧠 2/5 · 📝 10:05");
+  assert.equal(format({ ...base, lastCapture: "2026-10-19 09:00" }), "🧠 2/5 · ✓ 10:00", "an older copy is superseded by the summary");
+  assert.equal(format({ ...base, stuck: 1 }), "🧠 ⚠️ 2/5 · تعثّر الحفظ");
+  assert.equal(format({ ...base, mode: "manual", since: 9 }), "🧠 9 · يدوي · ✓ 10:00");
+  const P = tmp(); const js = prompts(P, "a", 2); run("end", { session_id: "a", cwd: P, transcript_path: tfrom(P, js) });
+  assert.match(status("a").lastCapture, /^\d{4}-\d\d-\d\d \d\d:\d\d$/, "copying the text records when");
+  assert.match(format(status("a")), /📝 \d\d:\d\d$/);
+});
