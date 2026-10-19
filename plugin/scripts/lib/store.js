@@ -7,7 +7,7 @@ const path = require("path");
 const C = require("../../core/memory-core.js");
 const { MAX_JSON, MAX_BACKUPS, TRIM_AT, WLOCK_STALE } = require("./config");
 const { sleep, lst, sha256, nonce, int, today, stamp } = require("./util");
-const { safeFile, readSafe, writeAtomic, writeVerified, unlinkSafe, safeDir } = require("./fsx");
+const { safeFile, readSafe, writeAtomic, writeVerified, unlinkSafe, safeDir, breakStale } = require("./fsx");
 const { projectDir, P, notes, pubSafe } = require("./context");
 
 // ---------------- the memory files (the only writer) ----------------
@@ -91,10 +91,11 @@ function takeWriteLock(wait = 3000) {
     if (f.stat) {
       // "<owner> <ms> [<pid> <host>]": a holder on this machine whose process is gone (killed, crashed) is stale at once;
       // otherwise (the browser extension writes no pid) after 15 s
-      let a = []; try { a = fs.readFileSync(WLOCK, "utf8").trim().split(" "); } catch {}
+      let a = [], seen = null; try { seen = fs.readFileSync(WLOCK, "utf8"); a = seen.trim().split(" "); } catch {}
       const at = int(a[1]), pid = int(a[2]), gone = pid && a[3] === os.hostname() && !alive(pid);
       if (!gone && Date.now() - (at || f.stat.mtimeMs) < WLOCK_STALE) { sleep(50); continue; }
-      unlinkSafe(WLOCK);
+      if (seen === null) { sleep(20); continue; }
+      breakStale(WLOCK, seen);
     }
     try { const fd = fs.openSync(WLOCK, "wx", 0o644); fs.writeSync(fd, `${me} ${Date.now()} ${process.pid} ${os.hostname()}`); fs.closeSync(fd); } catch { sleep(20); continue; }
     sleep(40);

@@ -29,6 +29,16 @@ function writeAtomic(file, data) {
     }
   }
 }
+// Remove a lock judged stale — but only if it is still the very lock that was judged. Between reading it and removing it,
+// its holder may have released it and another process taken a new one; deleting that one would let two writers in.
+// So: move it aside atomically, check it is the one we read, and put it back if it is not.
+function breakStale(file, seen) {
+  const aside = `${file}.stale-${process.pid}-${nonce(3)}`;
+  try { fs.renameSync(file, aside); } catch { return; }
+  let now = null; try { now = fs.readFileSync(aside, "utf8"); } catch {}
+  if (now !== seen) { try { fs.linkSync(aside, file); } catch {} }   // a live lock: restore it (unless yet another exists)
+  try { fs.unlinkSync(aside); } catch {}
+}
 function writeVerified(file, data) { writeAtomic(file, data); if (fs.readFileSync(file, "utf8") !== data) throw new Error("read-back mismatch " + path.basename(file)); }
 const unlinkSafe = (p) => { const s = lst(p); if (s && s.isFile() && !s.isSymbolicLink()) { try { fs.unlinkSync(p); } catch {} } };
 // a directory we own: not a link, (optionally) owned by us; created if missing
@@ -40,4 +50,4 @@ function safeDir(d, mode = 0o700, owner = false) {
   return !!s && s.isDirectory() && !s.isSymbolicLink() && (!owner || uid === null || s.uid === uid);
 }
 
-module.exports = { safeFile, readSafe, writeAtomic, writeVerified, unlinkSafe, safeDir };
+module.exports = { breakStale, safeFile, readSafe, writeAtomic, writeVerified, unlinkSafe, safeDir };

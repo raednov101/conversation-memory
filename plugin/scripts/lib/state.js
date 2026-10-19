@@ -5,34 +5,36 @@ const os = require("os");
 const path = require("path");
 const { EVERY, MAX_JSON, MAX_SESSIONS, LOCK_WAIT, LOCK_STALE } = require("./config");
 const { sleep, lst, nonce, int } = require("./util");
-const { readSafe, writeAtomic, unlinkSafe } = require("./fsx");
+const { readSafe, writeAtomic, unlinkSafe, breakStale } = require("./fsx");
 const { input, sid, HOME, PRIV, notes } = require("./context");
 const { capture } = require("./transcript");
 const C = require("../../core/memory-core.js");
 
 // ---------------- lock (every state change happens under it) ----------------
-let lockFile = null;
+let lockFile = null, lockToken = "";
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
 function lock() {
   const f = path.join(PRIV, "lock"), until = Date.now() + LOCK_WAIT;
   while (Date.now() < until) {
-    try { const fd = fs.openSync(f, "wx", 0o600); fs.writeSync(fd, `${process.pid} ${os.hostname()} ${Date.now()}`); fs.closeSync(fd); lockFile = f; return true; }
+    const token = `${process.pid} ${os.hostname()} ${Date.now()} ${nonce(4)}`;
+    try { const fd = fs.openSync(f, "wx", 0o600); fs.writeSync(fd, token); fs.closeSync(fd); lockFile = f; lockToken = token; return true; }
     catch (e) {
       if (e.code !== "EEXIST") return false;
       const s = lst(f); if (!s) continue;
       if (s.isSymbolicLink() || !s.isFile()) return false;
-      let pid = 0, host = "", ts = 0;
-      try { const a = fs.readFileSync(f, "utf8").trim().split(" "); pid = int(a[0]); host = a[1] || ""; ts = int(a[2]); } catch {}
+      let pid = 0, host = "", ts = 0, seen = null;
+      try { seen = fs.readFileSync(f, "utf8"); const a = seen.trim().split(" "); pid = int(a[0]); host = a[1] || ""; ts = int(a[2]); } catch {}
       const age = Date.now() - (ts && ts <= Date.now() ? ts : s.mtimeMs);
       // stale: holder provably gone on this machine, or older than any hook can live (they are killed after 30 s)
       const dead = pid ? (host === os.hostname() && !alive(pid)) || age > LOCK_STALE : Date.now() - s.mtimeMs > 5000;
-      if (dead) { unlinkSafe(f); continue; }
+      if (dead && seen !== null) { breakStale(f, seen); continue; }
       sleep(10 + Math.floor(Math.random() * 15));
     }
   }
   return false;
 }
-const unlock = () => { if (lockFile) unlinkSafe(lockFile); lockFile = null; };
+// release only our own lock: if it was (wrongly) broken and someone else holds the file now, theirs stays
+const unlock = () => { if (lockFile) { try { if (fs.readFileSync(lockFile, "utf8") === lockToken) unlinkSafe(lockFile); } catch {} } lockFile = null; lockToken = ""; };
 
 // ---------------- private state ----------------
 const STATUSES = ["pending", "saved", "stuck", "captured", "invalid"];

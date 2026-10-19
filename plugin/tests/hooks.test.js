@@ -514,3 +514,14 @@ test("indicator: text copied (📝) vs summary updated (✓) vs failure (⚠️)
   assert.match(status("a").lastCapture, /^\d{4}-\d\d-\d\d \d\d:\d\d$/, "copying the text records when");
   assert.match(format(status("a")), /📝 \d\d:\d\d$/);
 });
+
+test("locks: a stale lock is removed only if it is still the one judged stale; a newer live lock is put back", () => {
+  const { breakStale } = require("../scripts/lib/fsx.js");
+  const d = tmp(), f = path.join(d, "lock");
+  fs.writeFileSync(f, "111 host 1 aaaa"); breakStale(f, "111 host 1 aaaa");
+  assert.ok(!fs.existsSync(f), "the lock judged stale is removed");
+  fs.writeFileSync(f, "222 host 2 bbbb");             // its holder left and another process took a new lock meanwhile
+  breakStale(f, "111 host 1 aaaa");
+  assert.equal(fs.readFileSync(f, "utf8"), "222 host 2 bbbb", "the live lock is untouched");
+  assert.deepEqual(fs.readdirSync(d), ["lock"], "nothing left aside");
+});
