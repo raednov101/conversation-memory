@@ -24,13 +24,19 @@
   const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
   const isId = (v) => typeof v === "string" && /^d\d{1,6}$/.test(v);
   // strip control characters (keep \n and \t), system markers, and wrapper look-alikes; clamp length
+  // cut a string to at most n UTF-16 units without splitting a surrogate pair; lone surrogates are dropped
+  // (they turn into U+FFFD when written as UTF-8, and the read-back check would then fail forever)
+  const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+  const wellFormed = (s) => String(s).replace(LONE_SURROGATE, "");
+  const cut = (s, n) => { s = String(s); if (s.length <= n) return s; const c = s.charCodeAt(n - 1); return s.slice(0, c >= 0xD800 && c <= 0xDBFF ? n - 1 : n); };
   function cleanStr(v, max = LIMITS.str) {
     if (typeof v !== "string") return "";
-    let s = v.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u2028\u2029]/g, "");
+    let s = wellFormed(v).replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u2028\u2029]/g, "");
     let prev;
     do { prev = s; s = s.replace(/<!--\s*\/?\s*cm:[^>]*-->/gi, "").replace(/<\/?\s*conversation_memory[^>]*>/gi, ""); } while (s !== prev);
+    s = s.replace(/\[\s*conversation-memory\s*\]/gi, "(conversation-memory)");   // stored text can't pose as the system's own notes
     s = s.trim();
-    return s.length > max ? s.slice(0, max) + "…" : s;
+    return s.length > max ? cut(s, max) + "…" : s;
   }
   const cleanList = (v, max = LIMITS.list) => (Array.isArray(v) ? v : []).map((x) => cleanStr(x)).filter(Boolean).slice(0, max);
   const visibleLen = (s) => s.replace(/[\s\-*#>|:._…()\[\]«»"']/g, "").length;
@@ -45,19 +51,23 @@
 
   // ---------- secrets (linear time: one token pass, anchored token test) ----------
   const TOKEN_RE = /[A-Za-z0-9_.\-]+/g;
-  const SECRET_TOKEN_RE = /^(sk-[A-Za-z0-9_-]{20,}|[sr]k_(live|test)_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}$|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})/;
-  const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/g;
+  const SECRET_TOKEN_RE = /^(sk-[A-Za-z0-9_-]{20,}|[sr]k_(live|test)_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}(?![0-9A-Z])|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|hf_[A-Za-z0-9]{30,}|npm_[A-Za-z0-9]{30,}|SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|ya29\.[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})/;
+  // a private key is removed whole (header, body and footer); a header with no footer in reach is removed alone
+  const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----[\s\S]{0,20000}?-----END [A-Z ]{0,40}PRIVATE KEY-----|-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/g;
+  const WEBHOOK_RE = /https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9\/]{20,200}/g;
   const PLACEHOLDER = "(محذوف لأنه حساس)";
   // key names that contain a secret word (aws_secret_access_key, DB_PASSWORD, api-key, …) followed by = or : and a value.
   // Bounded repetitions keep it linear; the lookahead keeps redaction idempotent.
-  const ASSIGN_RE = /([A-Za-z0-9_\-]{0,40}(?:password|passwd|pwd|api[_-]?key|secret|token|access[_-]?key|private[_-]?key)[A-Za-z0-9_\-]{0,40}|كلمة\s{0,3}(?:ال)?(?:مرور|سر))(["']?\s{0,5}[:=]\s{0,5})(?!\(محذوف)["']?[^\s"']{5,200}/gi;
+  // the value may be quoted (then everything up to the closing quote) or bare (4+ characters); Arabic also reads «كلمة المرور هي …»
+  const ASSIGN_RE = /([A-Za-z0-9_\-]{0,40}(?:password|passwd|pwd|api[_-]?key|secret|token|access[_-]?key|private[_-]?key)[A-Za-z0-9_\-]{0,40}|كلمة\s{0,3}(?:ال)?(?:مرور|سر))(["']?\s{0,5}(?:[:=]|هي|هو)\s{0,5})(?!\(محذوف)(?:"[^"\n]{1,200}"|'[^'\n]{1,200}'|[^\s"']{4,200})/gi;
   const BEARER_RE = /\b(Bearer|Basic|Token)\s+(?!\(محذوف)[A-Za-z0-9._~+\/=-]{16,}/g;
   const URL_CRED_RE = /\b([a-z][a-z0-9+.\-]{1,20}:\/\/)[^\s:\/@]{1,100}:[^\s@\/]{1,200}@/gi;
-  const isSecretToken = (t) => t.length < 20000 && SECRET_TOKEN_RE.test(t);
+  const isSecretToken = (t) => SECRET_TOKEN_RE.test(t.length > 400 ? t.slice(0, 400) : t);   // the prefix decides; any length is removed
   function redact(text) {
     let changed = false;
     const out = String(text)
       .replace(PRIVATE_KEY_RE, () => ((changed = true), PLACEHOLDER))
+      .replace(WEBHOOK_RE, () => ((changed = true), PLACEHOLDER))
       .replace(URL_CRED_RE, (m, scheme) => ((changed = true), `${scheme}${PLACEHOLDER}@`))
       .replace(BEARER_RE, (m, k) => ((changed = true), `${k} ${PLACEHOLDER}`))
       .replace(ASSIGN_RE, (m, k) => ((changed = true), `${k}: ${PLACEHOLDER}`))
@@ -95,7 +105,7 @@
       id: cleanStr(e.id, 100), platform: PLATFORMS[e.platform] ? e.platform : "claude-code", chat: cleanStr(e.chat, 200), range: cleanStr(e.range, 40), date: cleanStr(e.date, 40),
       raised: cleanList(e.raised), decided: cleanList(e.decided), changed: cleanList(e.changed),
     })).filter((e) => e.id).slice(-LIMITS.log);
-    if (isObj(input.imported) && typeof input.imported.text === "string") m.imported = { date: cleanStr(input.imported.date, 40), text: input.imported.text.slice(0, LIMITS.imported) };
+    if (isObj(input.imported) && typeof input.imported.text === "string") m.imported = { date: cleanStr(input.imported.date, 40), text: cut(wellFormed(input.imported.text), LIMITS.imported) };
     m.mdHash = typeof input.mdHash === "string" ? input.mdHash.slice(0, 32) : "";
     m.archived = Math.max(0, Math.floor(+input.archived) || 0);
     return m;
@@ -261,7 +271,7 @@
     const sug = renderSuggestions(m);
     const head = [`# ${m.title}`, "## الخلاصة الحالية", renderSummary(m), "## القرارات السارية", renderDecisions(m, false), ...(sug ? ["## مقترحات لم تُعتمد بعد", sug] : []),
       "## القيود والمتطلبات", m.constraints.length ? bullets(m.constraints) : "لا قيود مسجلة بعد.", "## النصوص المعتمدة", renderPins(m)].join("\n");
-    let out = head.length > budget ? head.slice(0, budget) + "\n…(اقتُطع؛ الملف الكامل أدناه)" : head;
+    let out = head.length > budget ? cut(head, budget) + "\n…(اقتُطع؛ الملف الكامل أدناه)" : head;
     const entries = [];
     for (let k = m.log.length - 1; k >= 0; k--) {
       const r = renderEntry(m.log[k]);
@@ -339,7 +349,7 @@
     const es = m.log.filter((e) => (sel.log || []).includes(e.id));
     if (es.length) parts.push("من سجل النقاش:\n" + es.map(renderEntry).join("\n\n"));
     let out = parts.join("\n\n");
-    if (out.length > budget) out = out.slice(0, budget) + "\n…(اقتُطع عند " + budget + " حرف)";
+    if (out.length > budget) out = cut(out, budget) + "\n…(اقتُطع عند " + budget + " حرف)";
     return out;
   }
 
@@ -363,7 +373,8 @@
   }
 
   // ---------- pins ----------
-  const slug = (n) => String(n || "").replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, " ").replace(/\[\s*conversation-memory\s*\]/gi, " ").replace(/\s+/g, " ").replace(/^[.\s]+|[.\s]+$/g, "").slice(0, 60);
+  const slug0 = (n) => String(n || "").replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, " ").replace(/\[\s*conversation-memory\s*\]/gi, " ").replace(/\s+/g, " ").replace(/^[.\s]+|[.\s]+$/g, "");
+  const slug = (n) => cut(slug0(wellFormed(n || "")), 60).replace(/[.\s]+$/g, "");
   const WINDOWS_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
   const pinNameOk = (n) => { const s = slug(n); return !!s && s === String(n).trim().replace(/\s+/g, " ") && !WINDOWS_RESERVED.test(s); };
   const pinPath = (name, version) => `CONVERSATION_PINS/${name}/v${version}.md`;
@@ -408,7 +419,7 @@
   }
 
   // a text from a v0.x Markdown file, kept read-only when migrating
-  function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: String(mdText).slice(0, LIMITS.imported) }; return out; }
+  function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: cut(wellFormed(mdText), LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
     render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines };

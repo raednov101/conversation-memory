@@ -8,7 +8,7 @@ const C = require("../../core/memory-core.js");
 const { MAX_JSON, MAX_BACKUPS, TRIM_AT, WLOCK_STALE } = require("./config");
 const { sleep, lst, sha256, nonce, int, today, stamp } = require("./util");
 const { safeFile, readSafe, writeAtomic, writeVerified, unlinkSafe, safeDir, breakStale } = require("./fsx");
-const { projectDir, P, notes, pubSafe } = require("./context");
+const { projectDir, P, PRIV, notes, pubSafe } = require("./context");
 
 // ---------------- the memory files (the only writer) ----------------
 function readMemory() {
@@ -20,6 +20,34 @@ function readMemory() {
   if (!parsed.ok) return { bad: parsed.error };
   return { memory: parsed.memory, jsonText: j.text, mdText: md.text, token: C.token(j.text || ""), exists: j.text != null };
 }
+// ---------- trust: memory is loaded into a session only if it came through this plugin or the user approved it ----------
+// The memory file sits in the project and may come from anywhere (a cloned repo, git pull, the browser extension writing to a
+// linked folder). Loading it automatically would let whoever wrote it speak to the model at every session start. So the
+// private folder keeps the fingerprints of the versions written here, and of those the user approved with /conversation-memory:trust.
+const TRUST = () => path.join(PRIV, "trust.json");
+function readTrust() {
+  const r = readSafe(TRUST(), 2 * 1024 * 1024);
+  try { const t = JSON.parse(r.text || "null"); if (t && Array.isArray(t.hashes)) return { hashes: t.hashes.filter((h) => /^[0-9a-f]{14}$/.test(h)).slice(-40), snap: t.snap || null }; } catch {}
+  // a project where an earlier version of this plugin already ran: its current file was written here — trust it once
+  return { hashes: [], snap: null, migrate: fs.existsSync(path.join(PRIV, "state.json")) };
+}
+const isTrusted = (jsonText) => { if (jsonText == null) return true; const t = readTrust(); return t.hashes.includes(C.hash(jsonText)); };
+function trust(jsonText, memory) {
+  const t = readTrust();
+  const h = C.hash(jsonText);
+  const snap = memory ? { d: memory.decisions.map((x) => x.id + "\u0001" + x.text), l: memory.log.map((e) => e.id), g: memory.summary.goal, s: memory.summary.status } : t.snap;
+  try { writeAtomic(TRUST(), JSON.stringify({ hashes: [...t.hashes.filter((x) => x !== h), h].slice(-40), snap })); return true; } catch { return false; }
+}
+// what an untrusted file brings compared with the last trusted version — shown to the user before they approve it
+function untrustedChanges(memory) {
+  const t = readTrust(), snap = t.snap || { d: [], l: [], g: "", s: "" };
+  const known = new Set(snap.d), logs = new Set(snap.l);
+  const newDecisions = memory.decisions.filter((x) => !known.has(x.id + "\u0001" + x.text));
+  const newLog = memory.log.filter((e) => !logs.has(e.id));
+  return { newDecisions, newLog, summaryChanged: memory.summary.goal !== snap.g || memory.summary.status !== snap.s, first: !t.snap };
+}
+function migrateTrust(mem) { const t = readTrust(); if (t.migrate && mem.exists && !mem.bad) { trust(mem.jsonText, mem.memory); return true; } return false; }
+
 // Backups live in the project's data folder (.conversation-memory/backups/, git-ignored), shared with the browser
 // extension, so "undo" reverts the last change whoever made it. A version is never replaced without its backup:
 // if the backup can't be written, nothing is written.
@@ -69,11 +97,13 @@ function restoreBackup(n = 1) {
   m.mdHash = C.hash(md);
   const json = C.serialize(m);
   try { writeVerified(P.json, json); writeVerified(P.md, md); } catch (e) { return { err: "تعذّرت الكتابة: " + (e.code || e.message) }; }
+  trust(json, m);   // the user chose this version
   return { ok: true, when: b.when, log: b.log, decisions: b.decisions };
 }
 // temp files left by a write that was killed half-way (the original is intact); swept when older than a minute
 function sweepTemps(dir) {
-  try { for (const f of fs.readdirSync(dir)) if (/\.\d+\.[a-f0-9]{6}\.tmp$/.test(f)) { const p = path.join(dir, f), st = lst(p); if (st && st.isFile() && Date.now() - st.mtimeMs > 60000) unlinkSafe(p); } } catch {}
+  try { for (const f of fs.readdirSync(dir)) if (/^CONVERSATION_MEMORY[\w.-]{0,60}\.(json|md)\.\d+\.[a-f0-9]{6}\.tmp$/.test(f)) {   // only our own files
+    const p = path.join(dir, f), st = lst(p); if (st && st.isFile() && Date.now() - st.mtimeMs > 60000) unlinkSafe(p); } } catch {}
 }
 // mutate(memory) → memory'. Handles legacy migration, protects hand edits of the .md, writes both files, verifies.
 // Shared with the browser extension (same protocol in offscreen.js): an advisory lock file in the project's data folder,
@@ -87,13 +117,17 @@ function takeWriteLock(wait = 3000) {
   const me = nonce(8), until = Date.now() + wait;
   while (Date.now() < until) {
     const f = safeFile(WLOCK, 256);
-    if (f.bad) return null;
+    // a second link exists only for the instant another process restores a live lock it set aside (breakStale): wait
+    if (f.bad) { if (f.stat0 && f.stat0.nlink > 1 && f.stat0.isFile()) { sleep(20); continue; } return null; }
     if (f.stat) {
       // "<owner> <ms> [<pid> <host>]": a holder on this machine whose process is gone (killed, crashed) is stale at once;
       // otherwise (the browser extension writes no pid) after 15 s
       let a = [], seen = null; try { seen = fs.readFileSync(WLOCK, "utf8"); a = seen.trim().split(" "); } catch {}
-      const at = int(a[1]), pid = int(a[2]), gone = pid && a[3] === os.hostname() && !alive(pid);
-      if (!gone && Date.now() - (at || f.stat.mtimeMs) < WLOCK_STALE) { sleep(50); continue; }
+      const at = int(a[1]), pid = int(a[2]);
+      // a time in the future (clock skew, or a lock file that came with the project) can't hold the lock forever
+      const t = at || f.stat.mtimeMs, future = t > Date.now() + 60000;
+      const gone = pid && a[3] === os.hostname() && !alive(pid);
+      if (!gone && !future && Date.now() - t < WLOCK_STALE) { sleep(50); continue; }
       if (seen === null) { sleep(20); continue; }
       breakStale(WLOCK, seen);
     }
@@ -124,6 +158,7 @@ function writeMemory(mutate, confirm) {
       const cur = readMemory();
       if (cur.bad) return { err: cur.bad };
       let m = cur.memory;
+      const baseTrusted = cur.exists ? isTrusted(cur.jsonText) : !cur.mdText;
       if (!cur.exists && cur.mdText) { m = C.importLegacy(m, cur.mdText, today()); if (!attempt) notes.push("ℹ️ ذاكرة المحادثة: نُقل محتوى CONVERSATION_MEMORY.md القديم إلى الصيغة الجديدة كما هو، تحت «من الإصدار السابق»."); }
       else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !isSomeGeneratedView(cur.mdText, m)) {
         const keep = path.join(projectDir, `CONVERSATION_MEMORY.edited-${stamp()}.md`);
@@ -149,6 +184,7 @@ function writeMemory(mutate, confirm) {
       // confirm from the file itself, not from our copy
       const after = C.parseMemory(readSafe(P.json, MAX_JSON).text);
       if (!after.ok || (confirm && !confirm(after.memory))) continue;
+      if (baseTrusted) trust(json, after.memory);   // built on a trusted version → still trusted; else it stays for the user to approve
       return { memory: after.memory, token: C.token(json) };
     }
     return { err: "ملف الذاكرة يتغيّر باستمرار من برنامج آخر؛ سأعيد المحاولة لاحقاً" };
@@ -194,4 +230,4 @@ function writeShare(text) {
   try { writeVerified(f, text); return { path: f }; } catch (e) { return { err: "تعذّرت الكتابة: " + (e.code || e.message) }; }
 }
 
-module.exports = { pinVersions, writeShare, listBackups, describeBackup, restoreBackup, sweepTemps, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin };
+module.exports = { isTrusted, trust, untrustedChanges, migrateTrust, pinVersions, writeShare, listBackups, describeBackup, restoreBackup, sweepTemps, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin };

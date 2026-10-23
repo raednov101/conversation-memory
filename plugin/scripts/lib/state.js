@@ -72,15 +72,19 @@ function loadState() {
 const undone = (x) => Object.keys(x.msgs).some((i) => !x.done[i]);
 const busy = (x) => x.batches.some((b) => b.status === "pending" || b.status === "stuck") || undone(x) || x.pins.some((p) => p.status === "pending") || x.fixes.some((f) => f.status === "pending");
 function saveState(state) {
-  if (!lockFile) return;
+  if (!lockFile) return false;
   const sorted = Object.entries(state.sessions).sort((a, b) => (busy(b[1]) - busy(a[1])) || (b[1].t - a[1].t));
   for (const [id, x] of sorted.slice(MAX_SESSIONS)) {
     if (undone(x)) { try { capture(x, "evicted", x.tp, id); } catch {} if (undone(x)) notes.push("⚠️ ذاكرة المحادثة: جلسة قديمة أُزيلت من التتبع وفيها رسائل لم تُلخّص ولم يمكن نسخها."); }
   }
   state.sessions = Object.fromEntries(sorted.slice(0, MAX_SESSIONS));
   const json = JSON.stringify(state);
-  try { writeAtomic(path.join(PRIV, "state.json"), json); writeAtomic(path.join(PRIV, "state.json.bak"), json); }
-  catch (e) { if (process.env.CM_DEBUG) process.stderr.write(`saveState: ${e.code || e.message}\n`); }
+  try { writeAtomic(path.join(PRIV, "state.json"), json); writeAtomic(path.join(PRIV, "state.json.bak"), json); return true; }
+  catch (e) {
+    if (process.env.CM_DEBUG) process.stderr.write(`saveState: ${e.code || e.message}\n`);
+    notes.push(`⚠️ ذاكرة المحادثة: تعذّر حفظ حالة العدّ (${e.code || "خطأ"})؛ قد يُعاد طلب تلخيص سبق.`);
+    return false;
+  }
 }
 function session(state, id = sid) {
   const s = state.sessions[id] || (state.sessions[id] = normSession(null));

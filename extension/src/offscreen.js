@@ -116,7 +116,7 @@ async function takeWriteLock(r) {
     let held = false;
     try {
       const f = await (await d.getFileHandle("write.lock")).getFile(), at = +String(await f.text()).trim().split(" ")[1] || f.lastModified;
-      held = Date.now() - at < WLOCK_STALE;
+      held = at <= Date.now() + 60000 && Date.now() - at < WLOCK_STALE;   // a future time can't hold the lock forever
     } catch (e) { if (e && e.name !== "NotFoundError") { await sleep(50); continue; } }
     if (held) { await sleep(50); continue; }
     try { await writeVerified(d, "write.lock", `${me} ${Date.now()}`); } catch { await sleep(50); continue; }

@@ -10,7 +10,7 @@ function safeFile(p, max) {
   if (!s) return { missing: true };
   if (s.isSymbolicLink()) return { bad: "رابط رمزي (symlink)" };
   if (!s.isFile()) return { bad: "ليس ملفاً عادياً" };
-  if (s.nlink > 1) return { bad: "مرتبط بملف آخر (hard link)" };
+  if (s.nlink > 1) return { bad: "مرتبط بملف آخر (hard link)", stat0: s };
   if (max && s.size > max) return { bad: `أكبر من الحد (${Math.round(max / 1024)} ك.ب)` };
   return { stat: s };
 }
@@ -32,12 +32,17 @@ function writeAtomic(file, data) {
 // Remove a lock judged stale — but only if it is still the very lock that was judged. Between reading it and removing it,
 // its holder may have released it and another process taken a new one; deleting that one would let two writers in.
 // So: move it aside atomically, check it is the one we read, and put it back if it is not.
+// Remove a stale lock file, but only if it still holds exactly what the caller judged stale.
+// Breakers take a tiny exclusive "<file>.break" lock first, so the re-check and the removal are one step for every
+// breaker: a fresh lock created by someone else in between can never be removed (the old rename-aside-and-restore
+// had a window where a third process could slip in, leaving two holders).
 function breakStale(file, seen) {
-  const aside = `${file}.stale-${process.pid}-${nonce(3)}`;
-  try { fs.renameSync(file, aside); } catch { return; }
-  let now = null; try { now = fs.readFileSync(aside, "utf8"); } catch {}
-  if (now !== seen) { try { fs.linkSync(aside, file); } catch {} }   // a live lock: restore it (unless yet another exists)
-  try { fs.unlinkSync(aside); } catch {}
+  const m = file + ".break";
+  try { fs.closeSync(fs.openSync(m, "wx", 0o600)); }
+  catch (e) { if (e.code === "EEXIST") { const s = lst(m); if (s && s.isFile() && Date.now() - s.mtimeMs > 2000) { try { fs.unlinkSync(m); } catch {} } } return; }   // a breaker killed mid-way
+  try { let now = null; try { now = fs.readFileSync(file, "utf8"); } catch {} if (now === seen) fs.unlinkSync(file); }
+  catch {}
+  finally { try { fs.unlinkSync(m); } catch {} }
 }
 function writeVerified(file, data) { writeAtomic(file, data); if (fs.readFileSync(file, "utf8") !== data) throw new Error("read-back mismatch " + path.basename(file)); }
 const unlinkSafe = (p) => { const s = lst(p); if (s && s.isFile() && !s.isSymbolicLink()) { try { fs.unlinkSync(p); } catch {} } };

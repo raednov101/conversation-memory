@@ -73,6 +73,7 @@ function parseCommand(prompt) {
   if (t.startsWith(CMD + "fix")) return { fix: true, ask: t.slice((CMD + "fix").length).trim().slice(0, 500), slash };
   if (t.startsWith(CMD + "pins")) return { pins: true, args: t.slice((CMD + "pins").length).trim(), slash };
   if (t.startsWith(CMD + "share")) return { share: true, args: t.slice((CMD + "share").length).trim(), slash };
+  if (t.startsWith(CMD + "trust")) return { trust: true, slash };
   if (t.startsWith(CMD + "settings")) return { settings: true, args: t.slice((CMD + "settings").length).trim(), slash };
   if (t.startsWith(CMD + "restore")) { const n = parseInt(t.slice((CMD + "restore").length), 10); return { restore: n >= 1 && n <= 99 ? n : 0, listOnly: !(n >= 1), slash }; }
   return { slash };
