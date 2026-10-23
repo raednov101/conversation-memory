@@ -52,7 +52,8 @@
     const k = `scope:${chatKey(id)}`, known = await B.get(k, null);
     if (known && known.key) return known;
     const sc = s || (newPageScope && Date.now() - newPageScope.at < 120000 ? newPageScope : null);
-    if (sc || loaded) await B.set(k, { key: (sc || GENERAL).key, name: (sc || GENERAL).name || "" });   // remembered once the page is read
+    // only a project is remembered: the page may show a chat's project link after its messages, so "general" is never final
+    if (sc && loaded) await B.set(k, { key: sc.key, name: sc.name || "" });
     return sc || GENERAL;
   }
 
@@ -133,6 +134,7 @@
             const r = await B.fs("commit", { project: p.project, reply: mine.reply, batch: p.batch, base: p.base, platform: A.platform, chat: label, range: `${p.from}–${p.to}` });
             if (r.ok) { saved(st, p, [r.redacted ? "حُذفت بيانات حساسة من الملخص." : "", r.summarySkipped ? "لم تُستبدل الخلاصة لأن الذاكرة تغيّرت أثناء التلخيص؛ حُفظ السجل والقرارات." : "", ...(r.notes || [])].filter(Boolean).join(" "), mine.reply.length); st.pending = null; }
             else if (r.busy) { st.note = "برنامج آخر (بلقن Claude Code؟) يكتب في الذاكرة الآن؛ سأحفظ بعد لحظات."; schedule(4000); }   // nothing written, nothing counted
+            else if (r.writeFailed && (p.wf = (p.wf || 0) + 1) <= 5) { st.note = `${B.why(r.error)} — الرد محفوظ وتُعاد المحاولة بعد قليل (${p.wf} من 5).`; schedule(10000); }
             else fail(st, B.why(r.error), userCount);
           }
         } else if (Date.now() - st.pending.sentAt > TIMEOUT) { const e = st.pending; fail(st, "لم يصل رد الملخص خلال 5 دقائق", userCount); st.expired = e; }

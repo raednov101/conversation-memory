@@ -22,7 +22,7 @@ const openTab = () => { chrome.runtime.openOptionsPage(); window.close(); };
 
 if (inPopup) document.body.classList.add("popup");
 // which project's memory the tools below show (inside the browser each site project has its own; a linked folder is one)
-const scopeSel = () => ($("scopeSel").hidden ? "general" : $("scopeSel").value || "general");
+const scopeSel = () => $("scopeSel").value || "general";   // a single project leaves the (hidden) selector holding it
 const fsOp = (op, args) => chrome.runtime.sendMessage({ cmd: "fs", op, args: { scope: scopeSel(), ...(args || {}) } }).catch((err) => ({ ok: false, error: String(err) }));
 function showMemorySections(ready) {
   $("tools").hidden = !ready || inPopup;
@@ -44,7 +44,7 @@ async function refresh() {
     if (!inPopup) { loadMemory(); loadBackups(); }
     return;
   }
-  $("scopes").hidden = true; $("scopeSel").hidden = true; $("pick").textContent = "📁 تغيير المجلد";
+  $("scopes").hidden = true; $("scopeField").hidden = true; $("pick").textContent = "📁 تغيير المجلد";
   const p = await h.queryPermission({ mode: "readwrite" });
   showMemorySections(p === "granted");
   if (p === "granted" && !inPopup) { loadMemory(); loadBackups(); }
@@ -58,7 +58,7 @@ async function loadScopes() {
   const ul = $("scopes"), sel = $("scopeSel"), keep = sel.value;
   ul.textContent = ""; sel.textContent = "";
   const list = (r && r.ok && r.list) || [];
-  ul.hidden = !list.length; sel.hidden = list.length < 2;
+  ul.hidden = !list.length; $("scopeField").hidden = list.length < 2;
   for (const x of list) {
     const dl = document.createElement("button"); dl.type = "button"; dl.className = "small"; dl.textContent = "⬇️ تنزيل";
     dl.onclick = async () => {

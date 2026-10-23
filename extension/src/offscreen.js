@@ -24,7 +24,10 @@ async function kvSet(k, v) { const db = await idb(); return new Promise((res, re
 async function kvGet(k) { const db = await idb(); return new Promise((res, rej) => { const q = db.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 let SCOPE = "general", SCOPE_NAME = "";   // set for each request (requests run one at a time, under the "cm-write" lock)
 const cleanScope = (s) => (/^[a-z0-9-]{1,80}$/.test(String(s || "")) ? String(s) : "general");
-async function browserRoot(scope = SCOPE) { return dir(await navigator.storage.getDirectory(), ["projects", scope]); }
+// the browser's own storage: no other program can reach it, and navigator.locks("cm-write") already runs one request at a time,
+// so the file lock shared with the Claude Code plugin is not needed there
+const IN_BROWSER = new WeakSet();
+async function browserRoot(scope = SCOPE) { const d = await dir(await navigator.storage.getDirectory(), ["projects", scope]); IN_BROWSER.add(d); return d; }
 async function root() {
   const h = await kvGet("root");
   if (!h) return { h: await browserRoot(), inBrowser: true };
@@ -106,6 +109,7 @@ async function readMemory(r) {
 // Shared with the Claude Code plugin (same protocol in hook.js): an advisory lock file ".conversation-memory/write.lock",
 // "<owner> <epoch-ms>", stale after 15 s; taken by writing it and confirming it still holds our owner a moment later.
 async function takeWriteLock(r) {
+  if (IN_BROWSER.has(r)) return { browser: true };
   const d = await dataDir(r), me = nonce(), until = Date.now() + 3000;
   while (Date.now() < until) {
     // the other writer may be replacing the lock file while we read it: that read fails, which only means "busy, look again"
@@ -122,7 +126,7 @@ async function takeWriteLock(r) {
   }
   return null;
 }
-async function dropWriteLock(lk) { if (!lk) return; try { if (String(await readText(lk.d, "write.lock")).startsWith(lk.me + " ")) await lk.d.removeEntry("write.lock"); } catch {} }
+async function dropWriteLock(lk) { if (!lk || lk.browser) return; try { if (String(await readText(lk.d, "write.lock")).startsWith(lk.me + " ")) await lk.d.removeEntry("write.lock"); } catch {} }
 async function archive(r, entries) {
   if (!entries.length) return;
   await writeVerified(await dir(await dataDir(r), ["archive"]), `${stamp()}-${nonce().slice(0, 4)}.json`, JSON.stringify(entries, null, 1));
@@ -269,10 +273,15 @@ const ops = {
     if (!fields) return { ok: false, error: "الملخص ليس كائن JSON" };
     const v = C.validateDraft({ ...fields, batch, base }, batch);
     if (!v.ok) return { ok: false, error: v.error };
-    const w = await writeMemory(h, (m, token) => {
-      const r = C.applyDraft(m, v.draft, { platform, chat, range, date: today(), allowSummary: v.draft.base === token });
-      return { memory: r.memory, extra: r };
-    }, (mm) => mm.log.some((e) => e.id === batch));
+    let w;
+    try {
+      w = await writeMemory(h, (m, token) => {
+        const r = C.applyDraft(m, v.draft, { platform, chat, range, date: today(), allowSummary: v.draft.base === token });
+        return { memory: r.memory, extra: r };
+      }, (mm) => mm.log.some((e) => e.id === batch));
+    } catch (e) {   // the file system refused (permission withdrawn, disk full…): the reply itself is valid — keep it and retry
+      return { ok: false, writeFailed: true, error: "تعذّرت الكتابة في الملفات: " + String((e && e.message) || e) };
+    }
     if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
     const r = w.extra;
     return { ok: true, already: !r.applied, redacted: r.redacted, summarySkipped: r.skipped.includes("summary"), notes: w.notes };
