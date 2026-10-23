@@ -1,4 +1,5 @@
-// The indicator on the page: the pill, its panel, the pin form and toasts — inside a closed-off shadow root.
+// The indicator on the page: the pill, its panel, the pin form and toasts — inside a closed shadow root, so the site's
+// own scripts can neither read the memory shown in it nor press its buttons (only real clicks and keys count).
 // It only draws a view object and reports button presses; it never reads the page or writes files itself.
 (function (root) {
   "use strict";
@@ -6,7 +7,8 @@
     :host{all:initial}
     .pill{position:fixed;left:12px;bottom:96px;z-index:2147483646;font:12px/1.4 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;direction:rtl;
       background:#1f2328;color:#f6f8fa;border-radius:999px;padding:6px 12px;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;user-select:none;opacity:.92;border:0}
-    .pill:hover,.pill:focus-visible{opacity:1;outline:2px solid #fff3}
+    .pill:hover{opacity:1}.pill:focus-visible{opacity:1;outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px #0969da}
+    .panel button:focus-visible,.panel input:focus-visible{outline:2px solid #0969da;outline-offset:1px}
     .ok{background:#1a7f37}.txt{background:#1b7c83}.warn{background:#9a6700}.err{background:#cf222e}.busy{background:#0969da}.idle{background:#57606a}
     .panel{position:fixed;left:12px;bottom:132px;z-index:2147483647;direction:rtl;font:13px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
       background:#fff;color:#1f2328;border:1px solid #d0d7de;border-radius:10px;padding:12px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none}
@@ -32,9 +34,9 @@
     const s = v.st || {};
     let cls = "idle", text = "🧠 الذاكرة", info = "";
     const btns = [];
-    if (v.fsSt && v.fsSt.error === "inactive") { cls = "warn"; text = "🧠 🔄 حدّث الصفحة"; info = esc(why("inactive")) + "."; return { cls, text, info, btns }; }
-    if (!v.fsSt || !v.fsSt.ok || !v.fsSt.folder) { cls = "warn"; text = "🧠 اختر مجلد المشروع"; info = v.fsSt && !v.fsSt.ok && v.fsSt.error ? esc(why(v.fsSt.error)) : "لم يُحدَّد مجلد المشروع بعد."; btns.push(["📁 اختيار المجلد", "options"]); }
-    else if (v.fsSt.permission === "granted" && !v.fsOk) { cls = "warn"; text = "🧠 ⚠️ المجلد"; info = `تعذّر تجهيز مجلد المشروع «${esc(v.fsSt.folder)}»${v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : ""}.`; btns.push(["⚙️ الإعدادات", "options"]); }
+    if (v.fsSt && v.fsSt.error === "inactive") { cls = "warn"; text = "🧠 🔄 حدّث الصفحة"; info = esc(why("inactive")) + "."; btns.push(["🔄 حدّث الصفحة الآن", "reload"]); return { cls, text, info, btns }; }
+    if (!v.fsSt || !v.fsSt.ok || !v.fsSt.folder) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = "تعذّر تجهيز مكان حفظ الذاكرة" + (v.fsSt && v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : "") + "."; btns.push(["⚙️ الإعدادات", "options"]); }
+    else if (v.fsSt.permission === "granted" && !v.fsOk) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = `تعذّر تجهيز ذاكرة «${esc(v.fsSt.folder)}»${v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : ""}.`; btns.push(["⚙️ الإعدادات", "options"]); }
     else if (!v.fsOk) { cls = "warn"; text = "🧠 🔓 امنح الإذن"; info = `يلزم إذن الكتابة في «${esc(v.fsSt.folder)}».`; btns.push(["🔓 منح الإذن", "options"]); }
     else if (v.phase === "unlinked" && v.unreadable) { cls = "err"; text = "🧠 ⚠️ لا أقرأ الرسائل"; info = "لا أستطيع قراءة رسائل هذه الصفحة؛ ربما تغيّر تصميم الموقع. لم يُحفظ منها شيء."; }
     else if (v.phase === "unlinked") {
@@ -68,7 +70,7 @@
       btns.push(["⛓️ فك ربط المحادثة بالمشروع", "unlink"]);
     }
     if (v.crash) { cls = "err"; info = "خطأ داخلي: " + esc(v.crash); }
-    btns.push(["⚙️ الإعدادات والمجلد", "options"]);
+    btns.push(["⚙️ الإعدادات", "options"]);
     return { cls, text, info, btns };
   }
 
@@ -76,8 +78,9 @@
   function create(opts) {
     const host = document.createElement("div");
     host.id = "cm-memory-indicator";
-    const shadow = host.attachShadow({ mode: "open" });
-    shadow.innerHTML = `<style>${CSS}</style><button class="pill idle" type="button" aria-haspopup="true">🧠 …</button><div class="panel" role="dialog"></div><div class="toast" role="status"></div>`;
+    const shadow = host.attachShadow({ mode: opts.test ? "open" : "closed" });   // open only on the local test pages
+    shadow.innerHTML = `<style>${CSS}</style><button class="pill idle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cm-panel">🧠 …</button><div class="panel" id="cm-panel" role="dialog" aria-label="ذاكرة المحادثة"></div><div class="toast" role="status" aria-live="polite"></div>`;
+    const real = (e) => e.isTrusted;   // a click or key from the person, not from a page script
     const pill = shadow.querySelector(".pill"), panel = shadow.querySelector(".panel"), toastEl = shadow.querySelector(".toast");
     // keys typed in our panel must not reach the site's own shortcuts ("type anywhere to focus the composer")
     for (const ev of ["keydown", "keyup", "keypress", "input", "beforeinput", "paste"]) shadow.addEventListener(ev, (e) => e.stopPropagation());
@@ -90,7 +93,7 @@
       if (!host.isConnected) document.body.appendChild(host);
       if (pinDraft || share) return;   // don't redraw over the pin form or the share panel
       const d = describe(last.view, last.settings, opts.why, opts.maxAttempts);
-      pill.className = "pill " + d.cls; pill.textContent = d.text;
+      pill.className = "pill " + d.cls; pill.textContent = d.text; pill.setAttribute("aria-expanded", String(panel.classList.contains("open")));
       panel.innerHTML = `<p>${d.info}</p>` + d.btns.map(([t, a]) => `<button type="button" data-a="${a}">${t}</button>`).join("");
     }
     function closePin() { pinDraft = null; share = null; panel.classList.remove("open", "wide"); render(); }
@@ -103,7 +106,7 @@
       panel.querySelector(".preview").textContent = text.length > 400 ? text.slice(0, 400) + "…" : text;
       panel.classList.add("open");
       const input = panel.querySelector("input");
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); savePin(); } if (e.key === "Escape") closePin(); });
+      input.addEventListener("keydown", (e) => { if (!real(e)) return; if (e.key === "Enter") { e.preventDefault(); savePin(); } if (e.key === "Escape") closePin(); });
       setTimeout(() => input.focus(), 0);
     }
     function savePin() {
@@ -146,15 +149,18 @@
       panel.querySelector(".share-prev").textContent = t || "(لم تختر شيئاً بعد)";
       panel.querySelector(".count").textContent = `${t.length.toLocaleString("en-US")} / ${share.o.budget.toLocaleString("en-US")} حرف`;
     }
-    panel.addEventListener("change", (e) => { if (share && e.target && e.target.type === "checkbox") update(); });
-    pill.addEventListener("click", () => { if (pinDraft || share) return; render(); panel.classList.toggle("open"); });
+    panel.addEventListener("change", (e) => { if (real(e) && share && e.target && e.target.type === "checkbox") update(); });
+    const setOpen = (on) => { panel.classList.toggle("open", on); pill.setAttribute("aria-expanded", String(on)); if (on) { const f = panel.querySelector("button, input"); if (f) setTimeout(() => f.focus(), 0); } };
+    pill.addEventListener("click", (e) => { if (!real(e) || pinDraft || share) return; render(); setOpen(!panel.classList.contains("open")); });
+    panel.addEventListener("keydown", (e) => { if (real(e) && e.key === "Escape") { if (pinDraft || share) closePin(); else setOpen(false); pill.focus(); } });
     panel.addEventListener("click", (e) => {
+      if (!real(e)) return;
       const b = e.target && e.target.closest && e.target.closest("button[data-a]"); if (!b) return;
       const a = b.dataset.a;
       if (a === "pin-save") return savePin();
       if (a === "pin-cancel") return closePin();
       if (a === "share-insert") { if (!share || !share.text) { toast("اختر شيئاً أولاً."); return; } const { o, text } = share; closePin(); o.onInsert(text); return; }
-      panel.classList.remove("open");
+      setOpen(false);
       opts.onAction(a);
     });
     return { host, render, toast, openPin, openShare };

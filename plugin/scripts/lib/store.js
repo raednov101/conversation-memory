@@ -72,7 +72,8 @@ function backupJson(text) {
 // a backup as the user sees it: when, and what it held
 function describeBackup(name) {
   const r = readSafe(path.join(backupDir(), name), MAX_JSON), p = r.text ? C.parseMemory(r.text) : { ok: false };
-  const when = `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)} ${name.slice(9, 11)}:${name.slice(11, 13)}`;
+  // the name carries UTC (shared with the extension); shown in the person's own time
+  const when = new Date(Date.UTC(+name.slice(0, 4), +name.slice(4, 6) - 1, +name.slice(6, 8), +name.slice(9, 11), +name.slice(11, 13), +name.slice(13, 15))).toLocaleString("sv-SE").slice(0, 16);
   if (!p.ok) return { name, when, ok: false };
   const m = p.memory;
   return { name, when, ok: true, text: r.text, memory: m, log: m.log.length, decisions: m.decisions.filter((d) => d.status === "active").length, goal: m.summary.goal.slice(0, 60) };
@@ -168,15 +169,16 @@ function writeMemory(mutate, confirm) {
       let next = mutate(m, cur.token);
       if (!next) return { err: "لا تغيير" };
       const t = C.trimForSize(next, TRIM_AT);
-      if (t.archived.length) { if (!archive(t.archived)) return { err: "الملف كبير وتعذّر نقل أقدم السجل إلى الأرشيف" }; notes.push(`ℹ️ ذاكرة المحادثة: نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`); }
       next = t.memory;
       const md = C.render(next);
       next.mdHash = C.hash(md);
       const json = C.serialize(next);
       if (Buffer.byteLength(json) > MAX_JSON) return { err: "ملف الذاكرة تجاوز 4 ميجا" };
-      const again = readSafe(P.json, MAX_JSON);
-      if (again.bad || again.text !== cur.jsonText) continue;   // changed meanwhile (the extension, say): redo on the new version
       if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها", writeFailed: true };
+      // checked as late as possible: changed meanwhile (the extension, say) → redo on the new version, nothing archived twice
+      const again = readSafe(P.json, MAX_JSON);
+      if (again.bad || again.text !== cur.jsonText) continue;
+      if (t.archived.length) { if (!archive(t.archived)) return { err: "الملف كبير وتعذّر نقل أقدم السجل إلى الأرشيف" }; notes.push(`ℹ️ ذاكرة المحادثة: نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`); }
       try {
         writeVerified(P.json, json);
         writeVerified(P.md, md);

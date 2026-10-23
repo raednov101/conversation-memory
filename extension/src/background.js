@@ -9,7 +9,7 @@ let creating = null;
 async function ensureOffscreen() {
   const have = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"], documentUrls: [chrome.runtime.getURL(OFFSCREEN)] });
   if (have.length) return;
-  creating = creating || chrome.offscreen.createDocument({ url: OFFSCREEN, reasons: ["BLOBS"], justification: "Write conversation memory files into the project folder the user chose." })
+  creating = creating || chrome.offscreen.createDocument({ url: OFFSCREEN, reasons: ["BLOBS"], justification: "Read and write the conversation memory: in the extension's private origin storage, or in a project folder the user linked (file handles and file writes are done here, then the result is returned to the page)." })
     .catch((e) => { if (!/single offscreen/i.test(String(e))) throw e; })
     .finally(() => { creating = null; });
   await creating;
@@ -34,7 +34,17 @@ function claim(key, tab, ttl) {
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || msg.target === "offscreen") return;
-  if (msg.cmd === "fs") { toOffscreen(msg.op, msg.args).then((r) => reply(r || { ok: false, error: "no reply" }), (e) => reply({ ok: false, error: String((e && e.message) || e) })); return true; }
+  if (msg.cmd === "fs") {
+    // a page of the extension may do anything; a chat site may only touch its own site's memory, and never the full copy
+    const own = sender.url && sender.url.startsWith(chrome.runtime.getURL(""));
+    if (!own) {
+      const host = (() => { try { return new URL(sender.url).hostname; } catch { return ""; } })();
+      const site = host === "chatgpt.com" || host.endsWith(".chatgpt.com") ? "chatgpt" : host === "claude.ai" || host.endsWith(".claude.ai") ? "claude" : (self.CM_TEST_HOSTS ? "*" : "");
+      const scope = String((msg.args && msg.args.scope) || "");
+      if (!site || ["exportAll", "importAll", "listScopes"].includes(msg.op) || (site !== "*" && !scope.startsWith(site + "-"))) { reply({ ok: false, error: "not allowed" }); return; }
+    }
+    toOffscreen(msg.op, msg.args).then((r) => reply(r || { ok: false, error: "no reply" }), (e) => reply({ ok: false, error: String((e && e.message) || e) })); return true;
+  }
   if (msg.cmd === "claim") { claim(String(msg.key), sender.tab ? sender.tab.id : -1, Math.min(600000, +msg.ttl || 200000)).then(reply, () => reply({ ok: false })); return true; }
   if (msg.cmd === "openOptions") { chrome.runtime.openOptionsPage(); reply({ ok: true }); return; }
 });

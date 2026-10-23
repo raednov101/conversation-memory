@@ -70,7 +70,7 @@
   <header class="top">
     <div class="brand">
       <div class="logo" aria-hidden="true">🧠</div>
-      <div><h1>ذاكرة المحادثة</h1><p class="sub">لمحادثاتك في ChatGPT وClaude، في مجلد مشروعك</p></div>
+      <div><h1>ذاكرة المحادثة</h1><p class="sub">ذاكرة لمحادثاتك الطويلة في ChatGPT وClaude، لكل مشروع ذاكرته</p></div>
     </div>
     <span id="folderChip" class="chip">…</span>
   </header>
@@ -85,8 +85,16 @@
         <button id="pick" type="button">📁 ربط بمجلد على الجهاز (اختياري)</button>
         <button id="unlink" type="button" hidden>↩️ العودة للحفظ داخل المتصفح</button>
       </div>
+      <div class="row" id="keepRow">
+        <button id="exportAll" type="button">💾 حفظ نسخة كاملة في ملف</button>
+        <button id="importAll" type="button">📂 استعادة من ملف</button>
+        <input id="importFile" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p id="keepMsg" class="msg" role="status"></p>
+      <p class="muted" id="keepNote" style="margin:6px 0 0">تنبيه: حذف الإضافة من المتصفح يحذف ذاكرتها معها. احفظ نسخة في ملف قبل ذلك، أو اربطها بمجلد.</p>
       <details><summary>متى أربط مجلداً؟</summary>
         <p>فقط إن أردت أن تشترك الإضافة وبلقن Claude Code في ذاكرة مشروع واحد. يُكتب فيه <code>CONVERSATION_MEMORY.json</code> و<code>.md</code> والنصوص المعتمدة، وعند طلب الإذن اختر «السماح في كل زيارة».</p>
+        <p>ربط المجلد لا ينقل إليه ما حُفظ داخل المتصفح: يبقى كما هو، وتعود إليه بزر «العودة للحفظ داخل المتصفح».</p>
       </details>
     </section>
 

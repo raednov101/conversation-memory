@@ -19,6 +19,8 @@ shutil.copytree(EXT, build, dirs_exist_ok=True, ignore=shutil.ignore_patterns("t
 m = json.load(open(os.path.join(build, "manifest.json")))
 m["content_scripts"][0]["matches"].append("http://127.0.0.1/*")
 json.dump(m, open(os.path.join(build, "manifest.json"), "w"), ensure_ascii=False)
+bg = os.path.join(build, "src", "background.js")   # the worker treats the local test host like the real sites
+open(bg, "w", encoding="utf8").write('self.CM_TEST_HOSTS = ["http://127.0.0.1/*"];\n' + open(EXT + "/src/background.js", encoding="utf8").read())
 
 # ---- fake sites ----
 site = tempfile.mkdtemp(prefix="cm-site-")
@@ -107,14 +109,14 @@ with sync_playwright() as pw:
     p0 = ctx.new_page(); p0.goto(BASE + new_chat("chatgpt", "/c/inbrowser/", "داخل المتصفح - ChatGPT"))
     ok("اختر" not in (wait(lambda: pill(p0) if "🧠" in pill(p0) and "…" not in pill(p0) else None, 10) or "اختر"), "with no folder chosen, it works at once (no folder to pick)", pill(p0))
     for i in range(1, 6): say(p0, f"داخل المتصفح {i}")
-    j0 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "general/CONVERSATION_MEMORY.json")), 20) or {}
+    j0 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json")), 20) or {}
     ok(j0.get("log") and j0["log"][0]["range"] == "1–5", "…and the summary is saved in the browser, under «chats outside projects»", j0)
     p0.close()
     p0 = ctx.new_page(); p0.goto(BASE + new_chat("chatgpt", "/g/g-p-abc123-cafe/c/inproject/", "مشروع - ChatGPT"))
     wait(lambda: "🧠" in pill(p0), 10)
     for i in range(1, 6): say(p0, f"داخل مشروع {i}")
     j1 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-g-p-abc123/CONVERSATION_MEMORY.json")), 20) or {}
-    ok(j1.get("log") and len((json.loads(read("projects", "general/CONVERSATION_MEMORY.json") or "{}")).get("log", [])) == 1, "a chat inside a ChatGPT project gets that project's own memory", j1)
+    ok(j1.get("log") and len((json.loads(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json") or "{}")).get("log", [])) == 1, "a chat inside a ChatGPT project gets that project's own memory", j1)
     p0.close()
     opt.reload(); opt.wait_for_load_state()
     names = wait(lambda: (lambda t: t if "cafe" in t and "خارج المشاريع" in t else None)(opt.locator("#scopes").inner_text()), 8) or opt.locator("#scopes").inner_text()
@@ -123,6 +125,17 @@ with sync_playwright() as pw:
         opt.locator("#scopes li").filter(has_text="cafe").locator("button").click()
     md = open(dl.value.path(), encoding="utf-8").read()
     ok("داخل مشروع" in md or "## السجل" in md, "…and the download is that project's readable memory", md[:200])
+    with opt.expect_download() as dl:
+        opt.locator("#exportAll").click()
+    full_path = dl.value.path(); full = json.loads(open(full_path, encoding="utf-8").read())
+    ok(full.get("format") == "conversation-memory-backup" and {x["scope"] for x in full["projects"]} >= {"chatgpt-general", "chatgpt-g-p-abc123"},
+       "a full copy of everything kept in the browser can be saved to a file (removing the extension deletes its storage)", [x["scope"] for x in full.get("projects", [])])
+    opt.evaluate("async () => { const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('projects'); await d.removeEntry('chatgpt-g-p-abc123', { recursive: true }); }")
+    opt.locator("#importFile").set_input_files(full_path)
+    km = wait(lambda: (lambda t: t if "استُعيد" in t else None)(opt.locator("#keepMsg").inner_text()), 8) or opt.locator("#keepMsg").inner_text()
+    back = json.loads(read("projects", "chatgpt-g-p-abc123/CONVERSATION_MEMORY.json") or "{}")
+    ok("استُعيد 1" in km and back.get("log") == j1.get("log") and "ChatGPT: محادثات خارج المشاريع" in km,
+       "…and restored from it, while a project that still exists is never replaced", km)
 
     for platform, name, pid in (("chatgpt", "ChatGPT", "chatgpt"), ("claude", "Claude", "claude-web")):
         print(f"— {name}: counter, full transcript, JSON summary every 5 —")

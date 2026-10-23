@@ -40,7 +40,8 @@ async function rememberScopeName() {
   const n = await scopeNames(); if (n[SCOPE] === SCOPE_NAME) return;
   n[SCOPE] = SCOPE_NAME.slice(0, 80); await kvSet("scopeNames", n);
 }
-const scopeLabel = async (scope) => (scope === "general" ? "محادثات خارج المشاريع" : (await scopeNames())[scope] || scope);
+const GENERAL_NAMES = { general: "محادثات خارج المشاريع (إصدار سابق)", "chatgpt-general": "ChatGPT: محادثات خارج المشاريع", "claude-general": "Claude: محادثات خارج المشاريع" };
+const scopeLabel = async (scope) => GENERAL_NAMES[scope] || (await scopeNames())[scope] || scope;
 
 // ---------- fs helpers ----------
 async function dir(base, parts, create = true) { let d = base; for (const p of parts) d = await d.getDirectoryHandle(p, { create }); return d; }
@@ -87,13 +88,15 @@ async function isSomeGeneratedView(r, mdText, current) {
   for (const n of names) { const p = C.parseMemory(await readText(b, n)); if (p.ok && (p.memory.mdHash === h || C.isGeneratedView(mdText, p.memory, null))) return true; }
   return false;
 }
+// backup names carry the time in UTC (shared with the plugin); people read it in their own time
+const localWhen = (n) => new Date(Date.UTC(+n.slice(0, 4), +n.slice(4, 6) - 1, +n.slice(6, 8), +n.slice(9, 11), +n.slice(11, 13), +n.slice(13, 15))).toLocaleString("sv-SE").slice(0, 16);
 async function describeBackups(r, currentText) {
   const { b, names } = await backupNames(r), out = [];
   for (const n of names) {
     const text = await readText(b, n), p = C.parseMemory(text);
     if (!p.ok || text === currentText) continue;
     const m = p.memory;
-    out.push({ name: n, when: `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6, 8)} ${n.slice(9, 11)}:${n.slice(11, 13)}`, text, memory: m,
+    out.push({ name: n, when: localWhen(n), text, memory: m,
       log: m.log.length, decisions: m.decisions.filter((d) => d.status === "active").length, goal: m.summary.goal.slice(0, 60) });
   }
   return out;
@@ -153,14 +156,15 @@ async function writeMemory(r, mutate, confirm, held) {
       const out = mutate(m, cur.token);
       if (out.err) return { err: out.err };
       const t = C.trimForSize(out.memory, TRIM_AT);
-      if (t.archived.length) { await archive(r, t.archived); notes.push(`نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`); }
       const next = t.memory;
       const md = C.render(next);
       next.mdHash = C.hash(md);
       const json = C.serialize(next);
       if (new Blob([json]).size > MAX_JSON) return { err: "ملف الذاكرة سيتجاوز 4 ميجا" };
-      if ((await readText(r, JSON_FILE)) !== cur.jsonText) continue;   // someone else wrote meanwhile: start over on their version
       try { await backupJson(r, cur.jsonText); } catch { return { err: "تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها" }; }
+      // checked as late as possible: someone else wrote meanwhile → start over on their version (nothing archived twice)
+      if ((await readText(r, JSON_FILE)) !== cur.jsonText) continue;
+      if (t.archived.length) { await archive(r, t.archived); notes.push(`نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`); }
       await writeVerified(r, JSON_FILE, json);
       await writeVerified(r, MD_FILE, md);
       const after = C.parseMemory(await readText(r, JSON_FILE));        // confirm from the file itself
@@ -214,7 +218,7 @@ async function versionsOf(h, name) {
     const m = n.match(/^v(\d+)\.md$/); if (!m || fh.kind !== "file") continue;
     const f = await fh.getFile(); if (f.size > 400000) continue;
     const text = await f.text();
-    out.push({ v: +m[1], text, sha: await sha256(text), date: new Date(f.lastModified).toISOString().slice(0, 16).replace("T", " ") });
+    out.push({ v: +m[1], text, sha: await sha256(text), date: new Date(f.lastModified).toLocaleString("sv-SE").slice(0, 16) });
   }
   return out.sort((a, b) => a.v - b.v);
 }
@@ -355,12 +359,49 @@ const ops = {
       if (fh.kind !== "directory") continue;
       const cur = await readMemory(fh).catch(() => null);
       if (!cur || !cur.exists) continue;
-      out.push({ scope, name: scope === "general" ? "محادثات خارج المشاريع" : names[scope] || scope, decisions: cur.memory.decisions.filter((x) => x.status === "active").length, log: cur.memory.log.length, updated: cur.memory.updated });
+      out.push({ scope, name: GENERAL_NAMES[scope] || names[scope] || scope, decisions: cur.memory.decisions.filter((x) => x.status === "active").length, log: cur.memory.log.length, updated: cur.memory.updated });
     }
     out.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
     return { ok: true, list: out, linked: !!(await kvGet("root")) };
   },
   // the readable memory of one project, to download as a file
+  // everything kept inside the browser, as one file to keep: removing the extension deletes its storage with it
+  async exportAll() {
+    const out = { format: "conversation-memory-backup", v: 1, exported: today(), projects: [] }, names = await scopeNames();
+    let d; try { d = await dir(await navigator.storage.getDirectory(), ["projects"]); } catch { return { ok: true, data: out }; }
+    for await (const [scope, fh] of d.entries()) {
+      if (fh.kind !== "directory") continue;
+      const jsonText = await readText(fh, JSON_FILE).catch(() => null), p = C.parseMemory(jsonText);
+      if (!jsonText || !p.ok) continue;
+      const pins = {};
+      for (const pin of p.memory.pins) { const parts = pin.path.split("/"); try { pins[pin.path] = await readText(await dir(fh, parts.slice(0, -1), false), parts[parts.length - 1]); } catch {} }
+      out.projects.push({ scope, name: names[scope] || "", memory: JSON.parse(jsonText), pins });
+    }
+    return { ok: true, data: out, count: out.projects.length };
+  },
+  // brings such a file back; an existing memory is never replaced (its project is skipped and reported)
+  async importAll({ data }) {
+    if (!data || data.format !== "conversation-memory-backup" || !Array.isArray(data.projects)) return { ok: false, error: "الملف ليس نسخة من ذاكرة المحادثة" };
+    let added = 0; const skipped = [], names = await scopeNames();
+    for (const p of data.projects.slice(0, 500)) {
+      const scope = p && typeof p.scope === "string" && /^[a-z0-9-]{1,80}$/.test(p.scope) ? p.scope : "";
+      const parsed = scope ? C.parseMemory(JSON.stringify(p.memory)) : { ok: false };
+      if (!parsed.ok) { skipped.push(scope || "?"); continue; }
+      const r = await browserRoot(scope), cur = await readMemory(r).catch(() => ({ bad: true }));
+      if (cur.bad || cur.exists) { skipped.push(GENERAL_NAMES[scope] || names[scope] || p.name || scope); continue; }
+      for (const pin of parsed.memory.pins) {   // a pinned text comes back only if it is exactly the one recorded
+        const text = p.pins && typeof p.pins[pin.path] === "string" ? p.pins[pin.path] : null;
+        if (text === null || (await sha256(text)) !== pin.sha) continue;
+        const parts = pin.path.split("/"); await writeVerified(await dir(r, parts.slice(0, -1)), parts[parts.length - 1], text);
+      }
+      const w = await writeMemory(r, () => ({ memory: parsed.memory }), null);
+      if (w.err) { skipped.push(scope); continue; }
+      if (p.name && !GENERAL_NAMES[scope]) names[scope] = String(p.name).slice(0, 80);
+      added++;
+    }
+    await kvSet("scopeNames", names);
+    return { ok: true, added, skipped };
+  },
   async exportMd() {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
     const cur = await readMemory(h);

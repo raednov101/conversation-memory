@@ -72,7 +72,9 @@
       scope: () => {
         const m = location.pathname.match(/^\/project\/([0-9a-f-]{8,64})/i);
         if (m) return { key: "claude-" + m[1].toLowerCase(), name: document.title.replace(/\s*[-|]\s*Claude\s*$/i, "").trim() };
-        const a = [...document.querySelectorAll('a[href^="/project/"]')].find((x) => !x.closest("nav, aside, [data-testid*='sidebar' i]"));
+        // never a link written inside a message (anyone can paste one): only the page's own header/breadcrumb
+        const MSG = "[data-testid='user-message'], [data-testid='assistant-message'], [data-is-streaming], .font-claude-response, .standard-markdown, [data-perf-reply-text]";
+        const a = [...document.querySelectorAll('a[href^="/project/"]')].find((x) => !x.closest("nav, aside, [data-testid*='sidebar' i]") && !x.closest(MSG));
         const id = a && (a.getAttribute("href").match(/^\/project\/([0-9a-f-]{8,64})/i) || [])[1];
         return id ? { key: "claude-" + id.toLowerCase(), name: (a.innerText || "").trim() } : null;
       },

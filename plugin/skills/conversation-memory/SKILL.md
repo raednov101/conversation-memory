@@ -81,6 +81,7 @@ description: Keeps long conversations from being forgotten. Every few messages C
 |---|---|
 | تصحيح معلومة، أو اعتماد اقتراح، أو إلغاء قرار أو حذفه | `/conversation-memory:fix` مع وصف التصحيح |
 | التراجع عن آخر تغيير | `/conversation-memory:undo` |
+| اعتماد ملف ذاكرة جاء من خارج الجهاز (git أو الإضافة) ليُحمَّل في الجلسات | `/conversation-memory:trust` |
 | نسخة أقدم من الذاكرة | `/conversation-memory:restore` (يعرض النسخ)، ثم مع رقمها |
 | سجل نسخ نص معتمد، أو مقارنته، أو العودة لنسخة سابقة | `/conversation-memory:pins` |
 | نقل معلومات مختارة إلى محادثة أخرى | `/conversation-memory:share` |

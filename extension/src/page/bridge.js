@@ -13,6 +13,15 @@
   b.get = async (k, d) => { try { return (await chrome.storage.local.get(k))[k] ?? d; } catch { b.dead = true; return d; } };
   b.set = async (k, v) => { try { await chrome.storage.local.set({ [k]: v }); } catch { b.dead = true; } };
   const ERR = { noFolder: "اختر مجلد المشروع أولاً", needPermission: "يلزم منح إذن الكتابة للمجلد", inactive: "حُدّثت الإضافة؛ حدّث هذه الصفحة (F5) لتعمل النسخة الجديدة" };
-  b.why = (e) => ERR[e] || e || "خطأ غير معروف";
+  // errors raised by the browser itself arrive in English: say what they mean instead
+  const RAW = [
+    [/context invalidated|receiving end does not exist|could not establish connection|no reply|message port closed/i, ERR.inactive],
+    [/quota|no space|disk is full/i, "لا توجد مساحة كافية لحفظ الذاكرة في المتصفح أو على القرص"],
+    [/notallowed|permission|denied/i, "لا يوجد إذن بالكتابة؛ افتح الإعدادات وامنحه"],
+    [/notfound|could not be found|not found/i, "الملف أو المجلد لم يعد موجوداً؛ افتح الإعدادات واختر المجلد من جديد"],
+    [/nomodificationallowed|invalidstate|locked|busy/i, "الملف مشغول الآن؛ أعد المحاولة بعد لحظات"],
+    [/typeerror|referenceerror|syntaxerror|is not a function|undefined|null/i, "خطأ داخلي في الإضافة؛ حدّث الصفحة، وإن تكرر فأبلغنا"],
+  ];
+  b.why = (e) => { if (ERR[e]) return ERR[e]; const t = String(e || ""); if (!t) return "خطأ غير معروف"; if (/[\u0600-\u06FF]/.test(t)) return t; const r = RAW.find(([re]) => re.test(t)); return r ? r[1] : "خطأ غير متوقع: " + t.slice(0, 80); };
   (root.CM = root.CM || {}).bridge = b;
 })(self);

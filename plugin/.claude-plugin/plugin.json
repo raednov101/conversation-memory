@@ -1,7 +1,20 @@
 {
   "name": "conversation-memory",
   "version": "1.1.0",
-  "description": "ذاكرة للمحادثات الطويلة: كل 5 رسائل يكتب Claude مسودة JSON ويتحقق منها النظام ويحفظها في CONVERSATION_MEMORY.json/.md داخل المشروع؛ نصوص معتمدة حرفية، ونسخ كامل قبل ضغط السياق، ومؤشر في شريط الحالة.",
-  "author": { "name": "Raed" },
-  "keywords": ["memory", "summary", "context", "long-conversation", "ذاكرة", "تلخيص"]
+  "description": "ذاكرة للمحادثات الطويلة: كل 5 رسائل يكتب Claude مسودة JSON يتحقق منها النظام ويحفظها في CONVERSATION_MEMORY.json/.md داخل المشروع؛ نصوص معتمدة حرفية، ونسخ كامل قبل ضغط السياق، ومؤشر في شريط الحالة.",
+  "author": {
+    "name": "Raed",
+    "url": "https://github.com/raednov101"
+  },
+  "keywords": [
+    "memory",
+    "summary",
+    "context",
+    "long-conversation",
+    "ذاكرة",
+    "تلخيص"
+  ],
+  "homepage": "https://github.com/raednov101/conversation-memory",
+  "repository": "https://github.com/raednov101/conversation-memory",
+  "license": "MIT"
 }

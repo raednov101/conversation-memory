@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "ذاكرة المحادثة — ChatGPT و Claude",
+  "name": "ذاكرة المحادثة لـ ChatGPT وClaude",
   "short_name": "ذاكرة المحادثة",
   "version": "1.1.0",
-  "description": "كل 5 رسائل يلخّص المحادثة ويحفظها في مجلد مشروعك (CONVERSATION_MEMORY.json و .md)، بنفس صيغة بلقن Claude Code. يعمل في chatgpt.com و claude.ai.",
+  "description": "يلخّص محادثاتك في ChatGPT وClaude ويحفظ ذاكرة كل مشروع داخل المتصفح أو في مجلد تختاره. غير تابعة لـ OpenAI أو Anthropic.",
   "minimum_chrome_version": "122",
   "permissions": [
     "storage",

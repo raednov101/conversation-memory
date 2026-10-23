@@ -37,6 +37,7 @@ async function refresh() {
   const h = await kv("root");
   const s = $("folderState");
   $("unlink").hidden = !h;
+  $("keepRow").hidden = $("keepNote").hidden = !!h || inPopup;   // a full copy is about what lives inside the browser
   if (!h) {   // the default: inside the browser, nothing to choose
     s.textContent = "تلقائياً داخل المتصفح، ولكل مشروع في Claude أو ChatGPT ذاكرته."; s.className = "state ok";
     $("grant").hidden = true; $("pick").textContent = "📁 ربط بمجلد على الجهاز (اختياري)";
@@ -85,7 +86,11 @@ $("pick").addEventListener("click", async () => {
     await kv("root", h);
     await chrome.storage.local.set({ folderAt: Date.now() });   // open chats re-read the folder (and its project id) at once
   } catch (e) {
-    if (e.name !== "AbortError") { const st = $("folderState"); st.textContent = "تعذّر اختيار المجلد: " + e.message; st.className = "state err"; return; }
+    if (e.name !== "AbortError") {
+      const st = $("folderState"); st.className = "state err";
+      st.textContent = e.name === "SecurityError" || e.name === "NotAllowedError" ? "لم يُسمح بهذا المجلد؛ اختر مجلداً داخل مجلد المستخدم (مثل المستندات)، لا مجلد النظام." : "تعذّر اختيار المجلد؛ أعد المحاولة.";
+      return;
+    }
   }
   refresh();
 });
@@ -189,3 +194,26 @@ async function showPin(name, keep) {
 }
 
 chrome.storage.onChanged.addListener((ch) => { if (ch.folderAt && !inPopup) { loadMemory(); loadBackups(); } });
+
+// ---------- a full copy of what is kept inside the browser (removing the extension deletes it) ----------
+$("exportAll").addEventListener("click", async () => {
+  const r = await fsOp("exportAll"), msg = $("keepMsg");
+  if (!r || !r.ok) { msg.textContent = "تعذّر حفظ النسخة."; return; }
+  if (!r.count) { msg.textContent = "لا توجد ذاكرة محفوظة بعد."; return; }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(r.data, null, 1)], { type: "application/json" }));
+  a.download = `ذاكرة المحادثة - نسخة كاملة ${new Date().toLocaleDateString("sv-SE")}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  msg.textContent = `✓ حُفظت نسخة فيها ${r.count} ${r.count === 1 ? "مشروع" : r.count === 2 ? "مشروعان" : r.count <= 10 ? "مشاريع" : "مشروعاً"}.`;
+});
+$("importAll").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0], msg = $("keepMsg"); e.target.value = "";
+  if (!f) return;
+  if (f.size > 64 * 1024 * 1024) { msg.textContent = "الملف أكبر من المتوقع لنسخة ذاكرة."; return; }
+  let data; try { data = JSON.parse(await f.text()); } catch { msg.textContent = "الملف ليس نسخة من ذاكرة المحادثة."; return; }
+  const r = await fsOp("importAll", { data });
+  if (!r || !r.ok) { msg.textContent = (r && r.error) || "تعذّرت الاستعادة."; return; }
+  msg.textContent = `✓ استُعيد ${r.added} من المشاريع.` + (r.skipped.length ? ` لم يُستبدل ما هو موجود أصلاً: ${r.skipped.join("، ")}.` : "");
+  refresh();
+});

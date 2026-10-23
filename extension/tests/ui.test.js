@@ -38,5 +38,18 @@ test("the share button is offered wherever the folder is ready, never without on
 });
 test("after the extension is updated, an open page asks to be refreshed instead of asking for a folder", () => {
   const r = describe({ phase: "new", fsSt: { ok: false, error: "inactive" }, fsOk: false }, auto, (e) => (e === "inactive" ? "حدّث الصفحة" : e), 3);
-  assert.equal(r.text, "🧠 🔄 حدّث الصفحة"); assert.ok(!r.btns.length, "no folder button");
+  assert.equal(r.text, "🧠 🔄 حدّث الصفحة"); assert.deepEqual(r.btns.map(([, a]) => a), ["reload"], "only a reload button, never a folder button");
+});
+test("a storage problem is described as such, never as «choose a folder» (the memory lives inside the browser)", () => {
+  const r = describe({ phase: "nofolder", fsSt: { ok: false, error: "quota" }, fsOk: false }, auto, (e) => "لا توجد مساحة", 3);
+  assert.match(r.text, /الحفظ غير متاح/); assert.match(r.info, /لا توجد مساحة/); assert.ok(!/اختر مجلد/.test(r.text + r.info));
+});
+test("raw browser errors are explained in Arabic", () => {
+  global.self = global.self || global; global.chrome = { runtime: {}, storage: { local: {} } };
+  require("../src/page/bridge.js"); const why = self.CM.bridge.why;
+  assert.match(why("QuotaExceededError: The quota has been exceeded."), /مساحة/);
+  assert.match(why("Could not establish connection. Receiving end does not exist."), /حدّث هذه الصفحة/);
+  assert.match(why("NotAllowedError: permission denied"), /إذن/);
+  assert.equal(why("تعذّر شيء"), "تعذّر شيء", "Arabic messages pass through");
+  assert.match(why("WeirdError xyz"), /^خطأ غير متوقع/);
 });
