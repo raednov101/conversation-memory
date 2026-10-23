@@ -469,7 +469,7 @@ test("pins: history lists versions, shows the line diff, restores an older versi
     run("stop", { session_id: "a", cwd: P, transcript_path: tp, prompt_id: j._pid });
     assert.equal(memJson(P).pins[0].version, i);
   }
-  assert.match(ctx(prompt(P, "a", "/conversation-memory:pins")), /الشعار: 2 نسخ، المعتمدة النسخة 2/);
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:pins")), /الشعار: نسختان، المعتمدة النسخة 2/);
   const h = ctx(prompt(P, "a", "/conversation-memory:pins الشعار"));
   assert.match(h, /النسخة 1 — /); assert.match(h, /النسخة 2 — /);
   assert.match(h, /- سطر ثانٍ/); assert.match(h, /\+ سطر معدّل/); assert.ok(!/[-+] السطر الأول/.test(h), "unchanged lines are not listed");
@@ -534,7 +534,7 @@ test("settings: every N and manual mode per project; /save still works; the choi
   const sv = requests(prompt(M, "m", "/conversation-memory:save"));
   assert.equal(sv.length, 1, "manual: /save asks for the summary"); assert.match(sv[0].id, /-1-7-/, "…of all 7 waiting messages");
   assert.match(ctx(prompt(M, "m", "/conversation-memory:status")), /يدوي \(بالأمر/);
-  assert.match(prompt(P, "a", "/conversation-memory:settings كل 500").systemMessage, /بين 1 و100/);
+  assert.match(prompt(P, "a", "/conversation-memory:settings كل 500").systemMessage, /بين 1 و50/);
   assert.match(prompt(P, "a", "/conversation-memory:settings أحياناً").systemMessage, /لم أفهم/);
   assert.equal(requests(prompts(tmp(), "b", 5)[4]).length, 1, "another project keeps the default");
 });
@@ -546,7 +546,7 @@ test("cost: measured from the request and the draft, announced after saving, sho
   assert.match(s.systemMessage, /الكلفة ≈ [\d,]+ توكن تقديراً/);
   const st = status("a"); assert.ok(st.cost > 50 && st.cost < 3000, `plausible estimate (${st.cost})`);
   assert.ok(sess(P, "a").lastCost.chars >= ctx(j).length, "the request text is counted");
-  assert.match(ctx(prompt(P, "a", "/conversation-memory:status")), /الكلفة: آخر تلخيص [\d,]+ حرفاً .* ≈ [\d,]+ توكن؛ في هذه الجلسة 1 تلخيص/);
+  assert.match(ctx(prompt(P, "a", "/conversation-memory:status")), /الكلفة: آخر تلخيص [\d,]+ حرفاً .* ≈ [\d,]+ توكن؛ في هذه الجلسة تلخيص واحد/);
   run("start", { session_id: "n", cwd: P, source: "startup" });
   assert.ok(sess(P, "n").injected > 100, "the memory loaded at session start is measured too");
 });
@@ -632,4 +632,14 @@ test("correctness review: two writers never take the same pin version number", (
   const out = require("child_process").spawnSync(process.execPath, [path.join(__dirname, "helpers", "pin-race.js"), P, "العقد"], { input: "{}", env: { ...ENV }, encoding: "utf8" });
   const r = JSON.parse(out.stdout || "{}");
   assert.equal(r.v, 3, out.stderr); assert.equal(fs.readFileSync(path.join(d, "v2.md"), "utf8"), "نص كاتب آخر", "the other writer's version is intact");
+});
+
+test("a broken memory file can be restored from a backup; the broken file is kept aside, never thrown away", () => {
+  const P = tmp(); saveBatch(P, "a"); saveBatch(P, "a");
+  fs.writeFileSync(path.join(P, "CONVERSATION_MEMORY.json"), '{"format":"conversation-memory/1","summ');   // cut off
+  const j = prompt(P, "a", "/conversation-memory:undo");
+  assert.match(ctx(j), /استرجع النظام/, ctx(j));
+  assert.equal(memJson(P).log.length, 1, "the previous good version is back");
+  const kept = fs.readdirSync(P).filter((f) => f.startsWith("CONVERSATION_MEMORY.broken-"));
+  assert.equal(kept.length, 1); assert.match(fs.readFileSync(path.join(P, kept[0]), "utf8"), /"summ$/);
 });

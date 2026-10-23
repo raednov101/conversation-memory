@@ -405,7 +405,7 @@ with sync_playwright() as pw:
     print("— reliability: the writer closed mid-write, 40 times — the memory is always whole —")
     proj = "proj-kill"; use_folder(proj)
     pid_ = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status' })")["projectId"]
-    broken = 0
+    broken = 0; transient = 0
     for k in range(40):
         reply = "⟦ذاكرة:بداية⟧" + json.dumps({"summary": {"goal": f"هدف {k}"}, "entry": {"raised": [f"دفعة اختبار رقم {k} " + "ن" * 3000], "decided": [], "changed": []}}, ensure_ascii=False) + "⟦ذاكرة:نهاية⟧"
         opt.evaluate("""([pid, reply, k]) => { chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { project: pid } }).then((p) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'commit', args: { project: pid, reply, batch: 'kill-' + k, base: p.base, platform: 'chatgpt', chat: 'x', range: String(k) } })).catch(() => {}); }""", [pid_, reply, k])
@@ -416,9 +416,19 @@ with sync_playwright() as pw:
         t = read(proj, "CONVERSATION_MEMORY.json")
         if t is not None:
             try: json.loads(t)
-            except Exception: broken += 1
+            except Exception:
+                # read at the very instant a file is replaced: look again a moment later; only a file that stays broken counts
+                time.sleep(0.5); t = read(proj, "CONVERSATION_MEMORY.json")
+                try: json.loads(t); transient += 1
+                except Exception: broken += 1
     m_ = mem(proj) or {}
-    ok(broken == 0 and len(m_.get("log", [])) > 0, f"40 closes mid-write: never a broken file ({len(m_.get('log', []))} writes landed)", broken)
+    ok(broken == 0 and len(m_.get("log", [])) > 0, f"40 closes mid-write: never a broken file ({len(m_.get('log', []))} writes landed; {transient} reads caught a replacement in progress)", broken)
+    write(proj, "CONVERSATION_MEMORY.json", '{"format":"conversation-memory/1","summ')   # a cut-off file, however it happened
+    lb = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'listBackups', args: {} })")
+    # (a writer closed mid-write left its lock: it lapses after 15 s, so the first tries may say "busy")
+    rr = wait(lambda: (lambda r: r if r.get("ok") else None)(opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'restore', args: { n: 1 } })")), 25) or {}
+    ok(lb.get("broken") and lb.get("list") and rr.get("ok") and mem(proj) and any(f.startswith("CONVERSATION_MEMORY.broken-") for f in ls(proj)),
+       "a broken memory file can still be restored from a backup, and the broken file is kept aside", (lb.get("broken"), rr))
     ok(not [n for n in ls(proj) if n.startswith("CONVERSATION_MEMORY.edited-")], "…and a cut-off write is never mistaken for a hand edit")
 
     print("— compatibility & safety —")
@@ -553,7 +563,7 @@ with sync_playwright() as pw:
     print("— a page the extension can't read says so —")
     use_folder("proj-chatgpt")
     p = ctx.new_page(); p.goto(BASE + page("chatgpt", "/c/empty-chat/", "فارغ - ChatGPT"))
-    ok(wait(lambda: "لا أقرأ الرسائل" in pill(p), 25), "no readable messages on a chat page → visible warning", pill(p))
+    ok(wait(lambda: "تعذّرت قراءة المحادثة" in pill(p), 25), "no readable messages on a chat page → visible warning", pill(p))
     p.close()
 
     ctx.close()

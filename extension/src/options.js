@@ -113,7 +113,7 @@ async function loadSettings() {
 }
 async function saveSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
-  const every = Math.min(50, Math.max(1, parseInt($("every").value, 10) || 5));
+  const every = Math.min(self.MemoryCore.LIMITS.every, Math.max(1, parseInt($("every").value, 10) || 5));
   await chrome.storage.local.set({ settings: { ...settings, every, mode: $("mode").value, autoLink: $("autoLink").checked } });
   $("saved").textContent = "حُفظت الإعدادات ✓";
   setTimeout(() => ($("saved").textContent = ""), 2000);
@@ -128,10 +128,11 @@ async function loadBackups() {
   const ol = $("backups");
   const r = await fsOp("listBackups");
   ol.textContent = "";
-  if (!r || !r.ok || !r.list.length) { const li = document.createElement("li"); li.className = "muted"; li.textContent = r && !r.ok ? "امنح إذن الكتابة للمجلد أولاً." : "لا توجد نسخ سابقة بعد."; ol.append(li); return; }
+  $("restoreMsg").textContent = r && r.broken ? `⚠️ ملف الذاكرة الحالي تالف (${r.broken}). استرجع نسخة سابقة؛ يُحفظ الملف التالف جانباً.` : "";
+  if (!r || !r.ok || !r.list.length) { const li = document.createElement("li"); li.className = "muted"; li.textContent = r && !r.ok ? (r.error === "needPermission" ? "امنح إذن الكتابة للمجلد أولاً." : `تعذّرت قراءة النسخ: ${r.error}`) : "لا توجد نسخ سابقة بعد."; ol.append(li); return; }
   r.list.slice(0, 10).forEach((b, i) => {
     const li = document.createElement("li"), span = document.createElement("span"), btn = document.createElement("button");
-    span.textContent = `${b.when} — ${b.decisions} قرار، ${b.log} دفعة${b.goal ? ` — «${b.goal}»` : ""}`;
+    span.textContent = `${b.when} — ${self.MemoryCore.count(b.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(b.log, self.MemoryCore.W.batch)}${b.goal ? ` — «${b.goal}»` : ""}`;
     btn.type = "button"; btn.textContent = "استرجاع"; btn.dataset.n = String(i + 1);
     li.append(span, btn); ol.append(li);
   });
@@ -151,7 +152,7 @@ function say(where, text) { $(where).textContent = text; }
 async function loadMemory() {
   const r = await fsOp("readFull");
   if (!r || !r.ok) {
-    $("pins").replaceChildren(el("li", { className: "muted", textContent: r && r.error === "noFolder" ? "اختر مجلد المشروع أولاً." : r && r.error === "needPermission" ? "امنح إذن الكتابة للمجلد أولاً." : `تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.` }));
+    $("pins").replaceChildren(el("li", { className: "muted", textContent: r && r.error === "needPermission" ? "امنح إذن الكتابة للمجلد أولاً." : `تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.` }));
     return;
   }
   mem = r.memory; renderPins();
@@ -177,7 +178,7 @@ function showDiff(vs, a, b) {
 async function showPin(name, keep) {
   const r = await fsOp("pinVersions", { name });
   if (!r.ok) { say("pinMsg", `تعذّرت قراءة النسخ: ${r.error}`); return; }
-  openPin = name; $("pinHist").hidden = false; $("pinTitle").textContent = `سجل «${name}» — ${r.versions.length} ${r.versions.length === 1 ? "نسخة" : "نسخ"}`;
+  openPin = name; $("pinHist").hidden = false; $("pinTitle").textContent = `سجل «${name}» — ${self.MemoryCore.count(r.versions.length, self.MemoryCore.W.version)}`;
   const ul = $("pinVers"); ul.textContent = "";
   const vs = r.versions, cur = (mem.pins.find((p) => p.name === name) || {}).version;
   for (const x of vs.slice().reverse()) {
@@ -204,7 +205,7 @@ $("exportAll").addEventListener("click", async () => {
   a.href = URL.createObjectURL(new Blob([JSON.stringify(r.data, null, 1)], { type: "application/json" }));
   a.download = `ذاكرة المحادثة - نسخة كاملة ${new Date().toLocaleDateString("sv-SE")}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  msg.textContent = `✓ حُفظت نسخة فيها ${r.count} ${r.count === 1 ? "مشروع" : r.count === 2 ? "مشروعان" : r.count <= 10 ? "مشاريع" : "مشروعاً"}.`;
+  msg.textContent = `✓ حُفظت نسخة فيها ${self.MemoryCore.count(r.count, self.MemoryCore.W.project)}.`;
 });
 $("importAll").addEventListener("click", () => $("importFile").click());
 $("importFile").addEventListener("change", async (e) => {

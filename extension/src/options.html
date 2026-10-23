@@ -9,7 +9,7 @@
   @font-face{font-family:"PlexAr";font-weight:400;src:url(../fonts/plex-arabic-400.woff2) format("woff2")}
   @font-face{font-family:"PlexAr";font-weight:700;src:url(../fonts/plex-arabic-700.woff2) format("woff2")}
   :root{--bg1:#F3F6FC;--bg2:#E6ECF8;--card:#FFFFFF;--line:#D9E0EE;--fg:#0B1B3F;--muted:#5B6787;--soft:#F1F4FA;
-    --primary:#1E3991;--primary2:#0952A8;--gold:#A8761F;--ok:#1A7F37;--warn:#9A6700;--err:#C62828;--add:#1A7F37;--del:#C62828}
+    --primary:#1E3991;--primary2:#0952A8;--gold:#8A5F12;--ok:#1A7F37;--warn:#9A6700;--err:#C62828;--add:#1A7F37;--del:#C62828}
   @media (prefers-color-scheme:dark){:root{--bg1:#05072B;--bg2:#00144F;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.10);--fg:#EAF0FF;
     --muted:#9AA7C7;--soft:rgba(255,255,255,.04);--primary:#1E3991;--primary2:#0952A8;--gold:#C9922F;--ok:#4CC38A;--warn:#E3B341;--err:#FF6B6B;--add:#4CC38A;--del:#FF8A8A}}
   *{box-sizing:border-box}
@@ -55,7 +55,6 @@
   .items .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:55%}
   .items button,.small{padding:3px 9px;font-size:12px}
   .tag{display:inline-block;font-size:11px;padding:0 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-inline-start:4px}
-  .tag.sug{color:var(--gold);border-color:var(--gold)}
   textarea{width:100%;min-height:46px;resize:vertical}
   .diff{margin:6px 0 0;padding:8px;border-radius:8px;background:var(--soft);border:1px solid var(--line);font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto}
   .diff .del{color:var(--del);text-decoration:line-through}.diff .add{color:var(--add)}
@@ -99,12 +98,13 @@
     </section>
 
     <section class="card">
-      <h2>الحفظ</h2>
+      <h2>التلخيص</h2>
       <div class="field"><label for="mode">الطريقة</label>
         <select id="mode"><option value="auto">تلقائي</option><option value="manual">يدوي (بالزر فقط)</option></select></div>
       <div class="field"><label for="every">لخّص كل</label><span><input id="every" type="number" min="1" max="50"> رسائل</span></div>
       <label class="check"><input id="autoLink" type="checkbox"> اربط المحادثات الجديدة بالمشروع تلقائياً</label>
       <p id="saved" class="muted" style="margin:4px 0 0"></p>
+      <p class="muted" style="margin:6px 0 0">للعلم: التلخيص يرسل رسالة قصيرة باسمك في المحادثة نفسها، فتُحتسب من رصيد رسائلك في الموقع، ويذهب نص الذاكرة معها إلى ChatGPT أو Claude.</p>
       <details><summary>كيف يعمل؟</summary>
         <p>عند الاستحقاق ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» والخانة فارغة والنموذج متوقف، وتتحقق من رده قبل الحفظ. هذه الرسائل لا تُحتسب ولا تُحفظ في نص المحادثة، والنص الكامل يُحفظ بعد كل رد. المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة.</p>
       </details>
@@ -139,7 +139,7 @@
 
   <footer class="card">
     <details><summary>طريقة الاستخدام</summary>
-      <p>• الشارة 🧠 أسفل يسار الصفحة: عدد رسائلك حتى الحفظ القادم، و📝 حُفظ النص، و✓ حُدّث الملخص، و⚠️ مع السبب.<br>
+      <p>• الشارة 🧠 أسفل يسار الصفحة: عدد رسائلك حتى التلخيص القادم، و📝 حُفظ النص، و✓ حُدّث الملخص، و⚠️ مع السبب.<br>
         • في محادثة جديدة: «📥 أدرج الذاكرة» تضع نسخة مختصرة في خانة الرسالة.<br>
         • «📤 انقل معلومات مختارة»: تختار، وتعاين، ثم تُدرج دون إرسال.</p>
     </details>

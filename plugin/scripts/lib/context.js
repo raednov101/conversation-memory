@@ -6,6 +6,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { readStdin, sid8of, lst } = require("./util");
 const { safeDir } = require("./fsx");
+const { PROTOCOL } = require("../../core/memory-core.js");
 
 // ---------------- context ----------------
 const mode = process.argv[2];
@@ -14,11 +15,11 @@ const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR || input.cwd || p
 const sid = String(input.session_id || "default");
 const sid8 = sid8of(sid);
 const P = {
-  json: path.join(projectDir, "CONVERSATION_MEMORY.json"),
-  md: path.join(projectDir, "CONVERSATION_MEMORY.md"),
-  pins: path.join(projectDir, "CONVERSATION_PINS"),
-  pub: path.join(projectDir, ".conversation-memory"),
-  inbox: path.join(projectDir, ".conversation-memory", "inbox"),
+  json: path.join(projectDir, PROTOCOL.json),
+  md: path.join(projectDir, PROTOCOL.md),
+  pins: path.join(projectDir, PROTOCOL.pins),
+  pub: path.join(projectDir, PROTOCOL.data),
+  inbox: path.join(projectDir, PROTOCOL.data, "inbox"),
 };
 const HOME = path.join(os.homedir(), ".conversation-memory");
 // one private state per project, however its path is spelled: the real path (links resolved, true letter case on

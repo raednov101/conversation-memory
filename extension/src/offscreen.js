@@ -1,9 +1,11 @@
-// The only code that touches the project folder. Uses the shared core (memory-core.js, identical to the plugin's).
+// The only code that reads or writes the memory: inside the browser's private storage by default, or in a folder the
+// user linked. Uses the shared core (memory-core.js, byte-identical to the plugin's).
 // Every memory write: read → (migrate / keep hand edits) → apply → re-read to detect a concurrent writer → backup → write → read back.
 "use strict";
 const C = self.MemoryCore;
-const JSON_FILE = "CONVERSATION_MEMORY.json", MD_FILE = "CONVERSATION_MEMORY.md", PINS = "CONVERSATION_PINS", DATA = ".conversation-memory";
-const MAX_JSON = 4 * 1024 * 1024, TRIM_AT = 3 * 1024 * 1024, MAX_BACKUPS = 20, STATE_BUDGET = 3000, COMPACT_BUDGET = 5000, WLOCK_STALE = 15000;
+// file names, backup naming, sizes and the shared lock come from the core: the plugin follows the same definition
+const { json: JSON_FILE, md: MD_FILE, pins: PINS, data: DATA, maxJson: MAX_JSON, trimAt: TRIM_AT, maxBackups: MAX_BACKUPS, writeLockStale: WLOCK_STALE, futureSkew: FUTURE_SKEW } = C.PROTOCOL;
+const STATE_BUDGET = 3000, COMPACT_BUDGET = 5000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nonce = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const today = () => new Date().toLocaleString("sv-SE").slice(0, 16);
@@ -63,7 +65,7 @@ async function dataDir(r) {
 }
 // Backups in .conversation-memory/backups/, shared with the Claude Code plugin (same names, same folder), so "undo"
 // reverts the last change whoever made it. A version is never replaced without its backup.
-const BACKUP_RE = /^\d{8}-\d{6}-\d{3}(-[a-z0-9]{1,8})?\.json$/;
+const BACKUP_RE = C.PROTOCOL.backupRe;
 async function backupNames(r) {
   const b = await dir(await dataDir(r), ["backups"]);
   const names = [];
@@ -104,9 +106,11 @@ async function describeBackups(r, currentText) {
 
 // ---------- the memory (the only writer in the extension) ----------
 async function readMemory(r) {
-  const jsonText = await readText(r, JSON_FILE), mdText = await readText(r, MD_FILE);
-  const p = C.parseMemory(jsonText);
-  if (!p.ok) return { bad: p.error };
+  let jsonText = await readText(r, JSON_FILE), p = C.parseMemory(jsonText);
+  // a file being replaced by another writer at this very moment can read as cut off: look once more before calling it broken
+  if (!p.ok) { await sleep(150); jsonText = await readText(r, JSON_FILE); p = C.parseMemory(jsonText); }
+  const mdText = await readText(r, MD_FILE);
+  if (!p.ok) return { bad: p.error, brokenText: jsonText };
   return { memory: p.memory, jsonText, mdText, token: C.token(jsonText || ""), exists: jsonText != null };
 }
 // Shared with the Claude Code plugin (same protocol in hook.js): an advisory lock file ".conversation-memory/write.lock",
@@ -118,18 +122,18 @@ async function takeWriteLock(r) {
     // the other writer may be replacing the lock file while we read it: that read fails, which only means "busy, look again"
     let held = false;
     try {
-      const f = await (await d.getFileHandle("write.lock")).getFile(), at = +String(await f.text()).trim().split(" ")[1] || f.lastModified;
-      held = at <= Date.now() + 60000 && Date.now() - at < WLOCK_STALE;   // a future time can't hold the lock forever
+      const f = await (await d.getFileHandle(C.PROTOCOL.writeLock)).getFile(), at = +String(await f.text()).trim().split(" ")[1] || f.lastModified;
+      held = at <= Date.now() + FUTURE_SKEW && Date.now() - at < WLOCK_STALE;   // a future time can't hold the lock forever
     } catch (e) { if (e && e.name !== "NotFoundError") { await sleep(50); continue; } }
     if (held) { await sleep(50); continue; }
-    try { await writeVerified(d, "write.lock", `${me} ${Date.now()}`); } catch { await sleep(50); continue; }
+    try { await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`); } catch { await sleep(50); continue; }
     await sleep(40);
-    let mine = false; try { mine = String(await readText(d, "write.lock")).startsWith(me + " "); } catch {}
+    let mine = false; try { mine = String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " "); } catch {}
     if (mine) return { d, me };
   }
   return null;
 }
-async function dropWriteLock(lk) { if (!lk || lk.browser) return; try { if (String(await readText(lk.d, "write.lock")).startsWith(lk.me + " ")) await lk.d.removeEntry("write.lock"); } catch {} }
+async function dropWriteLock(lk) { if (!lk || lk.browser) return; try { if (String(await readText(lk.d, C.PROTOCOL.writeLock)).startsWith(lk.me + " ")) await lk.d.removeEntry(C.PROTOCOL.writeLock); } catch {} }
 async function archive(r, entries) {
   if (!entries.length) return;
   await writeVerified(await dir(await dataDir(r), ["archive"]), `${stamp()}-${nonce().slice(0, 4)}.json`, JSON.stringify(entries, null, 1));
@@ -293,9 +297,8 @@ const ops = {
   // the backups the user can restore (newest first; the same numbering as the plugin's /conversation-memory:restore)
   async listBackups() {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
-    const cur = await readMemory(h);
-    if (cur.bad) return { ok: false, error: cur.bad };
-    return { ok: true, list: (await describeBackups(h, cur.jsonText)).map(({ when, log, decisions, goal }) => ({ when, log, decisions, goal })) };
+    const cur = await readMemory(h);   // listed even when the current file is broken: that is when a restore is needed
+    return { ok: true, broken: cur.bad || "", list: (await describeBackups(h, cur.bad ? null : cur.jsonText)).map(({ when, log, decisions, goal }) => ({ when, log, decisions, goal })) };
   },
   // restore backup n (1 = the newest one that differs from the current file); the current version is backed up first
   async restore({ n }) {
@@ -304,12 +307,13 @@ const ops = {
     if (!lk) return { ok: false, busy: true, error: "برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات" };
     try {
       const cur = await readMemory(h);
-      if (cur.bad) return { ok: false, error: cur.bad };
-      const list = await describeBackups(h, cur.jsonText), b = list[(Math.floor(+n) || 1) - 1];
-      if (!b) return { ok: false, error: list.length ? `لا توجد نسخة رقم ${n}` : "لا توجد نسخة سابقة للاسترجاع بعد" };
-      try { await backupJson(h, cur.jsonText); } catch { return { ok: false, error: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" }; }
+      // a broken memory file is exactly when a restore is needed: the broken file is kept aside, never thrown away
+      const list = await describeBackups(h, cur.bad ? null : cur.jsonText), b = list[(Math.floor(+n) || 1) - 1];
+      if (!b) return { ok: false, error: cur.bad ? cur.bad : list.length ? `لا توجد نسخة رقم ${n}` : "لا توجد نسخة سابقة للاسترجاع بعد" };
+      if (cur.bad) { if (typeof cur.brokenText === "string") await writeVerified(h, `CONVERSATION_MEMORY.broken-${stamp()}.json`, cur.brokenText); }
+      else try { await backupJson(h, cur.jsonText); } catch { return { ok: false, error: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" }; }
       let kept = "";   // a hand-edited .md is kept aside first, as every other write does
-      if (cur.exists && cur.mdText != null && cur.memory.mdHash && !(await isSomeGeneratedView(h, cur.mdText, cur.memory))) { kept = `CONVERSATION_MEMORY.edited-${stamp()}.md`; await writeVerified(h, kept, cur.mdText); }
+      if (!cur.bad && cur.exists && cur.mdText != null && cur.memory.mdHash && !(await isSomeGeneratedView(h, cur.mdText, cur.memory))) { kept = `CONVERSATION_MEMORY.edited-${stamp()}.md`; await writeVerified(h, kept, cur.mdText); }
       const m = b.memory, md = C.render(m);
       m.mdHash = C.hash(md);
       await writeVerified(h, JSON_FILE, C.serialize(m));

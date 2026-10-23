@@ -70,7 +70,7 @@ function pinsCommand(args) {
   if (!args) {
     if (!pins.length) return "[conversation-memory] لا توجد نصوص معتمدة بعد. أخبر المستخدم أن التثبيت بالأمر /conversation-memory:pin اسم.";
     return "[conversation-memory] النصوص المعتمدة (اعرضها للمستخدم كما هي؛ لسجل نسخ نصٍّ: /conversation-memory:pins اسمه):\n" +
-      dataBlock(pins.map((p) => { const vs = pinVersions(p.name); return `- ${p.name}: ${vs.length} ${vs.length === 1 ? "نسخة" : "نسخ"}، المعتمدة النسخة ${p.version} (${p.date})`; }).join("\n"));
+      dataBlock(pins.map((p) => { const vs = pinVersions(p.name); return `- ${p.name}: ${C.count(vs.length, C.W.version)}، المعتمدة النسخة ${p.version} (${p.date})`; }).join("\n"));
   }
   const m = args.match(/^(.*?)(?:\s+(?:restore|استرجع)\s+(\d+))?$/), name = (m[1] || "").trim().replace(/\s+/g, " "), k = m[2] ? +m[2] : 0;
   const vs = pinVersions(name);

@@ -45,7 +45,7 @@ const fmt = (n) => Number(n || 0).toLocaleString("en-US");
 function costText(s) {
   const L = [];
   if (s.lastCost.chars) L.push(`آخر تلخيص ${fmt(s.lastCost.chars)} حرفاً (الطلب والمسودة) ≈ ${fmt(C.estTokens(s.lastCost.chars))} توكن`);
-  if (s.costTotal.n) L.push(`في هذه الجلسة ${s.costTotal.n} ${s.costTotal.n === 1 ? "تلخيص" : "تلخيصات"} ≈ ${fmt(C.estTokens(s.costTotal.chars))} توكن`);
+  if (s.costTotal.n) L.push(`في هذه الجلسة ${C.count(s.costTotal.n, C.W.summary)} ≈ ${fmt(C.estTokens(s.costTotal.chars))} توكن`);
   if (s.injected) L.push(`الذاكرة المحمّلة عند بداية الجلسة ${fmt(s.injected)} حرفاً ≈ ${fmt(C.estTokens(s.injected))} توكن`);
   return L.length ? L.join("؛ ") + " (تقدير من عدد الحروف؛ لا يشمل ما قد يقرؤه Claude من ملف الذاكرة)" : "لم يُلخَّص شيء في هذه الجلسة بعد";
 }
@@ -108,7 +108,7 @@ function parseSettings(args, cfg) {
   const a = String(args || "").trim();
   if (!a) return { cfg, changed: false };
   const n = a.match(/^(?:every|كل)\s*(\d{1,3})(?:\s*رسائل|\s*رسالة)?$/i) || a.match(/^(\d{1,3})$/);
-  if (n) { const every = +n[1]; if (every < 1 || every > 100) return { err: "العدد بين 1 و100" }; return { cfg: { every, mode: "auto" }, changed: true }; }
+  if (n) { const every = +n[1]; if (every < 1 || every > C.LIMITS.every) return { err: `العدد بين 1 و${C.LIMITS.every}` }; return { cfg: { every, mode: "auto" }, changed: true }; }
   if (/^(manual|يدوي)$/i.test(a)) return { cfg: { ...cfg, mode: "manual" }, changed: true };
   if (/^(auto|تلقائي)$/i.test(a)) return { cfg: { ...cfg, mode: "auto" }, changed: true };
   return { err: `لم أفهم «${a.slice(0, 40)}». الصيغ: every 10 (أو كل 10)، manual (يدوي)، auto (تلقائي)` };

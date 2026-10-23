@@ -12,7 +12,7 @@
   b.fs = (op, args) => b.call({ cmd: "fs", op, args: { scope: b.scope, scopeName: b.scopeName, ...(args || {}) } });
   b.get = async (k, d) => { try { return (await chrome.storage.local.get(k))[k] ?? d; } catch { b.dead = true; return d; } };
   b.set = async (k, v) => { try { await chrome.storage.local.set({ [k]: v }); } catch { b.dead = true; } };
-  const ERR = { noFolder: "اختر مجلد المشروع أولاً", needPermission: "يلزم منح إذن الكتابة للمجلد", inactive: "حُدّثت الإضافة؛ حدّث هذه الصفحة (F5) لتعمل النسخة الجديدة" };
+  const ERR = { needPermission: "يلزم منح إذن الكتابة للمجلد", inactive: "حُدّثت الإضافة؛ حدّث هذه الصفحة (F5) لتعمل النسخة الجديدة" };
   // errors raised by the browser itself arrive in English: say what they mean instead
   const RAW = [
     [/context invalidated|receiving end does not exist|could not establish connection|no reply|message port closed/i, ERR.inactive],

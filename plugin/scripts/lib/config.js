@@ -2,10 +2,11 @@
 // Settings. One place for every limit the hooks use.
 
 // ---------------- settings ----------------
-const EVERY = Math.min(100, Math.max(1, Math.floor(Number(process.env.CONV_MEMORY_EVERY)) || 5));
-const INJECT_BUDGET = 5000, CAPTURE_BUDGET = 12000, PART_CHARS = 40000, MAX_DRAFT = 300 * 1024, MAX_JSON = 4 * 1024 * 1024;
-const MAX_TRANSCRIPT = 50 * 1024 * 1024, MAX_SESSIONS = 50, KEEP_MSGS = 500, MAX_UNDONE = 2000, MAX_ATTEMPTS = 3, MAX_BACKUPS = 20;
-const TRIM_AT = 3 * 1024 * 1024, WLOCK_STALE = 15000;
+const { LIMITS, PROTOCOL } = require("../../core/memory-core.js");
+const EVERY = Math.min(LIMITS.every, Math.max(1, Math.floor(Number(process.env.CONV_MEMORY_EVERY)) || 5));
+const INJECT_BUDGET = 5000, CAPTURE_BUDGET = 12000, PART_CHARS = 40000, MAX_DRAFT = 300 * 1024, MAX_JSON = PROTOCOL.maxJson;
+const MAX_TRANSCRIPT = 50 * 1024 * 1024, MAX_SESSIONS = 50, KEEP_MSGS = 500, MAX_UNDONE = 2000, MAX_ATTEMPTS = 3, MAX_BACKUPS = PROTOCOL.maxBackups;
+const TRIM_AT = PROTOCOL.trimAt, WLOCK_STALE = PROTOCOL.writeLockStale;   // shared with the extension (core PROTOCOL)
 const LOCK_WAIT = 5000, LOCK_STALE = 60000, PIN_TURNS = 3, ANCHOR_MIN = 15, ANCHOR_MAX = 300;
 const CMD = "/conversation-memory:";
 

@@ -17,7 +17,7 @@ function readMemory() {
   const md = readSafe(P.md, MAX_JSON);
   if (md.bad) return { bad: `CONVERSATION_MEMORY.md ${md.bad}` };
   const parsed = C.parseMemory(j.text);
-  if (!parsed.ok) return { bad: parsed.error };
+  if (!parsed.ok) return { bad: parsed.error, brokenText: j.text };
   return { memory: parsed.memory, jsonText: j.text, mdText: md.text, token: C.token(j.text || ""), exists: j.text != null };
 }
 // ---------- trust: memory is loaded into a session only if it came through this plugin or the user approved it ----------
@@ -51,7 +51,7 @@ function migrateTrust(mem) { const t = readTrust(); if (t.migrate && mem.exists 
 // Backups live in the project's data folder (.conversation-memory/backups/, git-ignored), shared with the browser
 // extension, so "undo" reverts the last change whoever made it. A version is never replaced without its backup:
 // if the backup can't be written, nothing is written.
-const BACKUP_RE = /^\d{8}-\d{6}-\d{3}(-[a-z0-9]{1,8})?\.json$/;
+const BACKUP_RE = C.PROTOCOL.backupRe;
 const backupDir = () => path.join(P.pub, "backups");
 function listBackups() {
   try { return fs.readdirSync(backupDir()).filter((f) => BACKUP_RE.test(f)).sort().reverse(); } catch { return []; }
@@ -89,13 +89,19 @@ function isSomeGeneratedView(mdText, current) {
 // first, so a restore can itself be undone. Called with the write lock held.
 function restoreBackup(n = 1) {
   const cur = readMemory();
-  if (cur.bad) return { err: cur.bad };
+  // a broken memory file is exactly when a restore is needed: the broken file is kept aside, never thrown away
+  // (a link or an oversized file is not "broken": that is refused as before)
+  if (cur.bad && typeof cur.brokenText !== "string") return { err: cur.bad };
   const usable = listBackups().map(describeBackup).filter((b) => b.ok && b.text !== cur.jsonText);
   const b = usable[n - 1];
-  if (!b) return { err: usable.length ? `لا توجد نسخة رقم ${n} (المتاح: 1 إلى ${usable.length})` : "لا توجد نسخة سابقة للاسترجاع بعد" };
-  if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" };
+  if (!b) return { err: cur.bad ? cur.bad : usable.length ? `لا توجد نسخة رقم ${n} (المتاح: 1 إلى ${usable.length})` : "لا توجد نسخة سابقة للاسترجاع بعد" };
+  if (cur.bad) {
+    const keep = path.join(projectDir, `CONVERSATION_MEMORY.broken-${stamp()}.json`);
+    try { writeAtomic(keep, cur.brokenText); notes.push(`ℹ️ ذاكرة المحادثة: كان ملف الذاكرة تالفاً، فحُفظ كما هو في ${path.basename(keep)} قبل الاسترجاع.`); }
+    catch { return { err: "تعذّر حفظ الملف التالف جانباً، فلم أسترجع شيئاً" }; }
+  } else if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" };
   // a hand-edited .md is kept aside first, as every other write does
-  if (cur.exists && cur.mdText != null && cur.memory.mdHash && !isSomeGeneratedView(cur.mdText, cur.memory)) {
+  if (!cur.bad && cur.exists && cur.mdText != null && cur.memory.mdHash && !isSomeGeneratedView(cur.mdText, cur.memory)) {
     const keep = path.join(projectDir, `CONVERSATION_MEMORY.edited-${stamp()}.md`);
     try { writeAtomic(keep, cur.mdText); notes.push(`ℹ️ ذاكرة المحادثة: عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${path.basename(keep)} قبل الاسترجاع.`); }
     catch { return { err: "تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أسترجع شيئاً" }; }
@@ -116,7 +122,7 @@ function sweepTemps(dir) {
 // Shared with the browser extension (same protocol in offscreen.js): an advisory lock file in the project's data folder,
 // "<owner> <epoch-ms>", stale after 15 s; taken by writing it and confirming it still holds our owner after a moment.
 // Writers also re-read the JSON right before replacing it (compare-and-swap) and confirm the result afterwards.
-const WLOCK = path.join(P.pub, "write.lock");
+const WLOCK = path.join(P.pub, C.PROTOCOL.writeLock);
 let heldLock = null;   // taken once per Stop, before any draft is consumed
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
 function takeWriteLock(wait = 3000) {
@@ -132,7 +138,7 @@ function takeWriteLock(wait = 3000) {
       let a = [], seen = null; try { seen = fs.readFileSync(WLOCK, "utf8"); a = seen.trim().split(" "); } catch {}
       const at = int(a[1]), pid = int(a[2]);
       // a time in the future (clock skew, or a lock file that came with the project) can't hold the lock forever
-      const t = at || f.stat.mtimeMs, future = t > Date.now() + 60000;
+      const t = at || f.stat.mtimeMs, future = t > Date.now() + C.PROTOCOL.futureSkew;
       const gone = pid && a[3] === os.hostname() && !alive(pid);
       if (!gone && !future && Date.now() - t < WLOCK_STALE) { sleep(50); continue; }
       if (seen === null) { sleep(20); continue; }

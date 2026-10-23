@@ -25,6 +25,8 @@
     .toast{position:fixed;left:12px;bottom:56px;z-index:2147483647;direction:rtl;font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+  const q = (t) => `«<bdi>${esc(t)}</bdi>»`;   // a name inside Arabic text keeps its own direction (English names, numbers)
+  const n = (k, w) => root.MemoryCore.count(k, root.MemoryCore.W[w]);   // Arabic counting forms
   const tokens = (chars) => root.MemoryCore.estTokens(chars);   // the shared core's estimate (≈ 3 characters per token)
   const hhmm = (t) => (t ? new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 
@@ -36,20 +38,20 @@
     const btns = [];
     if (v.fsSt && v.fsSt.error === "inactive") { cls = "warn"; text = "🧠 🔄 حدّث الصفحة"; info = esc(why("inactive")) + "."; btns.push(["🔄 حدّث الصفحة الآن", "reload"]); return { cls, text, info, btns }; }
     if (!v.fsSt || !v.fsSt.ok || !v.fsSt.folder) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = "تعذّر تجهيز مكان حفظ الذاكرة" + (v.fsSt && v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : "") + "."; btns.push(["⚙️ الإعدادات", "options"]); }
-    else if (v.fsSt.permission === "granted" && !v.fsOk) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = `تعذّر تجهيز ذاكرة «${esc(v.fsSt.folder)}»${v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : ""}.`; btns.push(["⚙️ الإعدادات", "options"]); }
-    else if (!v.fsOk) { cls = "warn"; text = "🧠 🔓 امنح الإذن"; info = `يلزم إذن الكتابة في «${esc(v.fsSt.folder)}».`; btns.push(["🔓 منح الإذن", "options"]); }
-    else if (v.phase === "unlinked" && v.unreadable) { cls = "err"; text = "🧠 ⚠️ لا أقرأ الرسائل"; info = "لا أستطيع قراءة رسائل هذه الصفحة؛ ربما تغيّر تصميم الموقع. لم يُحفظ منها شيء."; }
+    else if (v.fsSt.permission === "granted" && !v.fsOk) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = `تعذّر تجهيز ذاكرة ${q(v.fsSt.folder)}${v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : ""}.`; btns.push(["⚙️ الإعدادات", "options"]); }
+    else if (!v.fsOk) { cls = "warn"; text = "🧠 🔓 امنح الإذن"; info = `يلزم إذن الكتابة في ${q(v.fsSt.folder)}.`; btns.push(["🔓 منح الإذن", "options"]); }
+    else if (v.phase === "unlinked" && v.unreadable) { cls = "err"; text = "🧠 ⚠️ تعذّرت قراءة المحادثة"; info = "لا أستطيع قراءة رسائل هذه الصفحة؛ ربما تغيّر تصميم الموقع. لم يُحفظ منها شيء."; }
     else if (v.phase === "unlinked") {
-      text = "🧠 غير مربوطة"; info = `هذه المحادثة غير مربوطة بمشروع «${esc(v.fsSt.folder)}»، فلا تُلخَّص ولا تُحفظ.` +
-        `<br><span class="muted">اربطها إن كانت عن هذا المشروع؛ تُلخَّص حينها من أولها (${v.userCount} ${v.userCount === 1 ? "رسالة" : "رسائل"} حتى الآن).</span>`;
-      btns.push(["🔗 اربط بالمشروع", "link"], SHARE);
+      text = "🧠 غير مربوطة"; info = `هذه المحادثة غير مربوطة بالذاكرة ${q(v.fsSt.folder)}، فلا تُلخَّص ولا تُحفظ.` +
+        `<br><span class="muted">اربطها إن كان موضوعها يخص هذه الذاكرة؛ تُلخَّص حينها من أولها (${n(v.userCount, "msg")} حتى الآن).</span>`;
+      btns.push(["🔗 اربطها بالذاكرة", "link"], SHARE);
     }
-    else if (v.phase === "new") { text = "🧠 محادثة جديدة"; info = v.fsSt.inBrowser ? `الذاكرة: ${esc(v.fsSt.folder)}` : `المجلد: ${esc(v.fsSt.folder)}`; btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE); }
+    else if (v.phase === "new") { text = "🧠 محادثة جديدة"; info = v.fsSt.inBrowser ? `الذاكرة: <bdi>${esc(v.fsSt.folder)}</bdi>` : `المجلد: <bdi>${esc(v.fsSt.folder)}</bdi>`; btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE); }
     else if (v.phase === "chat") {
       const since = Math.max(0, v.userCount - s.summarizedUpTo), manual = settings.mode === "manual";
       const prog = manual ? `${since} · يدوي` : `${Math.min(since, settings.every)}/${settings.every}`;
       const cost = s.lastCost ? tokens(s.lastCost.req + s.lastCost.rep) : 0;
-      if (v.unreadable) { cls = "err"; text = "🧠 ⚠️ لا أقرأ الرسائل"; info = "لا أستطيع قراءة رسائل هذه الصفحة؛ ربما تغيّر تصميم الموقع. الحفظ متوقف هنا، ولم يُفقد شيء محفوظ."; }
+      if (v.unreadable) { cls = "err"; text = "🧠 ⚠️ تعذّرت قراءة المحادثة"; info = "لا أستطيع قراءة رسائل هذه الصفحة؛ ربما تغيّر تصميم الموقع. الحفظ متوقف هنا، ولم يُفقد شيء محفوظ."; }
       else if (s.pending) { cls = "busy"; text = `🧠 ⏳ ${prog} · يحفظ`; info = "طُلب الملخص من النموذج؛ يُحفظ عند اكتمال الرد."; }
       else if (s.status === "error") { cls = "err"; text = `🧠 ⚠️ ${prog} · تعثّر الحفظ`; info = `تعثّر الحفظ: ${esc(s.error)}` + (s.attempts >= maxAttempts ? " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)" : " (يعيد المحاولة بعد رسالتك القادمة)"); }
       // three outcomes, never confused: 📝 the full text is saved (summary later) · ✓ the summary was updated · ⚠️ failed
@@ -60,10 +62,10 @@
       if (v.empty && v.empty.length && !v.unreadable) info += `<br><span class="muted">${v.empty.length === 1 ? `رسالتك رقم ${v.empty[0]}` : `رسائلك رقم ${v.empty.join("، ")}`} بلا نص مقروء (صورة أو ملف)؛ لا يُحفظ منها إلا ما يذكره الرد عنها.</span>`;
       if (!v.unreadable) {
         const left = Math.max(0, settings.every - since);
-        info += `<br><span class="muted">${manual ? "الوضع اليدوي: لا يُطلب ملخص إلا بالزر." : `${left ? `الحفظ القادم بعد ${left} ${left === 1 ? "رسالة" : "رسائل"}.` : "الحفظ مستحق."}`} النص الكامل يُحفظ بعد كل رد.` +
-          `${!manual && settings.paused ? " (التلقائي متوقف)" : ""}${v.noComposer ? " لا أجد خانة الكتابة." : ""}</span>`;
+        info += `<br><span class="muted">${manual ? "الوضع اليدوي: لا يُطلب ملخص إلا بالزر." : `${left ? `التلخيص القادم بعد ${n(left, "msg")}.` : "التلخيص مستحق."}`} النص الكامل يُحفظ بعد كل رد.` +
+          `${!manual && settings.paused ? " (التلخيص التلقائي متوقف)" : ""}${v.noComposer ? " لا أجد خانة الكتابة." : ""}</span>`;
         if (v.userCount > s.summarizedUpTo && !s.pending) btns.push(["💾 لخّص واحفظ الآن", "summarize"]);
-        if (settings.mode === "auto") btns.push([settings.paused ? "▶️ تشغيل الحفظ التلقائي" : "⏸️ إيقاف الحفظ التلقائي", "pause"]);
+        if (settings.mode === "auto") btns.push([settings.paused ? "▶️ تشغيل التلخيص التلقائي" : "⏸️ إيقاف التلخيص التلقائي", "pause"]);
       }
       btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE);
       btns.push(["↩️ تراجع عن آخر تغيير في الذاكرة", "undo"]);

@@ -201,3 +201,9 @@ test("correctness review: cutting text never splits an emoji, and lone surrogate
   const m = C.normalizeMemory({ summary: { goal: "x".repeat(5000) + "\uD83D" } }); const md = C.render(m);
   assert.equal(Buffer.from(md, "utf8").toString("utf8"), md, "a rendered view always reads back identically");
 });
+
+test("Arabic counting forms (1, 2, 3–10, 11+, and hundreds)", () => {
+  const f = (k) => C.count(k, C.W.msg);
+  assert.equal(f(1), "رسالة واحدة"); assert.equal(f(2), "رسالتان"); assert.equal(f(3), "3 رسائل"); assert.equal(f(10), "10 رسائل");
+  assert.equal(f(11), "11 رسالة"); assert.equal(f(100), "100 رسالة"); assert.equal(f(103), "103 رسائل"); assert.equal(f(0), "0 رسالة");
+});

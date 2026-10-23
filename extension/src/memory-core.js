@@ -15,7 +15,7 @@
   "use strict";
 
   const FORMAT = "conversation-memory/1";
-  const LIMITS = { str: 2000, title: 200, list: 50, decisions: 300, constraints: 100, log: 2000, entryMin: 30, imported: 400000 };
+  const LIMITS = { str: 2000, title: 200, list: 50, decisions: 300, constraints: 100, log: 2000, entryMin: 30, imported: 400000, every: 50 };   // every: the most messages one summary may cover (both products)
   const SOURCES = ["user", "assistant-approved", "assistant"];
   const SOURCE_LABEL = { user: "المستخدم", "assistant-approved": "اقتراح اعتمده المستخدم", assistant: "اقتراح لم يُعتمد" };
   const PLATFORMS = { "claude-code": "Claude Code", chatgpt: "ChatGPT", "claude-web": "Claude (الويب)" };
@@ -24,6 +24,16 @@
   const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
   const isId = (v) => typeof v === "string" && /^d\d{1,6}$/.test(v);
   // strip control characters (keep \n and \t), system markers, and wrapper look-alikes; clamp length
+  // The on-disk protocol both writers follow (the plugin and the extension on a linked folder): names, backup naming,
+  // sizes and the shared lock. One definition, so the two can never drift apart.
+  const PROTOCOL = { json: "CONVERSATION_MEMORY.json", md: "CONVERSATION_MEMORY.md", pins: "CONVERSATION_PINS", data: ".conversation-memory",
+    backupRe: /^\d{8}-\d{6}-\d{3}(-[a-z0-9]{1,8})?\.json$/, maxBackups: 20, maxJson: 4 * 1024 * 1024, trimAt: 3 * 1024 * 1024,
+    writeLock: "write.lock", writeLockStale: 15000, futureSkew: 60000 };
+  // Arabic counting: 1 «رسالة واحدة», 2 «رسالتان», 3–10 «5 رسائل», 11+ «11 رسالة» (forms: [one, two, plural, singular])
+  const count = (n, [one, two, plural, singular]) => { n = Math.max(0, Math.floor(+n || 0)); const r = n % 100;
+    return n === 1 ? one : n === 2 ? two : n === 0 ? `0 ${singular}` : r >= 3 && r <= 10 ? `${n} ${plural}` : `${n} ${singular}`; };
+  const W = { msg: ["رسالة واحدة", "رسالتان", "رسائل", "رسالة"], version: ["نسخة واحدة", "نسختان", "نسخ", "نسخة"], project: ["مشروع واحد", "مشروعان", "مشاريع", "مشروعاً"],
+    summary: ["تلخيص واحد", "تلخيصان", "تلخيصات", "تلخيصاً"], decision: ["قرار واحد", "قراران", "قرارات", "قراراً"], batch: ["دفعة واحدة", "دفعتان", "دفعات", "دفعة"] };
   // cut a string to at most n UTF-16 units without splitting a surrogate pair; lone surrogates are dropped
   // (they turn into U+FFFD when written as UTF-8, and the read-back check would then fail forever)
   const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
@@ -422,5 +432,5 @@
   function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: cut(wellFormed(mdText), LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
-    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, utf8Len, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines };
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines, count, W, PROTOCOL };
 });

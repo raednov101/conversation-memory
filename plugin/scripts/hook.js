@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* conversation-memory 1.0 — command hooks for Claude Code.
+/* conversation-memory — command hooks for Claude Code.
  *
  * Who does what
  *   Claude  writes JSON drafts (operations) into <project>/.conversation-memory/inbox/

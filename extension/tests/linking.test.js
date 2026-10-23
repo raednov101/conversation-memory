@@ -27,7 +27,7 @@ test("used once: after linking, the same proof is consumed by the caller", () =>
   if (d.consume) proof = null;
   assert.equal(L.decide({ proof, now: 2, autoLink: true, userMessages: ["نص"] }).link, false);
 });
-test("content.js links a chat in exactly two places: this rule, and your click on «🔗 اربط بالمشروع»", () => {
+test("content.js links a chat in exactly two places: this rule, and your click on «🔗 اربطها بالذاكرة»", () => {
   const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "src", "content.js"), "utf8");
   const sets = (src.match(/linked\s*[:=]\s*[^,;}]+/g) || []).filter((x) => !/[:=]\s*false\s*$/.test(x));
   assert.deepEqual(sets.map((x) => x.replace(/\s+/g, " ")), ["linked = d.link", "linked: true"], sets.join(" | "));
