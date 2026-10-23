@@ -17,7 +17,8 @@ function run(mode, input, env = {}) {
 }
 const ctx = (j) => (j.hookSpecificOutput && j.hookSpecificOutput.additionalContext) || "";
 const all = (j) => ctx(j) + "\n" + (j.reason || "") + "\n" + (j.systemMessage || "");
-const PRIV = (P) => path.join(HOME, ".conversation-memory", "projects", crypto.createHash("sha1").update(path.resolve(P)).digest("hex").slice(0, 16));
+const idPath = (P) => { let p = path.resolve(P); try { p = fs.realpathSync.native(p); } catch {} return process.platform === "win32" ? p.toLowerCase() : p; };
+const PRIV = (P) => path.join(HOME, ".conversation-memory", "projects", crypto.createHash("sha1").update(idPath(P)).digest("hex").slice(0, 16));
 const state = (P) => JSON.parse(fs.readFileSync(path.join(PRIV(P), "state.json"), "utf8"));
 const sess = (P, s) => state(P).sessions[s];
 const memJson = (P) => { try { return JSON.parse(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8")); } catch { return null; } };
@@ -98,8 +99,8 @@ test("invalid drafts are rejected, reported, and never recorded as saved", () =>
   draft(r, { entry: { raised: [" - "] } }); s = run("stop", { session_id: "a", cwd: P }); assert.match(s.reason || "", /قصير/);
   draft({ ...r, id: "a-1-5-00000000" }); run("stop", { session_id: "a", cwd: P, stop_hook_active: true });
   assert.notEqual(sess(P, "a").batches[0].status, "saved");
-  const P2 = tmp(); const r2 = requests(prompts(P2, "a", 5)[4])[0]; draft(r2); const old = new Date(Date.now() - 600e3); fs.utimesSync(r2.path, old, old);
-  run("stop", { session_id: "a", cwd: P2 }); assert.equal(memJson(P2), null, "draft older than its request ignored");
+  const P2 = tmp(); const r2 = requests(prompts(P2, "a", 5)[4])[0]; draft(r2); const old = new Date(Date.now() - 3600e3); fs.utimesSync(r2.path, old, old);
+  run("stop", { session_id: "a", cwd: P2 }); assert.equal(memJson(P2), null, "a draft far older than its request (beyond any clock skew) is ignored");
 });
 
 test("stuck after 3 turns, visible; save command retries; status command reports real state", () => {
@@ -615,4 +616,20 @@ test("correctness review: messages queued while busy are kept if the state that 
   assert.equal(fs.readdirSync(path.join(PRIV(P), "events")).length, 1, "the queued message is still there");
   fs.rmdirSync(sf); prompt(P, "a");
   assert.equal(fs.readdirSync(path.join(PRIV(P), "events")).length, 0, "and is counted once the state can be saved");
+});
+
+test("correctness review: one project has one private state however its path is spelled (link, letter case on Windows)", () => {
+  const P = tmp(); prompt(P, "a");
+  const L = P + "-link"; fs.symlinkSync(P, L, process.platform === "win32" ? "junction" : "dir");
+  prompt(L, "a"); assert.equal(sess(P, "a").count, 2, "the same counter through a link to the folder");
+});
+
+test("correctness review: two writers never take the same pin version number", () => {
+  const P = tmp(); prompt(P, "a");
+  const d = path.join(P, "CONVERSATION_PINS", "العقد"); fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, "v1.md"), "نص أول");
+  // another writer claims v2 between our listing and our write: we must take v3, never overwrite v2
+  const out = require("child_process").spawnSync(process.execPath, [path.join(__dirname, "helpers", "pin-race.js"), P, "العقد"], { input: "{}", env: { ...ENV }, encoding: "utf8" });
+  const r = JSON.parse(out.stdout || "{}");
+  assert.equal(r.v, 3, out.stderr); assert.equal(fs.readFileSync(path.join(d, "v2.md"), "utf8"), "نص كاتب آخر", "the other writer's version is intact");
 });

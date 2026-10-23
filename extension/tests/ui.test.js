@@ -45,7 +45,7 @@ test("a storage problem is described as such, never as «choose a folder» (the 
   assert.match(r.text, /الحفظ غير متاح/); assert.match(r.info, /لا توجد مساحة/); assert.ok(!/اختر مجلد/.test(r.text + r.info));
 });
 test("raw browser errors are explained in Arabic", () => {
-  global.self = global.self || global; global.chrome = { runtime: {}, storage: { local: {} } };
+  globalThis.chrome = { runtime: {}, storage: { local: {} } };
   require("../src/page/bridge.js"); const why = self.CM.bridge.why;
   assert.match(why("QuotaExceededError: The quota has been exceeded."), /مساحة/);
   assert.match(why("Could not establish connection. Receiving end does not exist."), /حدّث هذه الصفحة/);

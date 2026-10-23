@@ -21,7 +21,10 @@ const P = {
   inbox: path.join(projectDir, ".conversation-memory", "inbox"),
 };
 const HOME = path.join(os.homedir(), ".conversation-memory");
-const PRIV = path.join(HOME, "projects", crypto.createHash("sha1").update(projectDir).digest("hex").slice(0, 16));
+// one private state per project, however its path is spelled: the real path (links resolved, true letter case on
+// macOS and Windows), and on Windows case-folded too (C:\\Proj and c:\\proj are the same folder)
+const idPath = (() => { let p = projectDir; try { p = fs.realpathSync.native(projectDir); } catch {} return process.platform === "win32" ? p.toLowerCase() : p; })();
+const PRIV = path.join(HOME, "projects", crypto.createHash("sha1").update(idPath).digest("hex").slice(0, 16));
 const notes = [];
 
 function privateDirOk() {

@@ -307,12 +307,14 @@ const ops = {
       if (cur.bad) return { ok: false, error: cur.bad };
       const list = await describeBackups(h, cur.jsonText), b = list[(Math.floor(+n) || 1) - 1];
       if (!b) return { ok: false, error: list.length ? `لا توجد نسخة رقم ${n}` : "لا توجد نسخة سابقة للاسترجاع بعد" };
-      await backupJson(h, cur.jsonText);
+      try { await backupJson(h, cur.jsonText); } catch { return { ok: false, error: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" }; }
+      let kept = "";   // a hand-edited .md is kept aside first, as every other write does
+      if (cur.exists && cur.mdText != null && cur.memory.mdHash && !(await isSomeGeneratedView(h, cur.mdText, cur.memory))) { kept = `CONVERSATION_MEMORY.edited-${stamp()}.md`; await writeVerified(h, kept, cur.mdText); }
       const m = b.memory, md = C.render(m);
       m.mdHash = C.hash(md);
       await writeVerified(h, JSON_FILE, C.serialize(m));
       await writeVerified(h, MD_FILE, md);
-      return { ok: true, when: b.when, log: b.log, decisions: b.decisions };
+      return { ok: true, when: b.when, log: b.log, decisions: b.decisions, kept };
     } finally { await dropWriteLock(lk); }
   },
   // full transcript of one conversation, every message complete

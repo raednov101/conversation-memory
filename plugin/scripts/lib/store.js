@@ -94,6 +94,12 @@ function restoreBackup(n = 1) {
   const b = usable[n - 1];
   if (!b) return { err: usable.length ? `لا توجد نسخة رقم ${n} (المتاح: 1 إلى ${usable.length})` : "لا توجد نسخة سابقة للاسترجاع بعد" };
   if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" };
+  // a hand-edited .md is kept aside first, as every other write does
+  if (cur.exists && cur.mdText != null && cur.memory.mdHash && !isSomeGeneratedView(cur.mdText, cur.memory)) {
+    const keep = path.join(projectDir, `CONVERSATION_MEMORY.edited-${stamp()}.md`);
+    try { writeAtomic(keep, cur.mdText); notes.push(`ℹ️ ذاكرة المحادثة: عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${path.basename(keep)} قبل الاسترجاع.`); }
+    catch { return { err: "تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أسترجع شيئاً" }; }
+  }
   const m = b.memory, md = C.render(m);
   m.mdHash = C.hash(md);
   const json = C.serialize(m);
@@ -200,14 +206,19 @@ function savePin(name, text) {
   const d = path.join(P.pins, name);
   if (path.dirname(d) !== P.pins) return { err: "اسم النص غير صالح" };
   if (!safeDir(P.pins, 0o755) || !safeDir(d, 0o755)) return { err: "مجلد النص غير صالح" };
-  const vs = fs.readdirSync(d).map((f) => (f.match(/^v(\d+)\.md$/) || [])[1]).filter(Boolean).map(Number);
-  const last = vs.length ? Math.max(...vs) : 0;
-  if (last) { const r = readSafe(path.join(d, `v${last}.md`), MAX_JSON); if (r.text === text) return { name, v: last, unchanged: true, sha: sha256(text) }; }
-  const f = path.join(d, `v${last + 1}.md`);
-  if (lst(f)) return { err: "تعارض في رقم النسخة" };
-  writeAtomic(f, text);
-  if (sha256(fs.readFileSync(f, "utf8")) !== sha256(text)) { unlinkSafe(f); return { err: "فشل التحقق من البصمة بعد الحفظ" }; }
-  return { name, v: last + 1, sha: sha256(text) };
+  // the next version number is claimed with an exclusive create, so two writers (two sessions, or the extension on a
+  // linked folder) can never both take it; the loser simply takes the following number
+  for (let tries = 0; tries < 5; tries++) {
+    const vs = fs.readdirSync(d).map((f) => (f.match(/^v(\d+)\.md$/) || [])[1]).filter(Boolean).map(Number);
+    const last = vs.length ? Math.max(...vs) : 0;
+    if (last) { const r = readSafe(path.join(d, `v${last}.md`), MAX_JSON); if (r.text === text) return { name, v: last, unchanged: true, sha: sha256(text) }; }
+    const f = path.join(d, `v${last + 1}.md`);
+    try { fs.closeSync(fs.openSync(f, "wx", 0o644)); } catch (e) { if (e.code === "EEXIST") continue; throw e; }
+    writeAtomic(f, text);
+    if (sha256(fs.readFileSync(f, "utf8")) !== sha256(text)) { unlinkSafe(f); return { err: "فشل التحقق من البصمة بعد الحفظ" }; }
+    return { name, v: last + 1, sha: sha256(text) };
+  }
+  return { err: "تعارض في رقم النسخة؛ أعد المحاولة" };
 }
 
 // every version of one pinned text, oldest first: { v, text, sha, date }

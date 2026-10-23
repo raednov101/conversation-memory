@@ -139,7 +139,7 @@ async function loadBackups() {
 $("backups").addEventListener("click", async (e) => {
   const n = e.target && e.target.dataset && e.target.dataset.n; if (!n) return;
   const r = await fsOp("restore", { n: +n });
-  $("restoreMsg").textContent = r.ok ? `استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.` : `لم يُسترجع شيء: ${r.error}`;
+  $("restoreMsg").textContent = r.ok ? `استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.${r.kept ? ` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}` : `لم يُسترجع شيء: ${r.error}`;
   loadBackups();
 });
 

@@ -16,7 +16,9 @@ function readDraft(id, created) {
   const p = draftPath(id), r = readSafe(p, MAX_DRAFT);
   if (r.text == null && !r.bad) return null;
   if (r.bad) { unlinkSafe(p); return { err: `ملف المسودة ${r.bad}` }; }
-  if (created && r.stat.mtimeMs < created - 2000) { unlinkSafe(p); return { err: "مسودة أقدم من الطلب (تُجوهلت)" }; }
+  // ids carry a random part, so only a leftover far older than the request is suspect; the margin covers clock skew
+  // between this process and a network or synced drive
+  if (created && r.stat.mtimeMs < created - 10 * 60000) { unlinkSafe(p); return { err: "مسودة أقدم من الطلب (تُجوهلت)" }; }
   try { return { json: JSON.parse(r.text), path: p }; } catch (e) { unlinkSafe(p); return { err: "المسودة ليست JSON صالحاً: " + e.message }; }
 }
 function batchRequest(list, token) {

@@ -195,7 +195,7 @@
     }
     if (a === "undo") {
       const r = await B.fs("restore", { n: 1 });
-      ui.toast(r.ok ? `↩️ استُرجعت نسخة ${r.when} (${r.decisions} قرار، ${r.log} دفعة). التراجع مرة أخرى يعيد ما تراجعت عنه.` : `لم يُسترجع شيء: ${B.why(r.error)}`);
+      ui.toast(r.ok ? `↩️ استُرجعت نسخة ${r.when} (${r.decisions} قرار، ${r.log} دفعة). التراجع مرة أخرى يعيد ما تراجعت عنه.${r.kept ? ` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}` : `لم يُسترجع شيء: ${B.why(r.error)}`);
       return;
     }
     if (a === "summarize") {
