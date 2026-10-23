@@ -178,7 +178,7 @@ test("lossless capture by prompt id, missing messages stay pending, resume undoe
   const P = tmp(); const js = prompts(P, "s", 7);
   const long = "بداية " + "ن".repeat(60000) + " 😀 نهاية";
   run("precompact", { session_id: "s", cwd: P, transcript_path: transcript(P, [...js.slice(0, 5).map((j) => ({ pid: j._pid, user: j._text })), { pid: js[5]._pid, user: js[5]._text, reply: long }]) });
-  assert.match(run("precompact", { session_id: "s", cwd: P, transcript_path: tfrom(P, js.slice(0, 3)) }).systemMessage || "x", /x|لم يُعثر/);
+  { const w = run("precompact", { session_id: "s", cwd: P, transcript_path: tfrom(P, js.slice(0, 3)) }).systemMessage || ""; assert.match(w, /لم يُعثر[\s\S]*7/, "a message missing from the transcript is named, never skipped in silence: " + w); }
   const text = capText(P); assert.ok(text.includes(long), "60k reply saved complete, emoji intact");
   assert.equal(sess(P, "s").done[7], undefined, "message 7 (not in transcript) stays pending");
   const st = run("start", { session_id: "s", cwd: P, source: "compact" });
@@ -642,4 +642,76 @@ test("a broken memory file can be restored from a backup; the broken file is kep
   assert.equal(memJson(P).log.length, 1, "the previous good version is back");
   const kept = fs.readdirSync(P).filter((f) => f.startsWith("CONVERSATION_MEMORY.broken-"));
   assert.equal(kept.length, 1); assert.match(fs.readFileSync(path.join(P, kept[0]), "utf8"), /"summ$/);
+});
+
+test("test review: secrets never reach the copies of unsummarized messages, and a pin holding one is refused", () => {
+  const KEY = "sk-ant-api03-" + "Q".repeat(40);
+  const P = tmp(); const js = [prompt(P, "a", `استخدم المفتاح ${KEY} في الإعداد`), prompt(P, "a", "تمام")];
+  const tp = transcript(P, js.map((j) => ({ pid: j._pid, user: j._text, reply: `حفظت ${KEY} في ملف البيئة` })));
+  run("precompact", { session_id: "a", cwd: P, transcript_path: tp });
+  assert.ok(capText(P).includes("استخدم المفتاح") && !capText(P).includes(KEY.slice(0, 20)), "copied, without the key (user text and reply)");
+  const a = prompt(P, "b", "اكتب نص الإعداد");
+  const j = prompt(P, "b", "/conversation-memory:pin الإعداد");
+  const t2 = transcript(P, [{ pid: a._pid, user: a._text, reply: `بداية نص الإعداد الكامل ${KEY} نهاية نص الإعداد الكامل` }, { pid: j._pid, user: j._text }]);
+  fs.writeFileSync(pinPath(j), JSON.stringify({ name: "الإعداد", start: "بداية نص الإعداد الكامل", end: "نهاية نص الإعداد الكامل" }));
+  const s = run("stop", { session_id: "b", cwd: P, transcript_path: t2 });
+  assert.match(s.reason || s.systemMessage || "", /بيانات حساسة/); assert.ok(!fs.existsSync(path.join(P, "CONVERSATION_PINS", "الإعداد")), "nothing pinned");
+});
+
+test("test review: the files the README promises are protected — hard links refused, backups capped at 20", () => {
+  const P = tmp(); saveBatch(P, "a");
+  const outside = path.join(tmp(), "outside.json"); fs.writeFileSync(outside, "{}");
+  fs.unlinkSync(path.join(P, "CONVERSATION_MEMORY.json")); fs.linkSync(outside, path.join(P, "CONVERSATION_MEMORY.json"));
+  const j = prompts(P, "a", 5)[4];
+  assert.equal(requests(j).length, 0, "no summary is even asked for"); assert.match(j.systemMessage || "", /مرتبط بملف آخر/, "and the user is told why");
+  assert.equal(fs.readFileSync(outside, "utf8"), "{}", "the outside file is never written through the link");
+  const Q = tmp(); for (let i = 0; i < 24; i++) saveBatch(Q, "a", `هدف ${i}`);
+  assert.equal(fs.readdirSync(path.join(Q, ".conversation-memory", "backups")).filter((f) => f.endsWith(".json")).length, 20);
+});
+
+test("test review: another writer changing the memory mid-save keeps their entry and skips our summary, with a note", () => {
+  const P = tmp(); saveBatch(P, "a", "الأول");
+  const r = requests(prompts(P, "a", 5)[4])[0]; draft(r, { summary: { goal: "خلاصتي" } });
+  // the competing writer lands between our read and our write (a helper process plays the extension)
+  const out = require("child_process").spawnSync(process.execPath, [path.join(__dirname, "helpers", "race-write.js"), P], { input: JSON.stringify({ session_id: "a", cwd: P }), env: { ...ENV, CLAUDE_PROJECT_DIR: P, CM_HOOK_MODE: "stop" }, encoding: "utf8" });
+  const j = JSON.parse(out.stdout || "{}"), m = memJson(P);
+  assert.ok(m.log.some((e) => e.id === "competitor"), "the other writer's entry survives"); assert.ok(m.log.some((e) => e.id === r.id), "ours is recorded too");
+  assert.notEqual(m.summary.goal, "خلاصتي", "our summary is not laid over theirs"); assert.match(j.systemMessage || "", /تغيّرت الذاكرة من برنامج آخر/, out.stderr);
+});
+
+test("test review: without prompt ids, messages are matched by their full text — two identical texts stay two turns", () => {
+  const P = tmp(); const js = [prompt(P, "a", "نعم"), prompt(P, "a", "سؤال وسط"), prompt(P, "a", "نعم")];
+  const L = [];
+  js.forEach((j, i) => { L.push({ type: "user", message: { role: "user", content: j._text } }); L.push({ type: "assistant", message: { content: [{ type: "text", text: `الرد رقم ${i + 1}` }] } }); });
+  const tp = path.join(P, "no-ids.jsonl"); fs.writeFileSync(tp, L.map((l) => JSON.stringify(l)).join("\n"));
+  run("precompact", { session_id: "a", cwd: P, transcript_path: tp });
+  const t = capText(P);
+  for (const k of [1, 2, 3]) assert.ok(t.includes(`الرد رقم ${k}`), `turn ${k} copied with its own reply`);
+  assert.equal((t.match(/### رسالة المستخدم \(\d+\)\nنعم\n/g) || []).length, 2, "the two «نعم» are two messages, not one copied twice");
+});
+
+test("test review: the two exact Arabic phrases act as commands and are not counted; anything longer is a normal message", () => {
+  const P = tmp(); prompts(P, "a", 3);
+  const j = prompt(P, "a", "احفظ الذاكرة");
+  assert.equal(sess(P, "a").count, 3, "not counted"); assert.equal(requests(j).length, 1, "a summary of the 3 messages is asked for");
+  assert.match(ctx(prompt(P, "a", "حالة الذاكرة")), /حالة الذاكرة \(من النظام/); assert.equal(sess(P, "a").count, 3);
+  prompt(P, "a", "احفظ الذاكرة لو سمحت"); assert.equal(sess(P, "a").count, 4, "a longer sentence is an ordinary message");
+});
+
+test("test review: a write lock left by a process that died on this machine is cleared at once, not after 15 s", () => {
+  const P = tmp(); const r = requests(prompts(P, "a", 5)[4])[0]; draft(r);
+  const dead = require("child_process").spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" }).stdout;
+  fs.mkdirSync(path.join(P, ".conversation-memory"), { recursive: true });
+  fs.writeFileSync(path.join(P, ".conversation-memory", "write.lock"), `someone ${Date.now()} ${dead} ${os.hostname()}`);
+  const t0 = Date.now(); run("stop", { session_id: "a", cwd: P });
+  assert.ok(memJson(P) && memJson(P).log.length === 1, "saved"); assert.ok(Date.now() - t0 < 2500, `in ${Date.now() - t0} ms`);
+});
+
+test("test review: CONV_MEMORY_EVERY sets the default count, within 1–50", () => {
+  const P = tmp(); const e = (v) => ({ CONV_MEMORY_EVERY: v });
+  const runE = (env, sid, text) => run("prompt", { session_id: sid, cwd: P, prompt: text, prompt_id: `e-${sid}-${text}` }, env);
+  let j; for (let i = 0; i < 3; i++) j = runE(e("3"), "x", `م${i}`);
+  assert.equal(requests(j).length, 1, "due after 3");
+  for (let i = 0; i < 50; i++) j = runE(e("999"), "y", `م${i}`);
+  assert.equal(requests(j).length, 1, "999 is capped at 50");
 });

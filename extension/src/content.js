@@ -27,7 +27,9 @@
   // so choosing another folder never carries a chat's state or writes into the new folder.
   let folder = { at: 0, v: { ok: false } }, PID = "";
   async function folderStatus(force) {
-    if (force || Date.now() - folder.at > 10000) { folder = { at: Date.now(), v: await B.fs("status") }; PID = (folder.v && folder.v.projectId) || ""; }
+    // a good answer is kept 10 s; a failed one (the writer still starting, say) is asked again within a second, so a
+    // chat started at that moment still links and saves
+    if (force || Date.now() - folder.at > (folder.v && folder.v.ok ? 10000 : 1000)) { folder = { at: Date.now(), v: await B.fs("status") }; PID = (folder.v && folder.v.projectId) || ""; }
     return folder.v;
   }
   // linked (does this chat belong to the project?), what was summarized (count + fingerprints), the request in flight

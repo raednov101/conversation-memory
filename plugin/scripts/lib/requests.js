@@ -68,8 +68,9 @@ function statusText(s, mem, backups, cfg) {
 function parseCommand(prompt) {
   const t = String(prompt || "").trim();
   const slash = /^\/[A-Za-z0-9_:.-]+(\s|$)/.test(t);
-  if (t.startsWith(CMD + "save") || t === "احفظ الذاكرة") return { save: true, slash };
-  if (t.startsWith(CMD + "status") || t === "حالة الذاكرة") return { status: true, slash };
+  // two exact Arabic phrases work like the commands (the whole message, nothing else), and are not counted either
+  if (t.startsWith(CMD + "save") || t === "احفظ الذاكرة") return { save: true, slash: true };
+  if (t.startsWith(CMD + "status") || t === "حالة الذاكرة") return { status: true, slash: true };
   if (t.startsWith(CMD + "pin") && !t.startsWith(CMD + "pins")) return { pin: true, name: C.slug(t.slice((CMD + "pin").length)), slash };
   if (t.startsWith(CMD + "undo")) return { restore: 1, slash };
   if (t.startsWith(CMD + "fix")) return { fix: true, ask: t.slice((CMD + "fix").length).trim().slice(0, 500), slash };

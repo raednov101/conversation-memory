@@ -46,6 +46,12 @@
     b.textContent = kind; return b;
   }
   bar.appendChild(button("send"));
+  // ?lazy: a long chat whose older messages arrive late (only the newest two turns at first), as on the real sites
+  if (new URLSearchParams(location.search).has("lazy")) {
+    const kids = [...thread.children], older = kids.slice(0, Math.max(0, kids.length - 4));
+    older.forEach((k) => k.remove());
+    setTimeout(() => { for (const k of older.reverse()) thread.insertBefore(k, thread.firstChild); }, 2500);
+  }
   // the model: a summary request gets a JSON draft (ChatGPT flavour wraps it in a code block whose header leaks into innerText)
   function reply(t) {
     if (t.startsWith("🧠 ذاكرة المحادثة:")) {
@@ -70,8 +76,18 @@
     if (afterSend && location.pathname !== afterSend) history.pushState(null, "", afterSend);
     composer.innerHTML = "";
     addMsg("user", t);
-    const a = P === "claude" ? addMsg("assistant", "") : null;
+    const stream = window.__stream;   // as on the real sites: the reply element appears at once and its text grows
+    const a = P === "claude" || stream ? addMsg("assistant", "") : null;
     bar.innerHTML = ""; bar.appendChild(button("stop"));
+    if (stream) {
+      const full = reply(t), steps = 6; let i = 0;
+      const iv = setInterval(() => {
+        i++; const piece = full.slice(0, Math.ceil((full.length * i) / steps));
+        if (V) a.__set(piece); else a.innerText = piece;
+        if (i >= steps) { clearInterval(iv); if (P === "claude") a.setAttribute("data-is-streaming", "false"); bar.innerHTML = ""; bar.appendChild(button("send")); }
+      }, window.__delay / steps);
+      return;
+    }
     setTimeout(() => {
       const text = reply(t);
       if (P === "chatgpt") addMsg("assistant", text); else if (V) { a.__set(text); a.setAttribute("data-is-streaming", "false"); } else { a.innerText = text; a.setAttribute("data-is-streaming", "false"); }

@@ -207,3 +207,24 @@ test("Arabic counting forms (1, 2, 3–10, 11+, and hundreds)", () => {
   assert.equal(f(1), "رسالة واحدة"); assert.equal(f(2), "رسالتان"); assert.equal(f(3), "3 رسائل"); assert.equal(f(10), "10 رسائل");
   assert.equal(f(11), "11 رسالة"); assert.equal(f(100), "100 رسالة"); assert.equal(f(103), "103 رسائل"); assert.equal(f(0), "0 رسالة");
 });
+
+test("test review: every kind of secret the README names is removed (one fixture per pattern)", () => {
+  const A = (n, c = "a") => c.repeat(n);
+  const fixtures = {
+    "OpenAI / Anthropic": "sk-ant-api03-" + A(30, "Q"), "OpenAI project": "sk-proj-" + A(30, "x"), "Stripe live": "sk_live_" + A(20, "9"), "Stripe restricted": "rk_test_" + A(20, "b"),
+    "AWS": "AKIA" + A(16, "Z"), "GitHub classic": "ghp_" + A(36, "c"), "GitHub app": "ghs_" + A(36, "d"), "GitHub fine-grained": "github_pat_" + A(40, "e"),
+    "GitLab": "glpat-" + A(20, "f"), "Slack token": "xoxb-" + A(20, "1"), "Google API": "AIza" + A(35, "g"), "Hugging Face": "hf_" + A(34, "h"),
+    "npm": "npm_" + A(36, "i"), "SendGrid": "SG." + A(22, "j") + "." + A(43, "k"), "Google OAuth": "ya29." + A(40, "l"), "JWT": "eyJ" + A(20, "m") + "." + A(20, "n") + "." + A(20, "o"),
+    "Slack webhook": "https://hooks.slack.com/services/T000/B000/" + A(24, "p"), "Bearer": "Authorization: Bearer " + A(30, "r"),
+    "URL credentials": "postgres://admin:hunter2pass@db.example.com/x", "password=": "password=Sup3rS3cret!", "Arabic password": "كلمة المرور هي Qw12345!",
+    "quoted short password": 'pwd: "a b1"', "private key": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAA\nAAAABG5vbmU=\n-----END OPENSSH PRIVATE KEY-----",
+  };
+  for (const [kind, secret] of Object.entries(fixtures)) {
+    const r = C.redact(`قبل ${secret} بعد`);
+    assert.ok(r.changed, `${kind}: detected`);
+    const core = secret.replace(/^(Authorization: Bearer |password=|كلمة المرور هي |pwd: )/, "").replace(/^postgres:\/\/admin:/, "");
+    assert.ok(!r.text.includes(core.slice(0, 24)) || core.length < 8, `${kind}: removed (${r.text.slice(0, 80)})`);
+    assert.match(r.text, /قبل[\s\S]*بعد/, `${kind}: the text around it stays`);
+  }
+  for (const fine of ["sk-short", "AKIA123", "مفتاح الحل هو الصبر", "ghp_short", "the password field is required"]) assert.ok(!C.redact(fine).changed, `not a secret: ${fine}`);
+});

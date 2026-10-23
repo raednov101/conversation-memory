@@ -7,7 +7,8 @@ PLUGIN="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; PROJ="$WORK/proj"; LOG="$WORK/log"; mkdir -p "$PROJ" "$LOG"
 # test copy whose indicator also writes what it would show, so it can be checked without a screen
 TPL="$WORK/plugin"; cp -r "$PLUGIN" "$TPL"
-sed -i 's|if (s \&\& s.v === 1) \$.ui.status(format(s));|if (s \&\& s.v === 1) { $.ui.status(format(s)); await $.fs.write(`${home}/.conversation-memory/indicator-probe.txt`, format(s)); }|' "$TPL/hooks/indicator.ts"
+# (node rather than sed -i, whose syntax differs between GNU and macOS)
+node -e 'const f=process.argv[1],fs=require("fs");const t=fs.readFileSync(f,"utf8");const a="if (s && s.v === 1) $.ui.status(format(s));";if(!t.includes(a))process.exit(1);fs.writeFileSync(f,t.replace(a,"if (s && s.v === 1) { $.ui.status(format(s)); await $.fs.write(`${home}/.conversation-memory/indicator-probe.txt`, format(s)); }"))' "$TPL/hooks/indicator.ts"
 SID="$(node -e 'console.log(require("crypto").randomUUID())')"; SID2="$(node -e 'console.log(require("crypto").randomUUID())')"
 OFF='{"enabledPlugins":{"conversation-memory@synced":false}}'   # an installed copy must not run alongside the one under test
 cc() { env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_AFTER_LAST_COMPACT -u CLAUDE_PID \
@@ -48,7 +49,7 @@ ok(mem && mem.format === "conversation-memory/1", "CONVERSATION_MEMORY.json writ
 ok(md.includes("## القرارات السارية") && md.includes("## السجل"), "CONVERSATION_MEMORY.md rendered from it");
 ok(mem && mem.log.length >= 2, "batch 1–5 and the recovered messages are both in the log", mem && mem.log.length);
 ok(/سُكّر وهيل|سكر وهيل/.test(all) && /556B2F/i.test(all), "name and colour saved");
-ok(/15 نوفمبر|١٥ نوفمبر/.test(all) && /40|٤٠/.test(all), "date and budget saved");
+ok(/15 نوفمبر|١٥ نوفمبر/.test(all) && /(40|٤٠)\s*(ألف|الف|,000|٬٠٠٠)/.test(all), "date and budget saved");
 const denials = fs.readdirSync(LOG).filter((f) => f.endsWith(".json")).flatMap((f) => (J(f).permission_denials || [])).filter((d) => JSON.stringify(d).includes("conversation-memory"));
 ok(denials.length === 0, "default permission mode: no prompt/denial for memory drafts", JSON.stringify(denials).slice(0, 300));
 const pins = fs.existsSync(path.join(P, "CONVERSATION_PINS")) ? fs.readdirSync(path.join(P, "CONVERSATION_PINS")) : [];
@@ -63,11 +64,11 @@ const s2 = transcriptOf(SID2);
 const inj2 = s2.filter((o) => o.type === "attachment" && o.attachment && o.attachment.type === "hook_additional_context").map((o) => (o.attachment.content || []).join("\n")).find((c) => c.includes("ملخص محفوظ")) || "";
 ok(inj2 && inj2.length < 7000, `new session loads a compact memory (${inj2.length} chars)`);
 const a8 = texts(s2);
-ok(/سُكّر وهيل|سكر وهيل/.test(a8) && /556B2F/i.test(a8) && /15|١٥/.test(a8), "new session answers from memory", a8.slice(0, 300));
+ok(/سُكّر وهيل|سكر وهيل/.test(a8) && /556B2F/i.test(a8) && /(15|١٥)\s*نوفمبر/.test(a8), "new session answers from memory", a8.slice(0, 300));
 ok(pin && a8.includes(pin.trim()), "new session reproduces the pinned text exactly");
 ok(!/مشبوه|لم يصدر منك|لم أنفذه|suspicious/.test(a8), "housekeeping never presented as suspicious");
 const t9 = J("t9.json").result || "";
-ok(/رسائل|حفظ/.test(t9) && /\d/.test(t9), "status command reports real numbers", t9.slice(0, 200));
+ok(/رسائل|رسالة|دفع/.test(t9) && /\b\d+\b/.test(t9) && !/لا أعرف|لا أستطيع/.test(t9), "status command reports real numbers", t9.slice(0, 200));
 const probe = (() => { try { return fs.readFileSync(path.join(os.homedir(), ".conversation-memory", "indicator-probe.txt"), "utf8"); } catch { return ""; } })();
 ok(/^🧠 (⏳ |⚠️ )?\d\/5( · (✓ \d\d:\d\d( · ≈[\d,]+ توكن)?|📝 \d\d:\d\d|يحفظ|تعثّر الحفظ))?$/.test(probe), `status-line indicator reads the status and formats it: «${probe}»`);
 // the correction applies to what is in force (decisions, summary); the log stays a faithful history of what was said.

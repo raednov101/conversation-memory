@@ -14,9 +14,13 @@ async function ensureOffscreen() {
     .finally(() => { creating = null; });
   await creating;
 }
+// a writer just created may not be listening yet ("Receiving end does not exist"): ask again for up to ~2 s
 async function toOffscreen(op, args) {
-  await ensureOffscreen();
-  return chrome.runtime.sendMessage({ target: "offscreen", op, args });
+  for (let i = 0; ; i++) {
+    await ensureOffscreen();
+    try { return await chrome.runtime.sendMessage({ target: "offscreen", op, args }); }
+    catch (e) { if (i >= 20 || !/receiving end does not exist|could not establish connection/i.test(String(e))) throw e; await new Promise((r) => setTimeout(r, 100)); }
+  }
 }
 
 // one tab at a time may send the summary request for a given chat (two tabs open on the same chat)
@@ -39,7 +43,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     const own = sender.url && sender.url.startsWith(chrome.runtime.getURL(""));
     if (!own) {
       const host = (() => { try { return new URL(sender.url).hostname; } catch { return ""; } })();
-      const site = host === "chatgpt.com" || host.endsWith(".chatgpt.com") ? "chatgpt" : host === "claude.ai" || host.endsWith(".claude.ai") ? "claude" : (self.CM_TEST_HOSTS ? "*" : "");
+      const site = host === "chatgpt.com" || host.endsWith(".chatgpt.com") || host === "chat.openai.com" ? "chatgpt" : host === "claude.ai" || host.endsWith(".claude.ai") ? "claude" : (self.CM_TEST_HOSTS ? "*" : "");
       const scope = String((msg.args && msg.args.scope) || "");
       if (!site || ["exportAll", "importAll", "listScopes"].includes(msg.op) || (site !== "*" && !scope.startsWith(site + "-"))) { reply({ ok: false, error: "not allowed" }); return; }
     }

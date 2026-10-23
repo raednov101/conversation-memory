@@ -112,6 +112,12 @@ with sync_playwright() as pw:
     j0 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json")), 20) or {}
     ok(j0.get("log") and j0["log"][0]["range"] == "1–5", "…and the summary is saved in the browser, under «chats outside projects»", j0)
     p0.close()
+    sw.evaluate("() => chrome.offscreen.closeDocument().catch(() => {})")   # the writer is not running when a chat starts
+    pr = ctx.new_page(); pr.goto(BASE + new_chat("chatgpt", "/c/restart/", "إعادة تشغيل - ChatGPT"))
+    sw.evaluate("() => chrome.offscreen.closeDocument().catch(() => {})")
+    say(pr, "أول رسالة والكاتب يبدأ من جديد")
+    ok(wait(lambda: "1/5" in pill(pr), 5), "the writer restarting just as a chat starts: the chat still links and counts", pill(pr))
+    pr.close()
     p0 = ctx.new_page(); p0.goto(BASE + new_chat("chatgpt", "/g/g-p-abc123-cafe/c/inproject/", "مشروع - ChatGPT"))
     wait(lambda: "🧠" in pill(p0), 10)
     for i in range(1, 6): say(p0, f"داخل مشروع {i}")
@@ -124,7 +130,7 @@ with sync_playwright() as pw:
     with opt.expect_download() as dl:
         opt.locator("#scopes li").filter(has_text="cafe").locator("button").click()
     md = open(dl.value.path(), encoding="utf-8").read()
-    ok("داخل مشروع" in md or "## السجل" in md, "…and the download is that project's readable memory", md[:200])
+    ok("· مشروع ·" in md and "داخل المتصفح" not in md, "…and the download is that project's readable memory (not another project's)", md[:300])
     with opt.expect_download() as dl:
         opt.locator("#exportAll").click()
     full_path = dl.value.path(); full = json.loads(open(full_path, encoding="utf-8").read())
@@ -143,13 +149,14 @@ with sync_playwright() as pw:
         path = "/c/chat-one/" if platform == "chatgpt" else "/chat/chat-one/"
         p = ctx.new_page(); p.goto(BASE + new_chat(platform, path, f"هوية المقهى - {name}"))
         wait(lambda: "🧠" in pill(p), 10)
-        say(p, "الرسالة الأولى: نبدأ هوية مقهى في جدة")
+        say(p, "الرسالة الأولى: نبدأ هوية مقهى في جدة، ومفتاح الخادم sk-proj-" + "Z" * 32)
         ok(wait(lambda: "1/5" in pill(p), 8), f"{name}: indicator shows 1/5", pill(p))
         for i in range(2, 5): say(p, f"الرسالة رقم {i}")
         ok(wait(lambda: "4/5" in pill(p), 8), f"{name}: indicator shows 4/5", pill(p))
         rawf = f".conversation-memory/chats/{platform}-chat-one.md"
         raw = wait(lambda: (lambda t: t if t and "الرسالة رقم 4" in t else None)(read(proj, rawf)), 10) or ""
         ok("الرسالة الأولى: نبدأ هوية مقهى في جدة" in raw and "رد النموذج على: الرسالة رقم 4" in raw, f"{name}: full transcript saved after every reply", raw[:200])
+        ok("Z" * 20 not in raw and "sk-proj-" + "Z" * 8 not in raw, f"{name}: a key typed in a message (and echoed in the reply) is removed from the saved transcript", raw[:300])
         ok(not requests(p), f"{name}: no summary request before 5 messages")
         say(p, "الرسالة الخامسة: اعتمدنا اللون الأزرق الداكن")
         j = wait(lambda: (lambda m: m if m and m["log"] else None)(mem(proj)), 20) or {}
@@ -258,6 +265,20 @@ with sync_playwright() as pw:
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=link]").click()
     j = wait(lambda: (lambda m: m if m and m["log"] else None)(mem(proj)), 20) or {}
     ok(j and j["log"][0]["range"] == "1–8" and len(requests(p)) == 1, "one click links it: the whole chat (1–8) is summarized", j.get("log"))
+    # a long chat reopened: older messages arrive late — nothing is re-summarized or sent from the partial view
+    p.goto(BASE + "/c/old-chat/?lazy=1"); p.wait_for_timeout(1800)
+    ok(not requests(p) and len(mem(proj)["log"]) == 1 and "سيُعاد" not in panel_text(p), "a reopened long chat whose older messages load late: nothing is redone from the partial view", panel_text(p))
+    ok(wait(lambda: "0/5" in pill(p), 8), "…and once they have loaded, the count is right (0/5)", pill(p))
+    # replies stream in, as on the real sites: nothing is saved or asked for until the reply is complete
+    for i in range(9, 13): say(p, f"قديمة {i}")
+    p.evaluate("window.__stream = true; window.__delay = 3000"); p.evaluate("t => window.__user(t)", "قديمة 13 بالبث")
+    p.wait_for_timeout(1500)
+    mid = read(proj, ".conversation-memory/chats/chatgpt-old-chat.md") or ""
+    ok(not requests(p) and "رد النموذج على: قديمة 13 بالبث" not in mid, "while a reply is still streaming: no summary request, and no half reply saved", (requests(p), mid[-120:]))
+    ok(wait(lambda: len(requests(p)) == 1, 15) and "رد النموذج على: قديمة 13 بالبث" in (read(proj, ".conversation-memory/chats/chatgpt-old-chat.md") or ""),
+       "…once it is complete: the full reply is saved and the summary is asked for", requests(p))
+    wait(lambda: (lambda m: m and len(m["log"]) >= 2)(mem(proj)), 20)
+    p.evaluate("window.__stream = false; window.__delay = 500")
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=unlink]").click()
     ok(wait(lambda: "غير مربوطة" in pill(p), 8), "…and it can be unlinked again", pill(p))
     p.close()
@@ -365,7 +386,7 @@ with sync_playwright() as pw:
     write(proj, ".conversation-memory/write.lock", "plugin-owner %d" % (int(time.time() * 1000) - 60000))
     for i in range(6, 11): say(p, f"قفل {i}")
     wait(lambda: (lambda m: m and len(m["log"]) >= 2)(mem(proj)), 20)
-    ok(read(proj, ".conversation-memory/write.lock") is None, "a stale lock is taken over and released after writing")
+    ok(wait(lambda: read(proj, ".conversation-memory/write.lock") is None, 5), "a stale lock is taken over and released after writing")
     p.close()
 
     print("— reliability: undo, folder access lost and back, unreadable messages named —")
