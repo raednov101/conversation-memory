@@ -27,6 +27,8 @@
   const fmt = (n) => Number(n || 0).toLocaleString("en-US");
   const q = (t) => `«<bdi>${esc(t)}</bdi>»`;   // a name inside Arabic text keeps its own direction (English names, numbers)
   const n = (k, w) => root.MemoryCore.count(k, root.MemoryCore.W[w]);   // Arabic counting forms
+  // "≈665" keeps its sign before the number inside Arabic text (isolated left-to-right run)
+  const approx = (n) => `\u2066≈${fmt(n)}\u2069`;
   const tokens = (chars) => root.MemoryCore.estTokens(chars);   // the shared core's estimate (≈ 3 characters per token)
   const hhmm = (t) => (t ? new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 
@@ -56,7 +58,7 @@
       else if (s.status === "error") { cls = "err"; text = `🧠 ⚠️ ${prog} · تعثّر الحفظ`; info = `تعثّر الحفظ: ${esc(s.error)}` + (s.attempts >= maxAttempts ? " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)" : " (يعيد المحاولة بعد رسالتك القادمة)"); }
       // three outcomes, never confused: 📝 the full text is saved (summary later) · ✓ the summary was updated · ⚠️ failed
       else if (s.rawAt && s.rawAt > (s.lastSave || 0)) { cls = "txt"; text = `🧠 ${prog} · 📝 ${hhmm(s.rawAt)}`; info = `📝 النص الكامل محفوظ ${hhmm(s.rawAt)}.<br>${s.lastSave ? `✓ آخر تحديث للملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحدَّث الملخص بعد."}`; }
-      else { cls = s.lastSave ? "ok" : "idle"; text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "") + (s.lastSave && cost ? ` · ≈${fmt(cost)} توكن` : ""); info = s.lastSave ? `✓ حُدّث الملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحفظ ملخص بعد."; }
+      else { cls = s.lastSave ? "ok" : "idle"; text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "") + (s.lastSave && cost ? ` · ${approx(cost)} توكن` : ""); info = s.lastSave ? `✓ حُدّث الملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : "لم يُحفظ ملخص بعد."; }
       if (s.lastCost && !v.unreadable) info += `<br><span class="muted">كلفة آخر تلخيص: الطلب ${fmt(s.lastCost.req)} حرفاً والرد ${fmt(s.lastCost.rep)} ≈ ${fmt(cost)} توكن${s.costTotal && s.costTotal.n > 1 ? `؛ في هذه المحادثة ${s.costTotal.n} تلخيصات ≈ ${fmt(tokens(s.costTotal.chars))} توكن` : ""} (تقدير). ويبقى الطلب ورده في سياق المحادثة.</span>`;
       if (s.note && !v.unreadable) info += `<br><span class="muted">${esc(s.note)}</span>`;
       if (v.empty && v.empty.length && !v.unreadable) info += `<br><span class="muted">${v.empty.length === 1 ? `رسالتك رقم ${v.empty[0]}` : `رسائلك رقم ${v.empty.join("، ")}`} بلا نص مقروء (صورة أو ملف)؛ لا يُحفظ منها إلا ما يذكره الرد عنها.</span>`;

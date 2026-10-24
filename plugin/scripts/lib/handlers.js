@@ -41,7 +41,7 @@ function onPrompt(state, out) {
     if (!holdWriteLock(5000)) r = { err: "برنامج آخر يكتب في الذاكرة الآن؛ أعد الأمر بعد لحظات" };
     else try { r = restoreBackup(cmd.restore); } finally { releaseWriteLock(); }
     if (r.ok) notes.push(`↩️ ذاكرة المحادثة: استُرجعت نسخة ${r.when}.`);
-    ctx.push(r.ok ? `[conversation-memory] استرجع النظام نسخة الذاكرة المحفوظة في ${r.when} (${r.decisions} قرار سارٍ، ${r.log} دفعة في السجل)، وحفظ النسخة التي كانت قبلها احتياطياً. أخبر المستخدم بذلك في سطر، وأن تكرار /conversation-memory:undo يعيد ما تراجع عنه.`
+    ctx.push(r.ok ? `[conversation-memory] استرجع النظام نسخة الذاكرة المحفوظة في ${r.when} (القرارات السارية: ${C.count(r.decisions, C.W.decision)}، والسجل: ${C.count(r.log, C.W.batch)})، وحفظ النسخة التي كانت قبلها احتياطياً. أخبر المستخدم بذلك في سطر، وأن تكرار /conversation-memory:undo يعيد ما تراجع عنه.`
       : `[conversation-memory] لم يُسترجع شيء: ${r.err}. أخبر المستخدم بذلك في سطر.`);
   }
   const pins = s.pins.filter((p) => p.status === "pending");

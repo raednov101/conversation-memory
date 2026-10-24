@@ -125,6 +125,14 @@ async function healCut(r, cur) {
   await writeVerified(r, JSON_FILE, C.serialize(m)); await writeVerified(r, MD_FILE, md);
   return `وُجد ملف الذاكرة مقطوعاً (كتابة قُطعت)، فاستُرجعت آخر نسخة سليمة (${b.when}) وحُفظ المقطوع جانباً.`;
 }
+// the approved version of each pinned text, verified against its fingerprint (for inserting it verbatim into a chat)
+async function pinTextsOf(r, m) {
+  const out = {};
+  for (const p of m.pins) {
+    try { const parts = p.path.split("/"), t = await readText(await dir(r, parts.slice(0, -1), false), parts[parts.length - 1]); if (t != null && (await sha256(t)) === p.sha) out[p.name] = t; } catch {}
+  }
+  return out;
+}
 async function readHealed(r) { let cur = await readMemory(r); if (cur.bad && (await healCut(r, cur))) cur = await readMemory(r); return cur; }
 // Shared with the Claude Code plugin (same protocol in hook.js): an advisory lock file ".conversation-memory/write.lock",
 // "<owner> <epoch-ms>", stale after 15 s; taken by writing it and confirming it still holds our owner a moment later.
@@ -287,7 +295,11 @@ const ops = {
     if (cur.bad) return { ok: false, error: cur.bad };
     if (!cur.exists && !cur.mdText) return { ok: true, text: "" };
     const m = !cur.exists ? C.importLegacy(cur.memory, cur.mdText, "") : cur.memory;
-    return { ok: true, text: C.renderCompact(m, COMPACT_BUDGET) };
+    if (!cur.exists) return { ok: true, text: C.renderCompact(m, COMPACT_BUDGET) };
+    // for a chat box: everything in force, the pinned texts themselves (the site can't open their files), the latest
+    // log entries, no markdown markers
+    const sel = { summary: true, constraints: true, decisions: m.decisions.filter((d) => d.status === "active").map((d) => d.id), pins: m.pins.map((p) => p.name), log: m.log.slice(-3).map((e) => e.id) };
+    return { ok: true, text: C.renderSelection(m, sel, COMPACT_BUDGET, { pinTexts: await pinTextsOf(h, m), plain: true }) };
   },
   // the model's reply → validated draft → applied by the core
   async commit({ project, reply, batch, base, platform, chat, range }) {
@@ -365,7 +377,7 @@ const ops = {
     const cur = await readMemory(h);
     if (cur.bad) return { ok: false, error: cur.bad };
     const m = !cur.exists && cur.mdText ? C.importLegacy(cur.memory, cur.mdText, "") : cur.memory;
-    return { ok: true, memory: m, exists: cur.exists };
+    return { ok: true, memory: m, exists: cur.exists, pinTexts: await pinTextsOf(h, m) };
   },
   // every saved version of a pinned text, oldest first: { v, text, sha, date }
   async pinVersions({ name }) {

@@ -38,7 +38,7 @@ function pinRequest(p) {
 }
 // the backups the user can restore, newest first, numbered as /conversation-memory:restore expects
 function backupsText(list) {
-  return list.length ? list.slice(0, 10).map((b, i) => `  ${i + 1}. ${b.when} — ${b.decisions} قرار سارٍ، ${b.log} دفعة في السجل${b.goal ? `، الهدف: «${b.goal}»` : ""}`).join("\n") : "  لا توجد نسخ سابقة بعد";
+  return list.length ? list.slice(0, 10).map((b, i) => `  ${i + 1}. ${b.when} — القرارات السارية: ${C.count(b.decisions, C.W.decision)}، والسجل: ${C.count(b.log, C.W.batch)}${b.goal ? `، الهدف: «${b.goal}»` : ""}`).join("\n") : "  لا توجد نسخ سابقة بعد";
 }
 const fmt = (n) => Number(n || 0).toLocaleString("en-US");
 // what summarizing costs, measured from the text actually sent and written (an estimate in tokens, said to be one)

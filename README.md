@@ -1,4 +1,4 @@
-# ذاكرة المحادثة 1.2.0 — لـ Claude وChatGPT
+# ذاكرة المحادثة 1.2.1 — لـ Claude وChatGPT
 
 النقاش الطويل لا يضيع. كل 5 رسائل منك تُلخَّص المحادثة وتُحفظ ذاكرةً للمشروع: الهدف والوضع الحالي، والقرارات ومن اتخذها، والقيود، والنصوص التي اعتمدتها حرفياً. تكمل منها في جلسة جديدة أو على منصة أخرى.
 
@@ -21,7 +21,7 @@
 ```
 
 **الإضافة:**
-1. نزّل [conversation-memory-extension-1.2.0.zip](https://github.com/raednov101/conversation-memory/raw/main/downloads/conversation-memory-extension-1.2.0.zip) وفك ضغطه.
+1. نزّل [conversation-memory-extension-1.2.1.zip](https://github.com/raednov101/conversation-memory/raw/main/downloads/conversation-memory-extension-1.2.1.zip) وفك ضغطه.
 2. افتح `chrome://extensions` وفعّل «وضع المطوّر».
 3. اختر «تحميل إضافة غير مضغوطة» وحدد المجلد.
 

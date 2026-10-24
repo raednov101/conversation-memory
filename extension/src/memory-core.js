@@ -348,16 +348,21 @@
 
   // ---------- sharing: chosen parts of the memory as text for another conversation ----------
   // sel: { summary: bool, decisions: [ids], constraints: bool, pins: [names], log: [ids] } → text, cut at `budget` characters
-  function renderSelection(m, sel, budget = 3000) {
-    const parts = [];
-    if (sel.summary) parts.push("الخلاصة الحالية:\n" + renderSummary(m));
+  // opts.pinTexts {name: text}: pinned texts inserted verbatim (a chat site cannot open the pin's file, Claude Code can);
+  // opts.plain: no markdown markers (a message typed into a chat box shows them as they are)
+  function renderSelection(m, sel, budget = 3000, opts = {}) {
+    const parts = [], P = (t) => (opts.plain ? t.replace(/\*\*/g, "").replace(/^#{1,6} +/gm, "") : t);   // pinned texts stay verbatim
+    if (sel.summary) parts.push(P("الخلاصة الحالية:\n" + renderSummary(m)));
     const ds = m.decisions.filter((d) => d.status === "active" && (sel.decisions || []).includes(d.id));
-    if (ds.length) parts.push("قرارات:\n" + ds.map((d) => `- ${d.text} (${SOURCE_LABEL[d.source]})`).join("\n"));
-    if (sel.constraints && m.constraints.length) parts.push("القيود:\n" + bullets(m.constraints));
+    if (ds.length) parts.push(P("قرارات:\n" + ds.map((d) => `- ${d.text} (${SOURCE_LABEL[d.source]})`).join("\n")));
+    if (sel.constraints && m.constraints.length) parts.push(P("القيود:\n" + bullets(m.constraints)));
     const ps = m.pins.filter((p) => (sel.pins || []).includes(p.name));
-    if (ps.length) parts.push("نصوص معتمدة (النص الحرفي في ملفه):\n" + ps.map((p) => `- ${p.name} — النسخة ${p.version}، ${p.path}`).join("\n"));
+    const texts = opts.pinTexts || {};
+    for (const p of ps.filter((x) => typeof texts[x.name] === "string")) parts.push(`نص معتمد «${p.name}» (النسخة ${p.version}، انقله حرفياً):\n${texts[p.name]}`);
+    const refs = ps.filter((x) => typeof texts[x.name] !== "string");
+    if (refs.length) parts.push("نصوص معتمدة (النص الحرفي في ملفه):\n" + refs.map((p) => `- ${p.name} — النسخة ${p.version}، ${p.path}`).join("\n"));
     const es = m.log.filter((e) => (sel.log || []).includes(e.id));
-    if (es.length) parts.push("من سجل النقاش:\n" + es.map(renderEntry).join("\n\n"));
+    if (es.length) parts.push(P("من سجل النقاش:\n" + es.map(renderEntry).join("\n\n")));
     let out = parts.join("\n\n");
     if (out.length > budget) out = cut(out, budget) + "\n…(اقتُطع عند " + budget + " حرف)";
     return out;

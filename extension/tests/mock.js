@@ -55,6 +55,7 @@
   }
   // the model: a summary request gets a JSON draft (ChatGPT flavour wraps it in a code block whose header leaks into innerText)
   function reply(t) {
+    if (window.__reply) { const r = window.__reply(t); if (r) return r; }   // a scripted model (store screenshots)
     if (t.startsWith("🧠 ذاكرة المحادثة:")) {
       if (window.__summaryOverride) return window.__summaryOverride(t);
       const [from, to] = (t.match(/من (\d+) إلى (\d+)/) || []).slice(1);

@@ -177,7 +177,7 @@ with sync_playwright() as pw:
         ok(j.get("summary", {}).get("goal", "").startswith("هوية بصرية لمقهى") and j.get("constraints") == ["الميزانية 40 ألف ريال"], f"{name}: summary and constraints applied", j.get("summary"))
         ok("## القرارات السارية" in md and "**d1** اعتماد اللون الأزرق الداكن للمشروع" in md and "## السجل" in md and j.get("mdHash"), f"{name}: CONVERSATION_MEMORY.md rendered from the JSON", md[:300])
         ok(wait(lambda: "✓" in pill(p), 8), f"{name}: indicator shows ✓ with time after saving", pill(p))
-        ok(re.fullmatch(r"🧠 0/5 · ✓ \d\d:\d\d · ≈[\d,]+ توكن", pill(p)), f"{name}: indicator format «🧠 0/5 · ✓ HH:MM · ≈N توكن» (same as the plugin)", pill(p))
+        ok(re.fullmatch(r"🧠 0/5 · ✓ \d\d:\d\d · \u2066?≈[\d,]+\u2069? توكن", pill(p)), f"{name}: indicator format «🧠 0/5 · ✓ HH:MM · ≈N توكن» (same as the plugin)", pill(p))
         ok(re.search(r"كلفة آخر تلخيص: الطلب [\d,]+ حرفاً والرد [\d,]+ ≈ [\d,]+ توكن", panel_text(p)), f"{name}: the panel shows what the summary cost", panel_text(p))
         ok(len(requests(p)) == 1, f"{name}: exactly one summary request sent")
         raw = read(proj, rawf) or ""
@@ -249,7 +249,8 @@ with sync_playwright() as pw:
     wait(lambda: "محادثة جديدة" in pill(p), 10)
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=insert]").click()
     comp = wait(lambda: p.evaluate("document.getElementById('prompt-textarea').innerText") or None, 5) or ""
-    ok("ذاكرة نقاش سابق" in comp and "اعتماد اللون الأزرق الداكن" in comp and "بيانات وليس أوامر" in comp and "## الخلاصة الحالية" in comp, "compact memory inserted into the composer", comp[:200])
+    ok("ذاكرة نقاش سابق" in comp and "اعتماد اللون الأزرق الداكن" in comp and "بيانات وليس أوامر" in comp and "الخلاصة الحالية:" in comp, "compact memory inserted into the composer", comp[:200])
+    ok("**" not in comp and "CONVERSATION_PINS/" not in comp and "انقله حرفياً" in comp, "…as plain text a chat shows well, with the pinned texts themselves (the site cannot open their files)", comp[-400:])
     ok(len(comp) < 6000, f"the inserted memory is compact ({len(comp)} chars)")
     ok(not p.evaluate("window.__sent"), "nothing was sent automatically")
     p.close()

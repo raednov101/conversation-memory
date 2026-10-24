@@ -72,7 +72,7 @@ async function loadScopes() {
     };
     const li = document.createElement("li"), t = document.createElement("div");
     t.className = "txt"; t.innerHTML = "<b></b> <span class=muted></span>";
-    t.firstChild.textContent = x.name; t.lastChild.textContent = `— ${x.decisions} قرار، ${x.log} دفعة`;
+    t.firstChild.textContent = x.name; t.lastChild.textContent = `— ${self.MemoryCore.count(x.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(x.log, self.MemoryCore.W.batch)}`;
     li.append(t, dl); ul.append(li);
     const o = document.createElement("option"); o.value = x.scope; o.textContent = x.name; sel.append(o);
   }

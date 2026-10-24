@@ -197,7 +197,7 @@
     }
     if (a === "undo") {
       const r = await B.fs("restore", { n: 1 });
-      ui.toast(r.ok ? `↩️ استُرجعت نسخة ${r.when} (${r.decisions} قرار، ${r.log} دفعة). التراجع مرة أخرى يعيد ما تراجعت عنه.${r.kept ? ` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}` : `لم يُسترجع شيء: ${B.why(r.error)}`);
+      ui.toast(r.ok ? `↩️ استُرجعت نسخة ${r.when} (${C.count(r.decisions, C.W.decision)}، ${C.count(r.log, C.W.batch)}). التراجع مرة أخرى يعيد ما تراجعت عنه.${r.kept ? ` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}` : `لم يُسترجع شيء: ${B.why(r.error)}`);
       return;
     }
     if (a === "summarize") {
@@ -227,7 +227,7 @@
     if (!m.summary.goal && !m.summary.status && !m.decisions.length && !m.log.length && !m.pins.length) { ui.toast("لا توجد ذاكرة محفوظة لهذا المشروع بعد."); return; }
     ui.openShare(m, {
       budget: SHARE_BUDGET,
-      preview: (sel) => C.renderSelection(m, sel, SHARE_BUDGET),
+      preview: (sel) => C.renderSelection(m, sel, SHARE_BUDGET, { pinTexts: r.pinTexts || {}, plain: true }),
       onInsert: async (text) => {
         const c = A.composer(); if (!c) { ui.toast("لم أجد خانة الرسالة."); return; }
         if (CP.text(c)) { ui.toast("أفرغ خانة الرسالة أولاً، ثم أعد المحاولة."); return; }

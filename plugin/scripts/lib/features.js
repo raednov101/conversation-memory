@@ -21,9 +21,9 @@ function memoryContext(mem, when) {
 // a one-line account of what an unapproved memory file brings (shown to the user, never its content as instructions)
 function changesLine(mem) {
   const c = untrustedChanges(mem.memory), plat = [...new Set(c.newLog.map((e) => C.PLATFORMS[e.platform] || e.platform))];
-  if (c.first) return `فيه ${mem.memory.decisions.length} قرار و${mem.memory.log.length} دفعة سجل`;
+  if (c.first) return `فيه ${C.count(mem.memory.decisions.length, C.W.decision)} و${C.count(mem.memory.log.length, C.W.batch)} في السجل`;
   const parts = [];
-  if (c.newDecisions.length) parts.push(`${c.newDecisions.length} قرار جديد أو معدّل`);
+  if (c.newDecisions.length) parts.push(`${C.count(c.newDecisions.length, C.W.decision)} بين جديد ومعدّل`);
   if (c.newLog.length) parts.push(`${c.newLog.length} دفعة سجل جديدة${plat.length ? ` (${plat.join("، ")})` : ""}`);
   if (c.summaryChanged) parts.push("خلاصة مختلفة");
   return parts.length ? `تغيّر فيه: ${parts.join("، ")}` : "تغيّر ترتيبه أو صياغته";

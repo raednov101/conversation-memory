@@ -228,3 +228,17 @@ test("test review: every kind of secret the README names is removed (one fixture
   }
   for (const fine of ["sk-short", "AKIA123", "مفتاح الحل هو الصبر", "ghp_short", "the password field is required"]) assert.ok(!C.redact(fine).changed, `not a secret: ${fine}`);
 });
+
+test("a selection for a chat box: pinned texts verbatim, no markdown markers; for Claude Code: the pin's file", () => {
+  const m = C.normalizeMemory({ summary: { goal: "هدف", status: "وضع" }, pins: [{ name: "العقد", version: 2, path: "CONVERSATION_PINS/العقد/v2.md", sha: "a".repeat(64), date: "2026-10-24" }] });
+  const chat = C.renderSelection(m, { summary: true, pins: ["العقد"] }, 3000, { pinTexts: { "العقد": "البند الأول\nالبند الثاني" }, plain: true });
+  assert.ok(chat.includes("البند الأول\nالبند الثاني") && !chat.includes("**") && !chat.includes("CONVERSATION_PINS/"));
+  const cc = C.renderSelection(m, { summary: true, pins: ["العقد"] }, 3000);
+  assert.ok(cc.includes("CONVERSATION_PINS/العقد/v2.md") && cc.includes("**"));
+});
+
+test("plain selections never alter a pinned text, even one with markdown in it", () => {
+  const m = C.normalizeMemory({ summary: { goal: "هدف" }, log: [{ id: "e1", platform: "chatgpt", range: "1–5", raised: ["نقاش"], decided: [], changed: [] }], pins: [{ name: "ن", version: 1, path: "CONVERSATION_PINS/ن/v1.md", sha: "b".repeat(64), date: "" }] });
+  const out = C.renderSelection(m, { summary: true, pins: ["ن"], log: ["e1"] }, 3000, { pinTexts: { "ن": "# عنوان\n**مهم** كما هو" }, plain: true });
+  assert.ok(out.includes("# عنوان\n**مهم** كما هو"), "verbatim"); assert.ok(!/^#{1,6} /m.test(out.replace("# عنوان", "")) && !out.replace("**مهم**", "").includes("**"));
+});

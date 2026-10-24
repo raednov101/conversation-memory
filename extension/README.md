@@ -1,10 +1,10 @@
-# ذاكرة المحادثة — إضافة المتصفح لـ ChatGPT وClaude (1.2.0)
+# ذاكرة المحادثة — إضافة المتصفح لـ ChatGPT وClaude (1.2.1)
 
 في chatgpt.com وclaude.ai: كل 5 رسائل منك تُلخَّص المحادثة وتُحفظ ذاكرةً للمشروع، والنص الكامل يُحفظ بعد كل رد. وفي محادثة جديدة تُدرج الذاكرة بضغطة.
 
 ## التثبيت
 
-1. نزّل [conversation-memory-extension-1.2.0.zip](https://github.com/raednov101/conversation-memory/raw/main/downloads/conversation-memory-extension-1.2.0.zip) وفك ضغطه.
+1. نزّل [conversation-memory-extension-1.2.1.zip](https://github.com/raednov101/conversation-memory/raw/main/downloads/conversation-memory-extension-1.2.1.zip) وفك ضغطه.
 2. افتح `chrome://extensions` وفعّل «وضع المطوّر».
 3. اختر «تحميل إضافة غير مضغوطة» وحدد المجلد.
 
