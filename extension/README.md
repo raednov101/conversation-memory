@@ -4,7 +4,7 @@
 
 ## التثبيت
 
-1. نزّل `conversation-memory-extension-1.2.0.zip` من صفحة [الإصدارات](https://github.com/raednov101/conversation-memory/releases) وفك ضغطه.
+1. نزّل [conversation-memory-extension-1.2.0.zip](https://github.com/raednov101/conversation-memory/raw/main/downloads/conversation-memory-extension-1.2.0.zip) وفك ضغطه.
 2. افتح `chrome://extensions` وفعّل «وضع المطوّر».
 3. اختر «تحميل إضافة غير مضغوطة» وحدد المجلد.
 
