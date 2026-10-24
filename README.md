@@ -54,9 +54,9 @@
 
 | الاختبار | النتيجة |
 |---|---|
-| اختبارات Node للبلقن والمكتبة والإضافة (`npm test`)، على Linux وmacOS وWindows، وNode 18 و22 | **TESTS_NODE** |
-| الإضافة كاملة في Chromium 141 على صفحات تحاكي ChatGPT وclaude.ai (`npm run e2e`) | **TESTS_E2E** |
-| تجربة حقيقية داخل Claude Code في وضع الأذونات الافتراضي (`npm run integration`) | **TESTS_INT** |
+| اختبارات Node للبلقن والمكتبة والإضافة (`npm test`)، على Linux وmacOS وWindows، وNode 18 و22 | **94/94** |
+| الإضافة كاملة في Chromium 141 على صفحات تحاكي ChatGPT وclaude.ai (`npm run e2e`) | **151/151** |
+| تجربة حقيقية داخل Claude Code في وضع الأذونات الافتراضي (`npm run integration`) | **19/19** (Claude Code 2.1.309، Linux) |
 | فحص من ستة مراجعين مستقلين: الصحة، والأمن، والبنية، وجودة الاختبارات، وتجربة المستخدم، والتوزيع والوعود | [تقرير الفحص](docs/AUDIT.md) |
 
 لإعادة التشغيل من نسخة المستودع: `npm install`، ثم `npm test`، ثم `npm run e2e` (يحتاج Python وPlaywright).

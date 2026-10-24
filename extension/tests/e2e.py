@@ -142,6 +142,14 @@ with sync_playwright() as pw:
     back = json.loads(read("projects", "chatgpt-g-p-abc123/CONVERSATION_MEMORY.json") or "{}")
     ok("استُعيد 1" in km and back.get("log") == j1.get("log") and "ChatGPT: محادثات خارج المشاريع" in km,
        "…and restored from it, while a project that still exists is never replaced", km)
+    # a cut-off file inside the browser (a write the browser killed) heals itself from the newest backup
+    good = read("projects", "chatgpt-general/CONVERSATION_MEMORY.json")
+    write("projects", "chatgpt-general/.conversation-memory/backups/20261024-100000-000.json", good)   # the backup a previous save leaves
+    write("projects", "chatgpt-general/CONVERSATION_MEMORY.json", '{"format":"conversation-memory/1","summ')
+    gid = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status', args: { scope: 'chatgpt-general' } })").get("projectId")
+    pr_ = opt.evaluate("(pid) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { scope: 'chatgpt-general', project: pid } })", gid)
+    ok(pr_.get("ok") and read("projects", "chatgpt-general/CONVERSATION_MEMORY.json") == good and any(f.startswith("CONVERSATION_MEMORY.broken-") for f in ls("projects", "chatgpt-general")),
+       "a cut-off memory file inside the browser heals from the newest backup, and the cut-off file is kept aside", pr_)
 
     for platform, name, pid in (("chatgpt", "ChatGPT", "chatgpt"), ("claude", "Claude", "claude-web")):
         print(f"— {name}: counter, full transcript, JSON summary every 5 —")
@@ -231,6 +239,8 @@ with sync_playwright() as pw:
     p.locator("#cm-memory-indicator .panel input").fill("../خارج")
     p.locator("#cm-memory-indicator .panel button[data-a=pin-save]").click(); p.wait_for_timeout(800)
     ok("اسم غير صالح" in p.locator("#cm-memory-indicator .toast").inner_text() and "خارج" not in " ".join(ls("proj-chatgpt") + ls("proj-chatgpt", "CONVERSATION_PINS")), "a pin name with / is refused")
+    sp = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'savePin', args: { name: 'إعداد', text: 'المفتاح ghp_' + 'A'.repeat(36) } })")
+    ok(not sp.get("ok") and "حساسة" in str(sp.get("error")) and "إعداد" not in ls("proj-chatgpt", "CONVERSATION_PINS"), "a pinned text holding a secret is refused, nothing written", sp)
     p.locator("#cm-memory-indicator .panel button[data-a=pin-cancel]").click()
     p.close()
 
@@ -266,9 +276,9 @@ with sync_playwright() as pw:
     j = wait(lambda: (lambda m: m if m and m["log"] else None)(mem(proj)), 20) or {}
     ok(j and j["log"][0]["range"] == "1–8" and len(requests(p)) == 1, "one click links it: the whole chat (1–8) is summarized", j.get("log"))
     # a long chat reopened: older messages arrive late — nothing is re-summarized or sent from the partial view
-    p.goto(BASE + "/c/old-chat/?lazy=1"); p.wait_for_timeout(1800)
+    p.goto(BASE + "/c/old-chat/?lazy=7000"); p.wait_for_timeout(5500)   # long enough for an edit to be "confirmed", were it believed
     ok(not requests(p) and len(mem(proj)["log"]) == 1 and "سيُعاد" not in panel_text(p), "a reopened long chat whose older messages load late: nothing is redone from the partial view", panel_text(p))
-    ok(wait(lambda: "0/5" in pill(p), 8), "…and once they have loaded, the count is right (0/5)", pill(p))
+    ok(wait(lambda: "0/5" in pill(p), 8) and not requests(p) and len(mem(proj)["log"]) == 1, "…and once they have loaded, the count is right (0/5) and nothing was redone", pill(p))
     # replies stream in, as on the real sites: nothing is saved or asked for until the reply is complete
     for i in range(9, 13): say(p, f"قديمة {i}")
     p.evaluate("window.__stream = true; window.__delay = 3000"); p.evaluate("t => window.__user(t)", "قديمة 13 بالبث")
@@ -426,7 +436,7 @@ with sync_playwright() as pw:
     print("— reliability: the writer closed mid-write, 40 times — the memory is always whole —")
     proj = "proj-kill"; use_folder(proj)
     pid_ = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status' })")["projectId"]
-    broken = 0; transient = 0
+    broken = 0; transient = 0; samples = []
     for k in range(40):
         reply = "⟦ذاكرة:بداية⟧" + json.dumps({"summary": {"goal": f"هدف {k}"}, "entry": {"raised": [f"دفعة اختبار رقم {k} " + "ن" * 3000], "decided": [], "changed": []}}, ensure_ascii=False) + "⟦ذاكرة:نهاية⟧"
         opt.evaluate("""([pid, reply, k]) => { chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { project: pid } }).then((p) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'commit', args: { project: pid, reply, batch: 'kill-' + k, base: p.base, platform: 'chatgpt', chat: 'x', range: String(k) } })).catch(() => {}); }""", [pid_, reply, k])
@@ -441,9 +451,9 @@ with sync_playwright() as pw:
                 # read at the very instant a file is replaced: look again a moment later; only a file that stays broken counts
                 time.sleep(0.5); t = read(proj, "CONVERSATION_MEMORY.json")
                 try: json.loads(t); transient += 1
-                except Exception: broken += 1
+                except Exception as e: broken += 1; samples.append((k, len(t or ""), (t or "")[:50], (t or "")[-50:], str(e)[:60]))
     m_ = mem(proj) or {}
-    ok(broken == 0 and len(m_.get("log", [])) > 0, f"40 closes mid-write: never a broken file ({len(m_.get('log', []))} writes landed; {transient} reads caught a replacement in progress)", broken)
+    ok(broken == 0 and len(m_.get("log", [])) > 0, f"40 closes mid-write: never a broken file ({len(m_.get('log', []))} writes landed; {transient} reads caught a replacement in progress)", (broken, samples[:3]))
     write(proj, "CONVERSATION_MEMORY.json", '{"format":"conversation-memory/1","summ')   # a cut-off file, however it happened
     lb = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'listBackups', args: {} })")
     # (a writer closed mid-write left its lock: it lapses after 15 s, so the first tries may say "busy")

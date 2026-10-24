@@ -47,10 +47,11 @@
   }
   bar.appendChild(button("send"));
   // ?lazy: a long chat whose older messages arrive late (only the newest two turns at first), as on the real sites
-  if (new URLSearchParams(location.search).has("lazy")) {
+  const lazy = new URLSearchParams(location.search).get("lazy");   // ?lazy=<ms> until the older messages arrive
+  if (lazy !== null) {
     const kids = [...thread.children], older = kids.slice(0, Math.max(0, kids.length - 4));
     older.forEach((k) => k.remove());
-    setTimeout(() => { for (const k of older.reverse()) thread.insertBefore(k, thread.firstChild); }, 2500);
+    setTimeout(() => { for (const k of older.reverse()) thread.insertBefore(k, thread.firstChild); }, +lazy || 2500);
   }
   // the model: a summary request gets a JSON draft (ChatGPT flavour wraps it in a code block whose header leaks into innerText)
   function reply(t) {

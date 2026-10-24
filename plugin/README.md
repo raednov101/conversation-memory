@@ -10,7 +10,7 @@
 /plugin install conversation-memory --marketplace raednov101/conversation-memory
 ```
 
-يتطلب Node.js 18 أو أحدث. جُرّب حياً على Claude Code 2.1.302.
+يتطلب Node.js 18 أو أحدث. جُرّب حياً على Claude Code 2.1.309.
 
 ## كيف يعمل
 

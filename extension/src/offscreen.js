@@ -113,6 +113,19 @@ async function readMemory(r) {
   if (!p.ok) return { bad: p.error, brokenText: jsonText };
   return { memory: p.memory, jsonText, mdText, token: C.token(jsonText || ""), exists: jsonText != null };
 }
+// Inside the browser nobody edits the file by hand: a cut-off file can only come from a write that was killed (the
+// browser closing the writer at the worst moment, seen about once in a few hundred forced closes under heavy load).
+// It is healed from the newest backup and kept aside. In a linked folder it may be someone's edit: reported, left alone.
+async function healCut(r, cur) {
+  if (!cur.bad || !IN_BROWSER.has(r) || typeof cur.brokenText !== "string") return null;
+  const b = (await describeBackups(r, null))[0];
+  if (!b) return null;
+  await writeVerified(r, `CONVERSATION_MEMORY.broken-${stamp()}.json`, cur.brokenText);
+  const m = b.memory, md = C.render(m); m.mdHash = C.hash(md);
+  await writeVerified(r, JSON_FILE, C.serialize(m)); await writeVerified(r, MD_FILE, md);
+  return `وُجد ملف الذاكرة مقطوعاً (كتابة قُطعت)، فاستُرجعت آخر نسخة سليمة (${b.when}) وحُفظ المقطوع جانباً.`;
+}
+async function readHealed(r) { let cur = await readMemory(r); if (cur.bad && (await healCut(r, cur))) cur = await readMemory(r); return cur; }
 // Shared with the Claude Code plugin (same protocol in hook.js): an advisory lock file ".conversation-memory/write.lock",
 // "<owner> <epoch-ms>", stale after 15 s; taken by writing it and confirming it still holds our owner a moment later.
 async function takeWriteLock(r) {
@@ -143,13 +156,17 @@ async function archive(r, entries) {
 // Without the lock nothing is written: { err, busy: true } and the caller tries again later.
 async function writeMemory(r, mutate, confirm, held) {
   const notes = [];
-  let keptEdit = false;
+  let keptEdit = false, healed = false;
   const lk = held || await takeWriteLock(r);
   if (!lk) return { err: "برنامج آخر يكتب في الذاكرة الآن", busy: true };
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
       const cur = await readMemory(r);
-      if (cur.bad) return { err: cur.bad + " — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة" };
+      if (cur.bad) {
+        const note = healed ? null : await healCut(r, cur);
+        if (!note) return { err: cur.bad + " — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة" };
+        notes.push(note); healed = true; attempt--; continue;
+      }
       let m = cur.memory;
       if (!cur.exists && cur.mdText) { m = C.importLegacy(m, cur.mdText, today()); if (!attempt) notes.push("نُقل محتوى CONVERSATION_MEMORY.md القديم كما هو تحت «من الإصدار السابق»."); }
       else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !(await isSomeGeneratedView(r, cur.mdText, m))) {
@@ -260,13 +277,13 @@ const ops = {
   },
   async prepare({ project }) {
     const { h, err } = await rootFor(project); if (err) return { ok: false, error: err };
-    const cur = await readMemory(h);
+    const cur = await readHealed(h);
     if (cur.bad) return { ok: false, error: cur.bad };
     return { ok: true, base: cur.token, state: stateForPrompt(cur.memory) };
   },
   async readCompact() {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
-    const cur = await readMemory(h);
+    const cur = await readHealed(h);
     if (cur.bad) return { ok: false, error: cur.bad };
     if (!cur.exists && !cur.mdText) return { ok: true, text: "" };
     const m = !cur.exists ? C.importLegacy(cur.memory, cur.mdText, "") : cur.memory;
