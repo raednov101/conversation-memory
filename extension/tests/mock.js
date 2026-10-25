@@ -61,7 +61,7 @@
       const [from, to] = (t.match(/من (\d+) إلى (\d+)/) || []).slice(1);
       const draft = {
         summary: { goal: `هوية بصرية لمقهى (حتى الرسالة ${to})`, status: "اعتُمد اللون", next: ["اختيار الخط"], open: [] },
-        decisions: { add: [{ text: "اعتماد اللون الأزرق الداكن للمشروع", source: "user" }], revoke: [] },
+        decisions: { add: [{ text: "اعتماد اللون الأزرق الداكن للمشروع", source: "user", quote: "اعتمدنا اللون الأزرق الداكن" }], revoke: [] },
         constraints: { add: ["الميزانية 40 ألف ريال"], remove: [] },
         entry: { raised: [`نقاش تجريبي حول الهوية البصرية في الرسائل ${from}–${to}`], decided: ["اعتماد اللون الأزرق الداكن للمشروع"], changed: [] },
       };

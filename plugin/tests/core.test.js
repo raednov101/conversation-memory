@@ -242,3 +242,42 @@ test("plain selections never alter a pinned text, even one with markdown in it",
   const out = C.renderSelection(m, { summary: true, pins: ["ن"], log: ["e1"] }, 3000, { pinTexts: { "ن": "# عنوان\n**مهم** كما هو" }, plain: true });
   assert.ok(out.includes("# عنوان\n**مهم** كما هو"), "verbatim"); assert.ok(!/^#{1,6} /m.test(out.replace("# عنوان", "")) && !out.replace("**مهم**", "").includes("**"));
 });
+
+test("evidence: a decision is the user's only if their words back it; numbers must appear; failures wait as suggestions", () => {
+  const ev = { user: "نعتمد الأزرق الداكن للهوية. والميزانيّة ٥٥٬٠٠٠ ريال", all: "نعتمد الأزرق الداكن للهوية. والميزانيّة ٥٥٬٠٠٠ ريال\nأقترح خط IBM Plex للعناوين. موافق؟\nتمام" };
+  const draft = (add) => C.validateDraft({ batch: "b" + Math.random(), decisions: { add }, entry: { raised: ["نقاش الهوية البصرية والميزانية والخط"] } }).draft;
+  const m0 = C.emptyMemory();
+  // spelling-insensitive (diacritics, Arabic digits, separators, punctuation) and backed
+  let r = C.applyDraft(m0, draft([{ text: "اللون الأزرق الداكن", source: "user", quote: "نعتمد الأزرق الداكن" }, { text: "الميزانية 55 ألف ريال", source: "user", quote: "الميزانية 55000 ريال" }]), { date: "2026-10-25", evidence: ev });
+  assert.deepEqual(r.unverified, []);
+  assert.deepEqual(r.memory.decisions.map((d) => d.source), ["user", "user"]);
+  assert.equal(r.memory.decisions[0].quote, "نعتمد الأزرق الداكن");
+  // approved proposal: the quote may come from the assistant's words
+  r = C.applyDraft(m0, draft([{ text: "خط IBM Plex للعناوين", source: "assistant-approved", quote: "أقترح خط IBM Plex للعناوين" }]), { evidence: ev });
+  assert.equal(r.memory.decisions[0].source, "assistant-approved");
+  // the same quote attributed to the user is not their words → suggestion for review
+  r = C.applyDraft(m0, draft([{ text: "خط IBM Plex", source: "user", quote: "أقترح خط IBM Plex للعناوين" }]), { evidence: ev });
+  assert.equal(r.memory.decisions[0].source, "assistant"); assert.equal(r.memory.decisions[0].unverified, true);
+  assert.match(r.unverified[0].reason, /ليس من كلامك/);
+  // no quote, an invented quote, an invented number
+  r = C.applyDraft(m0, draft([{ text: "الافتتاح في الشتاء", source: "user" }, { text: "اسم المقهى سكر", source: "user", quote: "سمّيناه سكر وهيل" }, { text: "الميزانية 45 ألف ريال", source: "user", quote: "الميزانية 55000 ريال" }]), { date: "2026-10-25", evidence: ev });
+  assert.deepEqual(r.unverified.map((u) => u.reason.slice(0, 8)), ["بلا اقتبا", "الاقتباس ", "رقم لا يظ"].map((x) => x.slice(0, 8)));
+  assert.ok(r.memory.decisions.every((d) => d.source === "assistant" && d.unverified));
+  // numbers already in the memory, ids, colour codes and today's year are not new facts
+  const m1 = C.applyDraft(m0, draft([{ text: "الافتتاح 15 نوفمبر", source: "user", quote: "نعتمد الأزرق الداكن" }]), {}).memory;
+  r = C.applyDraft(m1, draft([{ text: "يبقى الافتتاح 15 نوفمبر 2026 بلون #556B2F ويحل محل d12", source: "user", quote: "نعتمد الأزرق الداكن" }]), { date: "2026-10-25", evidence: ev });
+  assert.deepEqual(r.unverified, []);
+  // an unbacked decision never replaces one in force
+  const m2 = C.applyDraft(m0, draft([{ text: "اللون أخضر", source: "user", quote: "نعتمد الأزرق الداكن" }]), {}).memory;
+  r = C.applyDraft(m2, draft([{ text: "اللون أحمر", source: "user", quote: "قلت أحمر", replaces: "d1" }]), { evidence: ev });
+  assert.equal(r.memory.decisions.find((d) => d.id === "d1").status, "active");
+  // approving it through a fix clears the mark; the md shows quotes and the review mark
+  const f = C.applyFix(r.memory, C.validateFix({ decisions: { approve: ["d2"] } }).fix, "2026-10-25").memory;
+  assert.equal(f.decisions[1].unverified, false);
+  assert.match(C.render(r.memory), /لم يُعثر على دليله/);
+  assert.match(C.render(m2), /> «نعتمد الأزرق الداكن»/);
+  // no evidence (a correction, an older writer): nothing is checked
+  assert.deepEqual(C.applyDraft(m0, draft([{ text: "بلا دليل 99", source: "user" }]), {}).unverified, []);
+  // fields survive a round trip
+  assert.equal(C.normalizeMemory(JSON.parse(C.serialize(r.memory))).decisions[1].unverified, true);
+});

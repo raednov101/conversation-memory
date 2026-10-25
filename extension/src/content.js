@@ -25,11 +25,15 @@
   const loadSettings = async () => { const s = await B.get("settings", {}); settings = { ...defaults, ...s, every: Math.min(C.LIMITS.every, Math.max(1, parseInt(s.every, 10) || 10)) }; };
   // PID: the id stored inside the chosen project folder. A chat's link and progress belong to (project, chat),
   // so choosing another folder never carries a chat's state or writes into the new folder.
-  let folder = { at: 0, v: { ok: false } }, PID = "";
+  let folder = { at: 0, v: { ok: false } }, PID = "", review = [];   // review: decisions waiting for the user (no evidence found)
   async function folderStatus(force) {
     // a good answer is kept 10 s; a failed one (the writer still starting, say) is asked again within a second, so a
     // chat started at that moment still links and saves
-    if (force || Date.now() - folder.at > (folder.v && folder.v.ok ? 10000 : 1000)) { folder = { at: Date.now(), v: await B.fs("status") }; PID = (folder.v && folder.v.projectId) || ""; }
+    if (force || Date.now() - folder.at > (folder.v && folder.v.ok ? 10000 : 1000)) {
+      folder = { at: Date.now(), v: await B.fs("status") }; PID = (folder.v && folder.v.projectId) || "";
+      const rv = folder.v && folder.v.ok && PID ? await B.fs("reviewList") : null;
+      review = rv && rv.ok ? rv.list : [];
+    }
     return folder.v;
   }
   // linked (does this chat belong to the project?), what was summarized (count + fingerprints), the request in flight
@@ -42,7 +46,10 @@
   const fail = (st, error, userCount) => Object.assign(st, { status: "error", error, attempts: st.attempts + 1, failedAt: userCount, pending: null });
   // what a summary cost: the request we typed and the reply it produced, in characters (tokens are estimated from them)
   const costOf = (st, w, replyLen) => { const c = { req: w.reqLen || 0, rep: replyLen || 0 }; const t = st.costTotal || { n: 0, chars: 0 }; return { lastCost: c, costTotal: { n: t.n + 1, chars: t.chars + c.req + c.rep } }; };
-  const saved = (st, w, note, replyLen) => Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen));
+  // the conversation as read from the page: the writer checks each decision's quote against it (never the extension's own requests)
+  const evidenceOf = (turns) => ({ user: turns.filter((t) => t.role === "user").map((t) => t.text).join("\n"), all: turns.map((t) => t.text).join("\n") });
+  const reviewNote = (r) => (r.unverified && r.unverified.length ? `🔎 ${r.unverified.length === 1 ? "قرار لم أجد دليله" : r.unverified.length === 2 ? "قراران لم أجد دليلهما" : C.count(r.unverified.length, C.W.decision) + " لم أجد دليلها"} في المحادثة، فحُفظ اقتراحاً ينتظر مراجعتك من «راجع القرارات».` : "");
+  const saved = (st, w, note, replyLen) => (saves++, Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen)));
 
   // ---------- which project of the site this chat belongs to (each has its own memory) ----------
   // Known from the address or the page; a chat started from a project's page keeps that project once created.
@@ -68,7 +75,7 @@
   }
 
   // ---------- the main loop: one pass over the page ----------
-  let busy = false, view = {}, seen = { url: "", at: 0 };
+  let busy = false, view = {}, seen = { url: "", at: 0 }, saves = 0, saveCount = 0;
   async function tick(force = {}) {
     if (B.dead) { view = { ...view, fsSt: { ok: false, error: "inactive" } }; ui.render(view, settings); return; }   // updated or reloaded extension: say so, offer a reload
     if (busy) return;
@@ -80,7 +87,7 @@
       if (moved) { B.scope = sc.key; B.scopeName = sc.name || ""; }
       const fsSt = await folderStatus(force.folder || moved);
       const fsOk = !!(fsSt.ok && fsSt.permission === "granted" && PID);
-      if (!id) { view = { phase: "new", fsSt, fsOk }; return; }
+      if (!id) { view = { phase: "new", fsSt, fsOk, review }; return; }
       if (!fsOk) { view = { phase: "nofolder", fsSt, fsOk }; return; }
       if (seen.url !== location.pathname) seen = { url: location.pathname, at: Date.now() };
       const key = chatKey(id);
@@ -121,8 +128,8 @@
         if (late && late.reply && late.reply.includes(C.END) && !gen) {
           const e = st.expired; st.expired = null;
           if (e.to > st.summarizedUpTo) {
-            const r = await B.fs("commit", { project: e.project, reply: late.reply, batch: e.batch, base: e.base, platform: A.platform, chat: label, range: `${e.from}–${e.to}` });
-            if (r.ok) saved(st, e, "وصل الملخص متأخراً وحُفظ.", late.reply.length);
+            const r = await B.fs("commit", { project: e.project, reply: late.reply, batch: e.batch, base: e.base, platform: A.platform, chat: label, range: `${e.from}–${e.to}`, evidence: evidenceOf(turns) });
+            if (r.ok) saved(st, e, ["وصل الملخص متأخراً وحُفظ.", reviewNote(r)].filter(Boolean).join(" "), late.reply.length);
             else if (r.busy) { st.expired = e; schedule(4000); }
           }
         }
@@ -134,8 +141,8 @@
           if (!done) { if (st.pending.len !== mine.reply.length) Object.assign(st.pending, { len: mine.reply.length, seenAt: Date.now() }); schedule(STABLE_MS + 100); }
           else {
             const p = st.pending;
-            const r = await B.fs("commit", { project: p.project, reply: mine.reply, batch: p.batch, base: p.base, platform: A.platform, chat: label, range: `${p.from}–${p.to}` });
-            if (r.ok) { saved(st, p, [r.redacted ? "حُذفت بيانات حساسة من الملخص." : "", r.summarySkipped ? "لم تُستبدل الخلاصة لأن الذاكرة تغيّرت أثناء التلخيص؛ حُفظ السجل والقرارات." : "", ...(r.notes || [])].filter(Boolean).join(" "), mine.reply.length); st.pending = null; }
+            const r = await B.fs("commit", { project: p.project, reply: mine.reply, batch: p.batch, base: p.base, platform: A.platform, chat: label, range: `${p.from}–${p.to}`, evidence: evidenceOf(turns) });
+            if (r.ok) { saved(st, p, [reviewNote(r), r.redacted ? "حُذفت بيانات حساسة من الملخص." : "", r.summarySkipped ? "لم تُستبدل الخلاصة لأن الذاكرة تغيّرت أثناء التلخيص؛ حُفظ السجل والقرارات." : "", ...(r.notes || [])].filter(Boolean).join(" "), mine.reply.length); st.pending = null; }
             else if (r.busy) { st.note = "برنامج آخر (بلقن Claude Code؟) يكتب في الذاكرة الآن؛ سأحفظ بعد لحظات."; schedule(4000); }   // nothing written, nothing counted
             else if (r.writeFailed && (p.wf = (p.wf || 0) + 1) <= 5) { st.note = `${B.why(r.error)} — الرد محفوظ وتُعاد المحاولة بعد قليل (${p.wf} من 5).`; schedule(10000); }
             else fail(st, B.why(r.error), userCount);
@@ -173,7 +180,8 @@
         }
       }
       await saveChat(key, st);
-      view = { phase: "chat", key, st, userCount, due: d.isDue, fsSt, fsOk, unreadable, noComposer: !c, empty };
+      if (saveCount !== saves) { saveCount = saves; await folderStatus(true); }   // a save may have added decisions to review
+      view = { phase: "chat", key, st, userCount, due: d.isDue, fsSt, fsOk, unreadable, noComposer: !c, empty, review };
     } catch (e) {
       view = { ...view, crash: String((e && e.message) || e) };
     } finally {
@@ -187,6 +195,7 @@
     if (a === "reload") { location.reload(); return; }
     if (a === "options") { B.call({ cmd: "openOptions" }); return; }
     if (a === "share") { openShare(); return; }
+    if (a === "review") { await folderStatus(true); if (!review.length) { ui.toast("لا قرارات تنتظر مراجعتك."); return; } ui.openReview(review); return; }
     if (a === "pause") { await B.set("settings", { ...settings, paused: !settings.paused }); return; }
     const id = A.chatId();
     if (a === "link" || a === "unlink") {
@@ -240,7 +249,13 @@
     const r = await B.fs("savePin", { name, text });
     ui.toast(r.ok ? `📌 ثُبّت «${r.name}» — النسخة ${r.v}${r.unchanged ? " (مطابق للسابقة)" : ` · بصمة ${r.hash}`}` : `تعذّر التثبيت: ${B.why(r.error)}`);
   }
-  const ui = M.ui.create({ onAction, onPinSave, validPinName: C.pinNameOk, why: B.why, maxAttempts: POL.MAX_ATTEMPTS, test: !!TEST });
+  async function onReview(id, action) {
+    const r = await B.fs("review", { id, action });
+    ui.toast(r.ok ? (action === "approve" ? `✓ اعتُمد ${id}` : `✕ أُلغي ${id}`) + " — يمكنك التراجع من «تراجع عن آخر تغيير»." : `لم يتغيّر شيء: ${B.why(r.error)}`);
+    await folderStatus(true);
+    return review;
+  }
+  const ui = M.ui.create({ onAction, onPinSave, onReview, validPinName: C.pinNameOk, why: B.why, maxAttempts: POL.MAX_ATTEMPTS, test: !!TEST });
 
   // pin the selected text, exactly as selected on the page (from the right-click menu)
   chrome.runtime.onMessage.addListener((msg) => {

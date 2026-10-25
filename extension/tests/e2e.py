@@ -570,7 +570,18 @@ with sync_playwright() as pw:
     for i in range(1, 6): say(p, f"تجربة {i}")
     ok(wait(lambda: "✓" in pill(p), 20), "after the summary: ✓", pill(p))
     say(p, "تجربة 6")
-    ok(wait(lambda: re.fullmatch(r"🧠 1/5 · 📝 \d\d:\d\d", pill(p)), 10), "a new reply saved as text only: 📝, a different state", pill(p))
+    ok(wait(lambda: re.fullmatch(r"🧠 1/5 · 📝 \d\d:\d\d( · 🔎1)?", pill(p)), 10), "a new reply saved as text only: 📝, a different state", pill(p))
+    # nothing the user said here backs the model's «decision» (the messages were «تجربة 1…5»): it waits for review
+    jr = mem(proj) or {}
+    ok([(d["source"], d.get("unverified"), d.get("quote")) for d in jr.get("decisions", [])] == [("assistant", True, "اعتمدنا اللون الأزرق الداكن")], "a decision whose quote isn't in the conversation is kept as a suggestion marked for review", jr.get("decisions"))
+    ok("🔎1" in pill(p), "the indicator says one decision waits for review", pill(p))
+    p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=review]").click()
+    rv = wait(lambda: (lambda t: t if "الاقتباس" in t else None)(p.locator("#cm-memory-indicator .panel").inner_text()), 8) or p.locator("#cm-memory-indicator .panel").inner_text()
+    ok("اعتماد اللون الأزرق الداكن" in rv and "اعتمدنا اللون الأزرق الداكن" in rv, "the review panel shows the decision and the words it was saved from", rv[:300])
+    p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").click()
+    ja = wait(lambda: (lambda j: j if j and j["decisions"][0]["source"] == "assistant-approved" else None)(mem(proj)), 10) or mem(proj) or {}
+    ok(ja.get("decisions") and ja["decisions"][0]["source"] == "assistant-approved" and not ja["decisions"][0].get("unverified"), "approving it makes it «a suggestion you approved», and the mark goes", ja.get("decisions"))
+    ok(wait(lambda: "🔎" not in pill(p), 15), "…and the indicator no longer asks for review", pill(p))
     ok("النص الكامل محفوظ" in panel_text(p) and "آخر تحديث للملخص" in panel_text(p), "…and the panel tells the two apart")
     opt.evaluate("async () => { const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, mode: 'manual' } }); }")
     for i in range(7, 12): say(p, f"تجربة {i}")

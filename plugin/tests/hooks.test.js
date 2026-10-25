@@ -741,3 +741,32 @@ test("indicator: the session mode reads «N · نهاية الجلسة»", { ski
   const base = { v: 1, every: 5, since: 7, pending: 0, stuck: 0, lastSave: "2026-10-25 10:00", error: "", updated: 0 };
   assert.equal(format({ ...base, mode: "session" }), "🧠 7 · نهاية الجلسة · ✓ 10:00");
 });
+
+test("evidence: a decision is saved as the user's only when the conversation backs it; otherwise it waits for review", () => {
+  const P = tmp(); const js = [];
+  for (let i = 1; i <= 5; i++) js.push(prompt(P, "ev", i === 2 ? "نعتمد اسم سُكّر وهيل والميزانية ٥٥ ألف" : `رسالة ${i}`));
+  const tp = transcript(P, js.map((j) => ({ pid: j._pid, user: j._text })));
+  draft(requests(js[4])[0], { decisions: { add: [
+    { text: "الاسم سكر وهيل", source: "user", quote: "نعتمد اسم سكر وهيل" },
+    { text: "الميزانية 45 ألف", source: "user", quote: "والميزانية ٥٥ ألف" },
+    { text: "الافتتاح في ديسمبر", source: "user", quote: "قررنا الافتتاح في ديسمبر" }] } });
+  const r = run("stop", { session_id: "ev", cwd: P, transcript_path: tp });
+  const d = memJson(P).decisions;
+  assert.deepEqual(d.map((x) => [x.source, x.unverified]), [["user", false], ["assistant", true], ["assistant", true]]);
+  assert.match(all(r), /🔎[\s\S]*d2[\s\S]*رقم لا يظهر[\s\S]*d3[\s\S]*الاقتباس ليس من كلامك/);
+  const st = run("prompt", { session_id: "ev", cwd: P, prompt: "/conversation-memory:status", prompt_id: "pst" });
+  assert.match(ctx(st), /تنتظر مراجعتك[\s\S]*d2[\s\S]*d3/);
+  assert.match(memMd(P), /> «نعتمد اسم سكر وهيل»/);
+});
+
+test("evidence: messages recovered from a capture are their own evidence (the old session's transcript may be gone)", () => {
+  const P = tmp(); const js = [prompt(P, "old", "اتفقنا على الخط الكوفي للشعار"), prompt(P, "old", "تمام")];
+  run("end", { session_id: "old", cwd: P, transcript_path: tfrom(P, js) });
+  run("start", { session_id: "new", cwd: P, source: "startup" });
+  const r = prompt(P, "new", "نكمل"), tp = tfrom(P, [r]);
+  const req = requests(run("stop", { session_id: "new", cwd: P, transcript_path: tp }))[0]; assert.ok(req, "a request for the recovered messages");
+  draft(req, { decisions: { add: [{ text: "الخط الكوفي للشعار", source: "user", quote: "اتفقنا على الخط الكوفي" }] } });
+  run("stop", { session_id: "new", cwd: P, transcript_path: tp });
+  const d = memJson(P).decisions;
+  assert.equal(d.length, 1); assert.equal(d[0].source, "user"); assert.equal(d[0].unverified, false);
+});

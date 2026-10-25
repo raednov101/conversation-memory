@@ -99,8 +99,27 @@ function onStop(state, out) {
   }
   try { stopWork(s, out); } finally { releaseWriteLock(); }
 }
+// the conversation the writer actually has, to check each decision's quote against (C.applyDraft). Read once per Stop.
+// A recovered batch adds its own captured messages (they may come from a session whose transcript is gone).
+const CAP_USER_RE = /### رسالة المستخدم \(\d+\)\n([\s\S]*?)\n\n### رد Claude\n/g;
+function evidenceSource(s) {
+  let base;
+  return (b) => {
+    if (base === undefined) {
+      const turns = readTranscript(s.tp || input.transcript_path);
+      base = turns ? { user: turns.map((t) => t.raw).join("\n"), all: turns.map((t) => t.raw + "\n" + t.assistant.join("\n")).join("\n") + "\n" + (typeof input.last_assistant_message === "string" ? input.last_assistant_message : "") } : null;
+    }
+    if (b.kind !== "recovered") return base;
+    const c = readCapture(b.id);
+    if (!c) return base;
+    const body = c.parts.map((p) => p.body).join("");
+    const user = [...body.matchAll(CAP_USER_RE)].map((m) => m[1]).join("\n");
+    return { user: (base ? base.user + "\n" : "") + user, all: (base ? base.all + "\n" : "") + body };
+  };
+}
 function stopWork(s, out) {
   const asks = [];
+  const evidenceOf = evidenceSource(s);
   const mem0 = readMemory();
   const okBases = new Set([mem0.token || "none"]);
   // 1) summary drafts
@@ -128,7 +147,7 @@ function stopWork(s, out) {
             let applied = null;
             const w = writeMemory((m, tok) => {
               // another writer changed the memory meanwhile: keep their summary, still record this batch's entry and decisions
-              const r = C.applyDraft(m, v.draft, { platform: "claude-code", chat: "", range: labelOf(b).replace(/^الرسائل |^رسائل منسوخة /, ""), date: today(), allowSummary: allowSummary && okBases.has(tok) });
+              const r = C.applyDraft(m, v.draft, { platform: "claude-code", chat: "", range: labelOf(b).replace(/^الرسائل |^رسائل منسوخة /, ""), date: today(), allowSummary: allowSummary && okBases.has(tok), evidence: evidenceOf(b) });
               applied = r; return r.memory;
             }, (mm) => mm.log.some((e) => e.id === b.id));
             if (w.err && w.writeFailed) { keep = true; err = w.err; }
@@ -136,6 +155,7 @@ function stopWork(s, out) {
             else {
               okBases.add(w.token);
               if (applied && applied.redacted) notes.push("🔒 ذاكرة المحادثة: حُذفت بيانات حساسة من الملخص تلقائياً قبل حفظه.");
+              if (applied && applied.unverified.length) notes.push(`🔎 ذاكرة المحادثة: ${applied.unverified.length === 1 ? "قرار لم أجد دليله" : applied.unverified.length === 2 ? "قراران لم أجد دليلهما" : C.count(applied.unverified.length, C.W.decision) + " لم أجد دليلها"} في المحادثة، فحُفظ اقتراحاً ينتظر مراجعتك: ${applied.unverified.map((u) => `${u.id} «${u.text.slice(0, 80)}» (${u.reason})`).join("؛ ")}. للاعتماد أو الإلغاء: /conversation-memory:fix.`);
               if (applied && applied.skipped.includes("summary")) notes.push("ℹ️ ذاكرة المحادثة: تغيّرت الذاكرة من برنامج آخر أثناء الحفظ، فبقيت خلاصته وأُضيف سجل هذه الرسائل وقراراتها.");
             }
           }

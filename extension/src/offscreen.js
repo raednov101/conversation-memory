@@ -208,6 +208,9 @@ async function writeMemory(r, mutate, confirm, held) {
 // Only what the model cannot see in the chat itself, kept short (it is sent with every summary request and stays in the
 // chat): the project's goal and state (other chats feed them too), the decisions in force with their ids (to revoke one)
 // and the constraints (not to repeat them). Next steps and open questions are rewritten from the chat anyway.
+// the conversation text a commit is checked against (from the page; strings only, bounded)
+const EVIDENCE_MAX = 4 * 1024 * 1024;
+const evidenceArg = (e) => (e && typeof e.all === "string" && typeof e.user === "string" ? { user: e.user.slice(-EVIDENCE_MAX), all: e.all.slice(-EVIDENCE_MAX) } : null);
 function stateForPrompt(m) {
   const s = m.summary, L = [];
   if (s.goal) L.push(`الهدف: ${s.goal}`);
@@ -303,7 +306,7 @@ const ops = {
     return { ok: true, text: C.renderSelection(m, sel, COMPACT_BUDGET, { pinTexts: await pinTextsOf(h, m), plain: true }) };
   },
   // the model's reply → validated draft → applied by the core
-  async commit({ project, reply, batch, base, platform, chat, range }) {
+  async commit({ project, reply, batch, base, platform, chat, range, evidence }) {
     const { h, err } = await rootFor(project); if (err) return { ok: false, error: err };
     const p = C.parseModelReply(String(reply || ""));
     if (!p.ok) return { ok: false, error: p.error };
@@ -314,7 +317,7 @@ const ops = {
     let w;
     try {
       w = await writeMemory(h, (m, token) => {
-        const r = C.applyDraft(m, v.draft, { platform, chat, range, date: today(), allowSummary: v.draft.base === token });
+        const r = C.applyDraft(m, v.draft, { platform, chat, range, date: today(), allowSummary: v.draft.base === token, evidence: evidenceArg(evidence) });
         return { memory: r.memory, extra: r };
       }, (mm) => mm.log.some((e) => e.id === batch));
     } catch (e) {   // the file system refused (permission withdrawn, disk full…): the reply itself is valid — keep it and retry
@@ -322,7 +325,28 @@ const ops = {
     }
     if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
     const r = w.extra;
-    return { ok: true, already: !r.applied, redacted: r.redacted, summarySkipped: r.skipped.includes("summary"), notes: w.notes };
+    return { ok: true, already: !r.applied, redacted: r.redacted, summarySkipped: r.skipped.includes("summary"), unverified: r.unverified || [], notes: w.notes };
+  },
+  // decisions the writer could not back with the conversation's words: they wait as suggestions until the user decides
+  async reviewList() {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    const cur = await readMemory(h);
+    if (cur.bad || !cur.exists) return { ok: true, list: [] };
+    return { ok: true, list: cur.memory.decisions.filter((d) => d.status === "active" && d.unverified).map(({ id, text, quote, date }) => ({ id, text, quote, date })) };
+  },
+  // approve (it becomes "a suggestion the user approved") or revoke one of them — a normal, backed-up, undoable write
+  async review({ id, action }) {
+    const { h, err } = await root(); if (err) return { ok: false, error: err };
+    if (!/^d\d{1,6}$/.test(String(id)) || (action !== "approve" && action !== "revoke")) return { ok: false, error: "طلب مراجعة غير صالح" };
+    const v = C.validateFix({ decisions: { [action]: [id] } });
+    let changes = [];
+    const w = await writeMemory(h, (m) => {
+      const d = m.decisions.find((x) => x.id === id && x.status === "active" && x.unverified);
+      if (!d) return { err: "لم يعد هذا القرار بانتظار المراجعة" };
+      const r = C.applyFix(m, v.fix, today()); changes = r.changes; return { memory: r.memory };
+    }, (mm) => !mm.decisions.some((x) => x.id === id && x.status === "active" && x.unverified));
+    if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
+    return { ok: true, changes };
   },
   // the backups the user can restore (newest first; the same numbering as the plugin's /conversation-memory:restore)
   async listBackups() {

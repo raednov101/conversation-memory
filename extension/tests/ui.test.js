@@ -53,3 +53,10 @@ test("raw browser errors are explained in Arabic", () => {
   assert.equal(why("تعذّر شيء"), "تعذّر شيء", "Arabic messages pass through");
   assert.match(why("WeirdError xyz"), /^خطأ غير متوقع/);
 });
+test("decisions waiting for review: a mark on the indicator, one line, and the review button first", () => {
+  const r = d({ lastSave: T(14, 5) }, auto, { review: [{ id: "d4", text: "x" }, { id: "d5", text: "y" }] });
+  assert.equal(r.text, "🧠 2/5 · ✓ 14:05 · 🔎2");
+  assert.match(r.info, /قراران ينتظران مراجعتك/);
+  assert.deepEqual(r.btns[0], ["🔎 راجع القرارات (2)", "review"]);
+  assert.ok(!d({ lastSave: T(14, 5) }, auto, { review: [] }).text.includes("🔎"), "nothing said when nothing waits");
+});

@@ -30,7 +30,7 @@ description: Keeps long conversations from being forgotten. At the session's edg
   "base": "<قيمة base كما في الملاحظة>",
   "summary": { "goal": "…", "status": "…", "next": ["…"], "open": ["…"] },
   "decisions": {
-    "add": [ { "text": "…", "source": "user", "replaces": "d3" } ],
+    "add": [ { "text": "…", "source": "user", "quote": "كلمات المستخدم كما كتبها", "replaces": "d3" } ],
     "revoke": ["d2"]
   },
   "constraints": { "add": ["…"], "remove": ["…"] },
@@ -45,6 +45,7 @@ description: Keeps long conversations from being forgotten. At the session's edg
     - `user`: قرار المستخدم.
     - `assistant-approved`: اقتراحك واعتمده المستخدم.
     - `assistant`: اقتراحك ولم يُعتمد بعد.
+  - **`quote` دليل القرار:** اقتباس قصير منسوخ حرفياً من المحادثة (4 إلى 300 حرف). لـ `user` من كلام المستخدم نفسه، ولـ `assistant-approved` من الاقتراح أو من موافقة المستخدم عليه. النظام يبحث عنه في المحادثة، ويتحقق أن أرقام القرار موجودة فيها. القرار بلا دليل لا يُرفض، لكنه يُحفظ اقتراحاً ينتظر مراجعة المستخدم، فلا تنسب للمستخدم ما لم يقله.
 - **`constraints`:** متطلبات المستخدم الدائمة، مثل «الرد بالعربي» و«الاسم الكامل أفق الابتكار».
 - إذا تعددت الدفعات، اكتب ملفاً لكل دفعة، وضع `summary` في واحد فقط.
 - بعد الكتابة قل للمستخدم بسطر واحد: «جهّزت تحديث الذاكرة».

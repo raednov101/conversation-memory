@@ -102,6 +102,7 @@
     m.decisions = (Array.isArray(input.decisions) ? input.decisions : []).filter(isObj).map((d) => ({
       id: isId(d.id) ? d.id : "", text: cleanStr(d.text), source: SOURCES.includes(d.source) ? d.source : "user",
       date: cleanStr(d.date, 40), status: d.status === "revoked" ? "revoked" : "active", revokedOn: cleanStr(d.revokedOn, 40), replaces: isId(d.replaces) ? d.replaces : "",
+      quote: cleanStr(d.quote, QUOTE_MAX), unverified: d.unverified === true,
     })).filter((d) => d.text).slice(-LIMITS.decisions);
     let next = 1 + Math.max(0, ...m.decisions.map((d) => +String(d.id).slice(1) || 0));
     for (const d of m.decisions) { if (!d.id || seen.has(d.id)) d.id = "d" + next++; seen.add(d.id); }
@@ -129,8 +130,36 @@
   const serialize = (m) => JSON.stringify(m, null, 2) + "\n";
   const token = (fileText) => (fileText ? hash(fileText).slice(0, 12) : "none");
 
+  // ---------- evidence: a decision attributed to the user must be backed by the user's own words ----------
+  // The model writes the summary, so it can misattribute or invent. Each decision carries a short verbatim quote; the writer
+  // checks it against the conversation it actually has, and checks that the decision's numbers appear there too.
+  // A decision that fails is kept, but as an unapproved suggestion marked for review — nothing is lost, nothing is overstated.
+  const QUOTE_MAX = 300, QUOTE_MIN = 4;
+  const DIGITS = { "٠": 0, "١": 1, "٢": 2, "٣": 3, "٤": 4, "٥": 5, "٦": 6, "٧": 7, "٨": 8, "٩": 9, "۰": 0, "۱": 1, "۲": 2, "۳": 3, "۴": 4, "۵": 5, "۶": 6, "۷": 7, "۸": 8, "۹": 9 };
+  const asciiDigits = (t) => String(t).replace(/[٠-٩۰-۹]/g, (c) => DIGITS[c]).replace(/(\d)[,٬'](?=\d{3}(?!\d))/g, "$1");
+  // spelling-insensitive: no diacritics or tatweel, one alef/yaa/haa, no punctuation or markdown, single spaces
+  const evNorm = (t) => asciiDigits(t).toLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  // numbers of 2+ digits that state something (not decision ids like d12, not colour codes like #556B2F)
+  const numbersIn = (t) => [...new Set(asciiDigits(t).match(/(?<![A-Za-z#\d])\d{2,}/g) || [])];
+  function prepareEvidence(ev) {
+    if (!isObj(ev) || typeof ev.all !== "string" || !ev.all.trim()) return null;
+    const all = evNorm(ev.all);
+    return { user: typeof ev.user === "string" ? evNorm(ev.user) : all, all, digits: asciiDigits(ev.all) };
+  }
+  // → "" when backed, else the reason (in Arabic, shown to the user)
+  function checkDecision(a, ev, known) {
+    const q = evNorm(a.quote || "");
+    if (a.source !== "assistant") {
+      if (q.replace(/\s/g, "").length < QUOTE_MIN) return "بلا اقتباس من المحادثة";
+      if (!(a.source === "user" ? ev.user : ev.all).includes(q)) return a.source === "user" ? "الاقتباس ليس من كلامك في المحادثة" : "الاقتباس غير موجود في المحادثة";
+    }
+    const miss = numbersIn(a.text).filter((n) => !ev.digits.includes(n) && !known.includes(n));
+    return miss.length ? `رقم لا يظهر في المحادثة: ${miss.slice(0, 3).join("، ")}` : "";
+  }
+
   // ---------- drafts ----------
-  // shape: { batch, base?, summary?: {goal,status,next[],open[]}, decisions?: {add:[{text,source,replaces?}], revoke:[id]},
+  // shape: { batch, base?, summary?: {goal,status,next[],open[]}, decisions?: {add:[{text,source,quote?,replaces?}], revoke:[id]},
   //          constraints?: {add:[], remove:[]}, entry: {raised[], decided[], changed[]} }
   function validateDraft(d, expectBatch) {
     if (!isObj(d)) return { ok: false, error: "المسودة يجب أن تكون كائن JSON" };
@@ -145,7 +174,7 @@
     if (d.decisions !== undefined) {
       if (!isObj(d.decisions)) return { ok: false, error: "decisions يجب أن يكون كائناً فيه add و revoke" };
       const add = (Array.isArray(d.decisions.add) ? d.decisions.add : []).map((x) => (typeof x === "string" ? { text: x } : x)).filter(isObj)
-        .map((x) => ({ text: cleanStr(x.text), source: SOURCES.includes(x.source) ? x.source : "user", replaces: isId(x.replaces) ? x.replaces : "" }))
+        .map((x) => ({ text: cleanStr(x.text), source: SOURCES.includes(x.source) ? x.source : "user", replaces: isId(x.replaces) ? x.replaces : "", quote: cleanStr(x.quote, QUOTE_MAX) }))
         .filter((x) => x.text).slice(0, LIMITS.list);
       const revoke = (Array.isArray(d.decisions.revoke) ? d.decisions.revoke : []).filter(isId).slice(0, LIMITS.list);
       out.decisions = { add, revoke };
@@ -162,16 +191,20 @@
     return { ok: true, draft: out };
   }
 
-  // apply a validated draft. ctx: { platform, chat, range, date, allowSummary }
-  // returns { memory, applied, redacted, skipped[] } — never mutates its input
+  // apply a validated draft. ctx: { platform, chat, range, date, allowSummary, evidence?: {user, all} }
+  // With evidence (the conversation's text the writer has), each decision is checked (checkDecision); without it, none is.
+  // returns { memory, applied, redacted, skipped[], unverified: [{id, text, reason}] } — never mutates its input
   function applyDraft(memory, draft, ctx) {
     const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
-    if (m.log.some((e) => e.id === draft.batch)) return { memory: m, applied: false, redacted: false, skipped: ["already-applied"] };
+    if (m.log.some((e) => e.id === draft.batch)) return { memory: m, applied: false, redacted: false, skipped: ["already-applied"], unverified: [] };
     let redacted = false;
     const R = (s) => { const r = redact(s); if (r.changed) redacted = true; return r.text; };
     const RL = (l) => l.map(R);
-    const skipped = [];
+    const skipped = [], unverified = [];
     const date = ctx.date || "";
+    const ev = prepareEvidence(ctx.evidence);
+    // numbers the memory already holds may be restated without being in this part of the conversation
+    const known = ev ? asciiDigits([m.summary.goal, m.summary.status, ...m.summary.next, ...m.summary.open, ...m.decisions.map((d) => d.text + " " + d.quote), ...m.constraints, date].join(" ")) : "";
     if (draft.summary) {
       if (ctx.allowSummary) m.summary = { goal: R(draft.summary.goal), status: R(draft.summary.status), next: RL(draft.summary.next), open: RL(draft.summary.open) };
       else skipped.push("summary");
@@ -182,8 +215,12 @@
       for (const a of draft.decisions.add) {
         const text = R(a.text);
         if (m.decisions.some((d) => d.status === "active" && d.text === text)) continue; // same decision twice
-        if (a.replaces) { const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active"); if (old) { old.status = "revoked"; old.revokedOn = date; } }
-        m.decisions.push({ id: "d" + next++, text, source: a.source, date, status: "active", revokedOn: "", replaces: a.replaces });
+        const why = ev ? checkDecision(a, ev, known) : "";
+        // an unbacked decision never replaces one in force: it waits as a suggestion until the user approves it
+        if (a.replaces && !why) { const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active"); if (old) { old.status = "revoked"; old.revokedOn = date; } }
+        const id = "d" + next++;
+        m.decisions.push({ id, text, source: why ? "assistant" : a.source, date, status: "active", revokedOn: "", replaces: why ? "" : a.replaces, quote: R(a.quote || ""), unverified: !!why });
+        if (why) unverified.push({ id, text, reason: why });
       }
       m.decisions = m.decisions.slice(-LIMITS.decisions);
     }
@@ -195,7 +232,7 @@
       raised: RL(draft.entry.raised), decided: RL(draft.entry.decided), changed: RL(draft.entry.changed) });
     m.log = m.log.slice(-LIMITS.log);
     m.updated = date;
-    return { memory: m, applied: true, redacted, skipped };
+    return { memory: m, applied: true, redacted, skipped, unverified };
   }
 
   // a model's reply (browser extension) → draft fields. The reply holds a JSON object between two markers.
@@ -236,11 +273,11 @@
   const isSuggestion = (d) => d.status === "active" && d.source === "assistant";
   function renderSuggestions(m) {
     const l = m.decisions.filter(isSuggestion);
-    return l.length ? l.map((d) => `- **${d.id}** ${d.text}${d.date ? ` _(${d.date})_` : ""}`).join("\n") : "";
+    return l.length ? l.map((d) => `- **${d.id}** ${d.text}${d.unverified ? " ⚠️ لم يُعثر على دليله في المحادثة؛ راجعه" : ""}${d.date ? ` _(${d.date})_` : ""}`).join("\n") : "";
   }
   function renderDecisions(m, withRevoked) {
     const active = m.decisions.filter(isDecision);
-    let out = active.length ? active.map((d) => `- **${d.id}** ${d.text} _(${SOURCE_LABEL[d.source]}${d.date ? "، " + d.date : ""}${d.replaces ? "، يحل محل " + d.replaces : ""})_`).join("\n") : "لا قرارات سارية بعد.";
+    let out = active.length ? active.map((d) => `- **${d.id}** ${d.text} _(${SOURCE_LABEL[d.source]}${d.date ? "، " + d.date : ""}${d.replaces ? "، يحل محل " + d.replaces : ""})_${withRevoked && d.quote ? `\n  > «${d.quote}»` : ""}`).join("\n") : "لا قرارات سارية بعد.";
     const revoked = m.decisions.filter((d) => d.status === "revoked");
     if (withRevoked && revoked.length) out += "\n\n<details><summary>قرارات أُلغيت (" + revoked.length + ")</summary>\n\n" + revoked.map((d) => `- ~~${d.text}~~ _(أُلغي ${d.revokedOn || ""})_`).join("\n") + "\n\n</details>";
     return out;
@@ -330,7 +367,7 @@
     const find = (id) => { const d = m.decisions.find((x) => x.id === id); if (!d) missing.push(id); return d; };
     if (fix.decisions) {
       for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); changes.push(`عُدّل نص ${d.id}`); } }
-      for (const id of fix.decisions.approve) { const d = find(id); if (d && d.source === "assistant") { d.source = "assistant-approved"; changes.push(`اعتُمد الاقتراح ${id}`); } }
+      for (const id of fix.decisions.approve) { const d = find(id); if (d && d.source === "assistant") { d.source = "assistant-approved"; d.unverified = false; changes.push(`اعتُمد الاقتراح ${id}`); } }
       for (const id of fix.decisions.revoke) { const d = find(id); if (d && d.status === "active") { d.status = "revoked"; d.revokedOn = date || ""; changes.push(`أُلغي ${id}`); } }
       for (const id of fix.decisions.remove) { const before = m.decisions.length; m.decisions = m.decisions.filter((x) => x.id !== id); if (m.decisions.length < before) changes.push(`حُذف ${id} نهائياً`); else missing.push(id); }
     }
@@ -437,5 +474,5 @@
   function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: cut(wellFormed(mdText), LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
-    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines, count, W, PROTOCOL };
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines, count, W, PROTOCOL, evNorm, numbersIn, QUOTE_MAX };
 });

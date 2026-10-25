@@ -21,6 +21,7 @@
     .panel .opt{display:flex;gap:6px;align-items:flex-start;margin:3px 0;font-size:12px;cursor:pointer}.panel .opt input{width:auto;margin:2px 0 0}
     .panel .opt .tag{color:#9a6700;font-size:11px}
     .panel h4{margin:8px 0 2px;font-size:12px;color:#57606a}
+    .rv{border-top:1px solid #d0d7de;padding-top:6px;margin-top:6px}.rv button{display:inline-block;width:auto;margin:0 0 0 6px}
     .share-prev{max-height:150px}.count{font-size:11px;color:#57606a;text-align:left}
     :host(.side-left) .pill,:host(.side-left) .panel,:host(.side-left) .toast{right:auto;left:16px}
     .toast{position:fixed;right:16px;bottom:56px;z-index:2147483647;direction:rtl;font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
@@ -34,6 +35,7 @@
   const hhmm = (t) => (t ? new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 
   const SHARE = ["📤 انقل معلومات مختارة إلى هذه المحادثة", "share"];
+  const REVIEW = (k) => [`🔎 راجع القرارات (${k})`, "review"];
   // the pill text, its colour, the panel text and its buttons for a view — pure, easy to reason about
   function describe(v, settings, why, maxAttempts) {
     const s = v.st || {};
@@ -74,6 +76,9 @@
       btns.push(["↩️ تراجع عن آخر تغيير في الذاكرة", "undo"]);
       btns.push(["⛓️ فك ربط المحادثة بالمشروع", "unlink"]);
     }
+    // decisions saved without evidence in the conversation wait for the user: said once, with one button
+    const rv = (v.phase === "chat" || v.phase === "new") && v.review ? v.review.length : 0;
+    if (rv) { text += ` · 🔎${rv}`; info += `<br><span class="muted">🔎 ${rv === 1 ? "قرار ينتظر" : rv === 2 ? "قراران ينتظران" : n(rv, "decision") + " تنتظر"} مراجعتك: لم أجد ${rv === 1 ? "دليله" : rv === 2 ? "دليلهما" : "دليلها"} في كلامك، فحُفظ اقتراحاً.</span>`; btns.unshift(REVIEW(rv)); }
     if (v.crash) { cls = "err"; info = "خطأ داخلي: " + esc(v.crash); }
     btns.push(["⚙️ الإعدادات", "options"]);
     return { cls, text, info, btns };
@@ -124,6 +129,16 @@
       closePin();
       opts.onPinSave(name, text);
     }
+    // decisions waiting for review: each with the words it was saved from, approve or revoke one at a time
+    function openReview(list) {
+      render();
+      share = { review: true };
+      const item = (d) => `<div class="rv"><p><b><bdi>${esc(d.id)}</bdi></b> ${esc(d.text)}${d.quote ? `<br><span class="muted">الاقتباس: ${q(d.quote)}</span>` : `<br><span class="muted">بلا اقتباس</span>`}</p>` +
+        `<button type="button" data-a="rv-approve" data-id="${esc(d.id)}">✓ اعتمده قراراً</button><button type="button" data-a="rv-revoke" data-id="${esc(d.id)}">✕ ألغِه</button></div>`;
+      panel.innerHTML = `<p><b>🔎 قرارات تنتظر مراجعتك</b><br><span class="muted">كتبها النموذج قراراً لك، ولم أجد كلامك الذي يثبتها في المحادثة. اعتمد الصحيح وألغِ الخطأ.</span></p>` +
+        list.map(item).join("") + `<button type="button" data-a="pin-cancel">إغلاق</button>`;
+      panel.classList.add("open", "wide");
+    }
     // choose parts of the project's memory, see exactly what will be inserted (and its length), then insert — never sent
     // m: the memory; o: { preview(sel) → text, budget, onInsert(text) }
     function openShare(m, o) {
@@ -166,11 +181,16 @@
       const a = b.dataset.a;
       if (a === "pin-save") return savePin();
       if (a === "pin-cancel") return closePin();
+      if (a === "rv-approve" || a === "rv-revoke") {
+        b.disabled = true;
+        Promise.resolve(opts.onReview(b.dataset.id, a === "rv-approve" ? "approve" : "revoke")).then((left) => { if (left && left.length) openReview(left); else closePin(); });
+        return;
+      }
       if (a === "share-insert") { if (!share || !share.text) { toast("اختر شيئاً أولاً."); return; } const { o, text } = share; closePin(); o.onInsert(text); return; }
       setOpen(false);
       opts.onAction(a);
     });
-    return { host, render, toast, openPin, openShare };
+    return { host, render, toast, openPin, openShare, openReview };
   }
 
   (root.CM = root.CM || {}).ui = { create, describe };

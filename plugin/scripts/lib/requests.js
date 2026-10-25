@@ -58,6 +58,7 @@ function statusText(s, mem, backups, cfg) {
     `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}${cfg.mode === "auto" ? "/" + cfg.every : ""}، آخر تحديث للملخص: ${s.lastSave || "لا يوجد بعد"}${s.lastCapture ? `، آخر نسخ للنص: ${s.lastCapture}` : ""}\n` +
     `- الكلفة: ${costText(s)}\n` +
     `- بانتظار الحفظ: ${by("pending")}\n- متعثرة: ${by("stuck")}${s.lastError ? ` (آخر خطأ: ${s.lastError})` : ""}\n- نُسخت قبل الضغط/الإغلاق: ${by("captured")}\n` +
+    (m && m.decisions.some((d) => d.status === "active" && d.unverified) ? `- ⚠️ تنتظر مراجعتك (لم يُعثر على دليلها في المحادثة): ${m.decisions.filter((d) => d.status === "active" && d.unverified).map((d) => `${d.id} «${d.text.slice(0, 60)}»`).join("، ")} — اعتمدها أو ألغها بـ /conversation-memory:fix\n` : "") +
     (m ? `- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => `${p.name} (ن${p.version})`).join("، ") || "لا شيء"}، دفعات السجل: ${m.log.length}\n` : "") +
     `- النسخ السابقة (للاسترجاع: /conversation-memory:restore رقم، أو /conversation-memory:undo للأحدث):\n${backupsText(backups || [])}\n` +
     `- البيانات الخاصة: ${PRIV}`;
