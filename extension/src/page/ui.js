@@ -5,12 +5,12 @@
   "use strict";
   const CSS = `
     :host{all:initial}
-    .pill{position:fixed;left:12px;bottom:96px;z-index:2147483646;font:12px/1.4 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;direction:rtl;
+    .pill{position:fixed;right:16px;bottom:96px;z-index:2147483646;font:12px/1.4 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;direction:rtl;
       background:#1f2328;color:#f6f8fa;border-radius:999px;padding:6px 12px;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;user-select:none;opacity:.92;border:0}
     .pill:hover{opacity:1}.pill:focus-visible{opacity:1;outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px #0969da}
     .panel button:focus-visible,.panel input:focus-visible{outline:2px solid #0969da;outline-offset:1px}
     .ok{background:#1a7f37}.txt{background:#1b7c83}.warn{background:#9a6700}.err{background:#cf222e}.busy{background:#0969da}.idle{background:#57606a}
-    .panel{position:fixed;left:12px;bottom:132px;z-index:2147483647;direction:rtl;font:13px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
+    .panel{position:fixed;right:16px;bottom:132px;z-index:2147483647;direction:rtl;font:13px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
       background:#fff;color:#1f2328;border:1px solid #d0d7de;border-radius:10px;padding:12px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none}
     .panel.open{display:block}.panel p{margin:0 0 8px;overflow-wrap:anywhere}
     .panel button{display:block;width:100%;margin:6px 0 0;padding:7px 8px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;color:#1f2328;cursor:pointer;font:inherit;text-align:right}
@@ -22,7 +22,8 @@
     .panel .opt .tag{color:#9a6700;font-size:11px}
     .panel h4{margin:8px 0 2px;font-size:12px;color:#57606a}
     .share-prev{max-height:150px}.count{font-size:11px;color:#57606a;text-align:left}
-    .toast{position:fixed;left:12px;bottom:56px;z-index:2147483647;direction:rtl;font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
+    :host(.side-left) .pill,:host(.side-left) .panel,:host(.side-left) .toast{right:auto;left:16px}
+    .toast{position:fixed;right:16px;bottom:56px;z-index:2147483647;direction:rtl;font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   const fmt = (n) => Number(n || 0).toLocaleString("en-US");
   const q = (t) => `«<bdi>${esc(t)}</bdi>»`;   // a name inside Arabic text keeps its own direction (English names, numbers)
@@ -95,6 +96,8 @@
       if (view) last = { view, settings };
       if (!document.body) return;
       if (!host.isConnected) document.body.appendChild(host);
+      // the side away from the site's sidebar: on the right of a left-to-right page, on the left of a right-to-left one
+      host.classList.toggle("side-left", getComputedStyle(document.documentElement).direction === "rtl" || document.documentElement.dir === "rtl");
       if (pinDraft || share) return;   // don't redraw over the pin form or the share panel
       const d = describe(last.view, last.settings, opts.why, opts.maxAttempts);
       pill.className = "pill " + d.cls; pill.textContent = d.text; pill.setAttribute("aria-expanded", String(panel.classList.contains("open")));
