@@ -753,7 +753,7 @@ test("evidence: a decision is saved as the user's only when the conversation bac
   const r = run("stop", { session_id: "ev", cwd: P, transcript_path: tp });
   const d = memJson(P).decisions;
   assert.deepEqual(d.map((x) => [x.source, x.unverified]), [["user", false], ["assistant", true], ["assistant", true]]);
-  assert.match(all(r), /🔎[\s\S]*d2[\s\S]*رقم لا يظهر[\s\S]*d3[\s\S]*الاقتباس ليس من كلامك/);
+  assert.match(all(r), /🔎[\s\S]*d2[\s\S]*رقم لا يظهر[\s\S]*d3[\s\S]*الاقتباس غير موجود/);
   const st = run("prompt", { session_id: "ev", cwd: P, prompt: "/conversation-memory:status", prompt_id: "pst" });
   assert.match(ctx(st), /تنتظر مراجعتك[\s\S]*d2[\s\S]*d3/);
   assert.match(memMd(P), /> «نعتمد اسم سكر وهيل»/);

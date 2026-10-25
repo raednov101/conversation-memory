@@ -593,8 +593,8 @@ with sync_playwright() as pw:
     rv = wait(lambda: (lambda t: t if "الاقتباس" in t else None)(p.locator("#cm-memory-indicator .panel").inner_text()), 8) or p.locator("#cm-memory-indicator .panel").inner_text()
     ok("اعتماد اللون الأزرق الداكن" in rv and "اعتمدنا اللون الأزرق الداكن" in rv, "the review panel shows the decision and the words it was saved from", rv[:300])
     p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").click()
-    ja = wait(lambda: (lambda j: j if j and j["decisions"][0]["source"] == "assistant-approved" else None)(mem(proj)), 10) or mem(proj) or {}
-    ok(ja.get("decisions") and ja["decisions"][0]["source"] == "assistant-approved" and not ja["decisions"][0].get("unverified"), "approving it makes it «a suggestion you approved», and the mark goes", ja.get("decisions"))
+    ja = wait(lambda: (lambda j: j if j and not j["decisions"][0].get("unverified") else None)(mem(proj)), 10) or mem(proj) or {}
+    ok(ja.get("decisions") and ja["decisions"][0]["source"] == "user" and not ja["decisions"][0].get("unverified"), "approving it makes it what it claimed to be (your decision), and the mark goes", ja.get("decisions"))
     ok(wait(lambda: "🔎" not in pill(p), 15), "…and the indicator no longer asks for review", pill(p))
     ok("النص الكامل محفوظ" in panel_text(p) and "آخر تحديث للملخص" in panel_text(p), "…and the panel tells the two apart")
     opt.evaluate("async () => { const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, mode: 'manual' } }); }")
@@ -625,8 +625,9 @@ with sync_playwright() as pw:
 
     print("— with your own API key: summarized in the background, nothing typed into the chat —")
     proj = "proj-key"; use_folder(proj)
-    opt.evaluate("""async () => { await chrome.storage.local.set({ byokKey: { provider: 'anthropic', model: 'test-model', key: 'test-key-0123456789abcdef' } });
-        const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, byok: true } }); }""")
+    opt.evaluate(f"""async () => {{ const kv = {KV}; await kv('byokKey', {{ provider: 'anthropic', model: 'test-model', key: 'test-key-0123456789abcdef' }});
+        const {{ settings = {{}} }} = await chrome.storage.local.get('settings'); await chrome.storage.local.set({{ settings: {{ ...settings, byok: true }} }}); }}""")
+    ok(not opt.evaluate("async () => JSON.stringify(await chrome.storage.local.get(null))").count("test-key"), "the key is not in the storage the chat sites' scripts can read")
     p = ctx.new_page(); p.goto(BASE + new_chat("chatgpt", "/c/chat-key/", "مفتاح - ChatGPT"))
     wait(lambda: "🧠" in pill(p), 10)
     for i in range(1, 5): say(p, f"مفتاح {i}")
@@ -639,7 +640,7 @@ with sync_playwright() as pw:
     ok("<conversation>" in call.get("text", "") and "مفتاح 3" in call.get("text", "") and "test-key" not in call.get("text", ""), "the messages travel with the request as data, the key never in the text", call.get("text", "")[:200])
     ok(jk.get("decisions") and jk["decisions"][0]["source"] == "user", "…and the decision, backed by your words, is yours", jk.get("decisions"))
     ok(wait(lambda: "✓" in pill(p), 10) and "بمفتاحك" in panel_text(p), "the indicator says it was summarized with your key", panel_text(p))
-    opt.evaluate("""async () => { await chrome.storage.local.remove('byokKey'); const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, byok: false } }); }""")
+    opt.evaluate(f"""async () => {{ const kv = {KV}; await kv('byokKey', null); const {{ settings = {{}} }} = await chrome.storage.local.get('settings'); await chrome.storage.local.set({{ settings: {{ ...settings, byok: false }} }}); }}""")
     p.close()
 
     print("— the site changed its page: the conversation is read from the site's own data —")

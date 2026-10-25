@@ -30,3 +30,8 @@ test("claude.ai: the branch ending at the current leaf; text blocks only (no thi
   assert.equal(claudeTurns({ chat_messages: [{ uuid: "b", sender: "assistant", index: 1, text: "2" }, { uuid: "a", sender: "human", index: 0, text: "1" }] }).map((t) => t.text).join(), "1,2", "no leaf: the site's order");
   assert.equal(claudeTurns({ messages: [] }), null);
 });
+
+test("a message of yours with no text (an image, a file) still counts, so messages are numbered as on the page", () => {
+  const j = { chat_messages: [{ uuid: "a", sender: "human", index: 0, text: "", content: [{ type: "image" }] }, { uuid: "b", sender: "assistant", index: 1, text: "صورة جميلة" }, { uuid: "c", sender: "human", index: 2, text: "التالي" }] };
+  assert.deepEqual(claudeTurns(j).map((t) => t.role), ["user", "assistant", "user"]);
+});

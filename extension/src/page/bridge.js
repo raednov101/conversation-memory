@@ -14,7 +14,8 @@
   b.set = async (k, v) => { try { await chrome.storage.local.set({ [k]: v }); } catch { b.dead = true; } };
   // a short technical diary for bug reports: what happened, never what was said (no message text, no memory content).
   // Kept in the extension's storage (last 60 events); exported from the settings page, or attached to «أبلغ».
-  const scrub = (t) => String(t || "").replace(/"[^"]*"|«[^»]*»|'[^']*'/g, "…").slice(0, 100);
+  // only the kind of error: the text before its first colon (a parser's message after it may quote the reply), no quotes
+  const scrub = (t) => String(t || "").split(/[:：—]/)[0].replace(/"[^"]*"|«[^»]*»|'[^']*'/g, "…").replace(/["'«»]/g, "").slice(0, 80);
   b.diag = async (kind, detail) => {
     try { const l = (await chrome.storage.local.get("diag")).diag || [], last = l[l.length - 1];
       if (last && last.kind === String(kind).slice(0, 30) && last.detail === scrub(detail) && Date.now() - Date.parse(last.t + "Z") < 600000) return;   // the same thing again: once per 10 minutes

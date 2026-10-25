@@ -103,6 +103,8 @@
       id: isId(d.id) ? d.id : "", text: cleanStr(d.text), source: SOURCES.includes(d.source) ? d.source : "user",
       date: cleanStr(d.date, 40), status: d.status === "revoked" ? "revoked" : "active", revokedOn: cleanStr(d.revokedOn, 40), replaces: isId(d.replaces) ? d.replaces : "",
       quote: cleanStr(d.quote, QUOTE_MAX), unverified: d.unverified === true,
+      ...(d.unverified === true && (d.claimed === "user" || d.claimed === "assistant-approved") ? { claimed: d.claimed } : {}),
+      ...(d.unverified === true && isId(d.pendingReplaces) ? { pendingReplaces: d.pendingReplaces } : {}),
     })).filter((d) => d.text).slice(-LIMITS.decisions);
     let next = 1 + Math.max(0, ...m.decisions.map((d) => +String(d.id).slice(1) || 0));
     for (const d of m.decisions) { if (!d.id || seen.has(d.id)) d.id = "d" + next++; seen.add(d.id); }
@@ -134,27 +136,44 @@
   // The model writes the summary, so it can misattribute or invent. Each decision carries a short verbatim quote; the writer
   // checks it against the conversation it actually has, and checks that the decision's numbers appear there too.
   // A decision that fails is kept, but as an unapproved suggestion marked for review — nothing is lost, nothing is overstated.
-  const QUOTE_MAX = 300, QUOTE_MIN = 4;
+  const QUOTE_MAX = 300, QUOTE_MIN = 4, APPROVAL_MIN = 2;   // a decision is stated in a few words; an approval may be «نعم» or «ok»
   const DIGITS = { "٠": 0, "١": 1, "٢": 2, "٣": 3, "٤": 4, "٥": 5, "٦": 6, "٧": 7, "٨": 8, "٩": 9, "۰": 0, "۱": 1, "۲": 2, "۳": 3, "۴": 4, "۵": 5, "۶": 6, "۷": 7, "۸": 8, "۹": 9 };
   const asciiDigits = (t) => String(t).replace(/[٠-٩۰-۹]/g, (c) => DIGITS[c]).replace(/(\d)[,٬'](?=\d{3}(?!\d))/g, "$1");
-  // spelling-insensitive: no diacritics or tatweel, one alef/yaa/haa, no punctuation or markdown, single spaces
-  const evNorm = (t) => asciiDigits(t).toLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
-    .replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  // numbers of 2+ digits that state something (not decision ids like d12, not colour codes like #556B2F)
-  const numbersIn = (t) => [...new Set(asciiDigits(t).match(/(?<![A-Za-z#\d])\d{2,}/g) || [])];
+  // spelling-insensitive: one Unicode form, no diacritics or tatweel, one alef/yaa/haa/kaf, no punctuation or markdown, single spaces
+  const evNorm = (t) => asciiDigits(String(t).normalize("NFKC")).toLowerCase().replace(/[ً-ٰٟـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/[ىی]/g, "ي").replace(/ة/g, "ه")
+    .replace(/ک/g, "ك").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  // The numbers a text states, as whole values (never a substring: «500» is not in «1500»). Numbers of 2+ digits only —
+  // single digits are as often spelled out («ثلاثة») as written, and would flag real decisions. Not decision ids (d12) or
+  // colour codes (#556B2F). The same amount written another way counts as one: «40 ألف» = 40000 = «40k»; a month's name = its number.
+  const MONTHS = [["يناير", "كانون الثاني", "january", "jan"], ["فبراير", "شباط", "february", "feb"], ["مارس", "آذار", "march", "mar"], ["ابريل", "أبريل", "نيسان", "april", "apr"], ["مايو", "أيار", "may"], ["يونيو", "حزيران", "june", "jun"],
+    ["يوليو", "تموز", "july", "jul"], ["اغسطس", "أغسطس", "آب", "august", "aug"], ["سبتمبر", "أيلول", "september", "sep"], ["اكتوبر", "أكتوبر", "تشرين الأول", "october", "oct"], ["نوفمبر", "تشرين الثاني", "november", "nov"], ["ديسمبر", "كانون الأول", "december", "dec"]];
+  const SCALE = /^\s*(k|K|ألف|الف|آلاف|الاف|ألفاً|ألفا|الفا|m|M|مليون|ملايين)(?![\p{L}])/u;
+  function numbersIn(t, expand) {
+    const s = asciiDigits(String(t).normalize("NFKC")), out = new Set();
+    const re = /(?<![A-Za-z#\d.])(\d+(?:\.\d+)?)/g; let m;
+    while ((m = re.exec(s))) {
+      const v = +m[1], sc = s.slice(re.lastIndex).match(SCALE), mul = sc ? (/^(m|M|مليون|ملايين)$/u.test(sc[1]) ? 1e6 : 1e3) : 1;
+      if (m[1].replace(".", "").length >= 2 || mul > 1) out.add(String(v * mul));
+      if (expand) { out.add(String(v)); if (v * mul >= 1000 && (v * mul) % 1000 === 0) out.add(String(v * mul / 1000)); if (v * mul >= 1e6 && (v * mul) % 1e6 === 0) out.add(String(v * mul / 1e6)); }
+    }
+    if (expand) { const low = evNorm(s); MONTHS.forEach((names, i) => { if (names.some((n) => low.includes(evNorm(n)))) { out.add(String(i + 1)); out.add(String(i + 1).padStart(2, "0")); } }); }
+    if (!expand) return [...out].filter((n) => !/^\d$/.test(n));
+    return out;
+  }
   function prepareEvidence(ev) {
     if (!isObj(ev) || typeof ev.all !== "string" || !ev.all.trim()) return null;
     const all = evNorm(ev.all);
-    return { user: typeof ev.user === "string" ? evNorm(ev.user) : all, all, digits: asciiDigits(ev.all) };
+    return { user: typeof ev.user === "string" ? evNorm(ev.user) : all, all, numbers: numbersIn(ev.all, true) };
   }
-  // → "" when backed, else the reason (in Arabic, shown to the user)
+  // → "" when backed, else the reason (in Arabic, shown to the user). Every quote must be the user's own words: for a
+  // decision, the words that state it; for an approved suggestion, the words that approve it.
   function checkDecision(a, ev, known) {
     const q = evNorm(a.quote || "");
     if (a.source !== "assistant") {
-      if (q.replace(/\s/g, "").length < QUOTE_MIN) return "بلا اقتباس من المحادثة";
-      if (!(a.source === "user" ? ev.user : ev.all).includes(q)) return a.source === "user" ? "الاقتباس ليس من كلامك في المحادثة" : "الاقتباس غير موجود في المحادثة";
+      if (q.replace(/\s/g, "").length < (a.source === "user" ? QUOTE_MIN : APPROVAL_MIN)) return "بلا اقتباس من كلامك";
+      if (!ev.user.includes(q)) return ev.all.includes(q) ? "الاقتباس ليس من كلامك في المحادثة" : "الاقتباس غير موجود في المحادثة";
     }
-    const miss = numbersIn(a.text).filter((n) => !ev.digits.includes(n) && !known.includes(n));
+    const miss = numbersIn(a.text, false).filter((n) => !ev.numbers.has(n) && !known.has(n));
     return miss.length ? `رقم لا يظهر في المحادثة: ${miss.slice(0, 3).join("، ")}` : "";
   }
 
@@ -203,8 +222,9 @@
     const skipped = [], unverified = [];
     const date = ctx.date || "";
     const ev = prepareEvidence(ctx.evidence);
-    // numbers the memory already holds may be restated without being in this part of the conversation
-    const known = ev ? asciiDigits([m.summary.goal, m.summary.status, ...m.summary.next, ...m.summary.open, ...m.decisions.map((d) => d.text + " " + d.quote), ...m.constraints, date].join(" ")) : "";
+    // numbers already established may be restated without being in this part of the conversation: those of decisions in
+    // force that were backed (never the model-written summary, never a flagged decision), constraints, and this year
+    const known = ev ? numbersIn([...m.decisions.filter((d) => d.status === "active" && !d.unverified).map((d) => d.text + " " + d.quote), ...m.constraints, String(date).slice(0, 4)].join(" "), true) : null;
     if (draft.summary) {
       if (ctx.allowSummary) m.summary = { goal: R(draft.summary.goal), status: R(draft.summary.status), next: RL(draft.summary.next), open: RL(draft.summary.open) };
       else skipped.push("summary");
@@ -216,10 +236,12 @@
         const text = R(a.text);
         if (m.decisions.some((d) => d.status === "active" && d.text === text)) continue; // same decision twice
         const why = ev ? checkDecision(a, ev, known) : "";
-        // an unbacked decision never replaces one in force: it waits as a suggestion until the user approves it
+        // an unbacked decision never replaces one in force: it waits as a suggestion until the user approves it — and then
+        // it becomes what the model said it was (the user's decision, or an approved suggestion) and replaces what it meant to
         if (a.replaces && !why) { const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active"); if (old) { old.status = "revoked"; old.revokedOn = date; } }
         const id = "d" + next++;
-        m.decisions.push({ id, text, source: why ? "assistant" : a.source, date, status: "active", revokedOn: "", replaces: why ? "" : a.replaces, quote: R(a.quote || ""), unverified: !!why });
+        m.decisions.push({ id, text, source: why ? "assistant" : a.source, date, status: "active", revokedOn: "", replaces: why ? "" : a.replaces, quote: R(a.quote || ""), unverified: !!why,
+          ...(why && a.source !== "assistant" ? { claimed: a.source } : {}), ...(why && a.replaces ? { pendingReplaces: a.replaces } : {}) });
         if (why) unverified.push({ id, text, reason: why });
       }
       m.decisions = m.decisions.slice(-LIMITS.decisions);
@@ -367,7 +389,13 @@
     const find = (id) => { const d = m.decisions.find((x) => x.id === id); if (!d) missing.push(id); return d; };
     if (fix.decisions) {
       for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); changes.push(`عُدّل نص ${d.id}`); } }
-      for (const id of fix.decisions.approve) { const d = find(id); if (d && d.source === "assistant") { d.source = "assistant-approved"; d.unverified = false; changes.push(`اعتُمد الاقتراح ${id}`); } }
+      for (const id of fix.decisions.approve) { const d = find(id); if (d && d.source === "assistant") {
+        // a flagged decision, approved: it is what the model said it was, and it replaces what it was meant to replace
+        d.source = d.unverified && d.claimed ? d.claimed : "assistant-approved";
+        if (d.unverified && d.pendingReplaces) { const old = m.decisions.find((x) => x.id === d.pendingReplaces && x.status === "active" && x !== d); if (old) { old.status = "revoked"; old.revokedOn = date || ""; changes.push(`أُلغي ${old.id} (حلّ محله ${id})`); } d.replaces = d.pendingReplaces; }
+        d.unverified = false; delete d.claimed; delete d.pendingReplaces;
+        changes.push(`اعتُمد ${id}`);
+      } }
       for (const id of fix.decisions.revoke) { const d = find(id); if (d && d.status === "active") { d.status = "revoked"; d.revokedOn = date || ""; changes.push(`أُلغي ${id}`); } }
       for (const id of fix.decisions.remove) { const before = m.decisions.length; m.decisions = m.decisions.filter((x) => x.id !== id); if (m.decisions.length < before) changes.push(`حُذف ${id} نهائياً`); else missing.push(id); }
     }

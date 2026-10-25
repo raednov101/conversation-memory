@@ -210,8 +210,12 @@ $("diagExport").addEventListener("click", async () => {
 // ---------- optional: summaries in the background with your own API key ----------
 const MODEL = { anthropic: "claude-haiku-5-5", openai: "gpt-5-mini" };
 const ORIGIN = { anthropic: "https://api.anthropic.com/*", openai: "https://api.openai.com/*" };
+// the key is kept in the extension's own database (its origin), which the scripts running on the chat sites can't open
+const keyGet = () => kv("byokKey").catch(() => undefined);
+const keyPut = (v) => kv("byokKey", v);
+async function keyDel() { const db = await idb(); await new Promise((res) => { const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").delete("byokKey"); tx.oncomplete = res; tx.onerror = res; }); }
 async function loadKey() {
-  const { byokKey: k } = await chrome.storage.local.get("byokKey"), { settings: s = {} } = await chrome.storage.local.get("settings");
+  const k = await keyGet(), { settings: s = {} } = await chrome.storage.local.get("settings");
   $("provider").value = (k && k.provider) || "anthropic";
   $("model").value = (k && k.model) || MODEL[$("provider").value];
   $("apiKey").value = ""; $("apiKey").placeholder = k && k.key ? "محفوظ ••••" + k.key.slice(-4) : "sk-…";
@@ -219,13 +223,14 @@ async function loadKey() {
 }
 $("provider").addEventListener("change", () => { if (Object.values(MODEL).includes($("model").value) || !$("model").value) $("model").value = MODEL[$("provider").value]; });
 $("keySave").addEventListener("click", async () => {
-  const provider = $("provider").value, model = $("model").value.trim() || MODEL[provider];
-  const { byokKey: old } = await chrome.storage.local.get("byokKey");
-  const key = $("apiKey").value.trim() || (old && old.provider === provider ? old.key : "");
-  if (!/^[\x21-\x7e]{20,300}$/.test(key)) { say("keyMsg", "اكتب المفتاح أولاً."); return; }
+  const provider = $("provider").value, model = $("model").value.trim() || MODEL[provider], typed = $("apiKey").value.trim();
+  // asked first, while the click still counts as yours (the browser refuses a permission request after other waits)
   let granted = false; try { granted = await chrome.permissions.request({ origins: [ORIGIN[provider]] }); } catch {}
   if (!granted) { say("keyMsg", "لم يُمنح إذن الاتصال بموقع المزوّد، فلم يُفعَّل."); return; }
-  await chrome.storage.local.set({ byokKey: { provider, model, key } });
+  const old = await keyGet();
+  const key = typed || (old && old.provider === provider ? old.key : "");
+  if (!/^[\x21-\x7e]{20,300}$/.test(key)) { say("keyMsg", "اكتب المفتاح أولاً."); return; }
+  await keyPut({ provider, model, key });
   const { settings: s = {} } = await chrome.storage.local.get("settings");
   await chrome.storage.local.set({ settings: { ...s, byok: true } });
   loadKey();
@@ -236,8 +241,8 @@ $("keyTest").addEventListener("click", async () => {
   say("keyMsg", r && r.ok ? `✓ المفتاح يعمل (${r.model}).` : `لم ينجح: ${(r && r.error) || "خطأ غير معروف"}`);
 });
 $("keyOff").addEventListener("click", async () => {
-  const { byokKey: k } = await chrome.storage.local.get("byokKey");
-  await chrome.storage.local.remove("byokKey");
+  const k = await keyGet();
+  await keyDel();
   const { settings: s = {} } = await chrome.storage.local.get("settings");
   await chrome.storage.local.set({ settings: { ...s, byok: false } });
   if (k && ORIGIN[k.provider]) chrome.permissions.remove({ origins: [ORIGIN[k.provider]] }).catch(() => {});

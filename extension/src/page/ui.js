@@ -190,7 +190,11 @@
       if (a === "pin-cancel") return closePin();
       if (a === "rv-approve" || a === "rv-revoke") {
         b.disabled = true;
-        Promise.resolve(opts.onReview(b.dataset.id, a === "rv-approve" ? "approve" : "revoke")).then((left) => { if (left && left.length) openReview(left); else closePin(); });
+        Promise.resolve(opts.onReview(b.dataset.id, a === "rv-approve" ? "approve" : "revoke")).then((r) => {
+          if (!share || !share.review) return;            // closed meanwhile: leave it closed
+          if (!r || !r.ok) { b.disabled = false; return; } // nothing changed: the button works again
+          if (r.list && r.list.length) openReview(r.list); else closePin();
+        });
         return;
       }
       if (a === "share-insert") { if (!share || !share.text) { toast("اختر شيئاً أولاً."); return; } const { o, text } = share; closePin(); o.onInsert(text); return; }

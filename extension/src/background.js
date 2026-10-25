@@ -9,8 +9,15 @@ const DEFAULTS = { every: 10, mode: "auto", paused: false, autoLink: true, byok:
 // The key stays in the extension's local storage and goes only to the provider the user chose. Nothing passes through us.
 const API = self.CM_TEST_API || { anthropic: "https://api.anthropic.com/v1/messages", openai: "https://api.openai.com/v1/chat/completions" };
 const MODELS = { anthropic: "claude-haiku-5-5", openai: "gpt-5-mini" };   // small, cheap models; the user may name another in the settings
+// the key lives in the extension's own database (options.js writes it): the chat sites' content scripts can't open it
+const keyGet = () => new Promise((res) => {
+  const r = indexedDB.open("cm", 1);
+  r.onupgradeneeded = () => r.result.createObjectStore("kv");
+  r.onerror = () => res(undefined);
+  r.onsuccess = () => { try { const q = r.result.transaction("kv").objectStore("kv").get("byokKey"); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); } catch { res(undefined); } };
+});
 async function byok(text, maxTokens) {
-  const { byokKey: c } = await chrome.storage.local.get("byokKey");
+  const c = await keyGet();
   if (!c || !c.key || !API[c.provider]) return { ok: false, error: "لا يوجد مفتاح محفوظ؛ أضفه من الإعدادات" };
   const model = String(c.model || MODELS[c.provider]).slice(0, 80);
   const hide = (t) => String(t || "").split(c.key).join("(المفتاح)").slice(0, 200);

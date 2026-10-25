@@ -76,6 +76,7 @@
 
   // ---------- the main loop: one pass over the page ----------
   let busy = false, view = {}, seen = { url: "", at: 0 }, saves = 0, saveCount = 0, lastHealth = "";
+  const dataHelps = new Map();
   async function tick(force = {}) {
     if (B.dead) { view = { ...view, fsSt: { ok: false, error: "inactive" } }; ui.render(view, settings); return; }   // updated or reloaded extension: say so, offer a reload
     if (busy) return;
@@ -97,9 +98,11 @@
       const pageBroken = (page.total === 0 && waited > DATA_AFTER_MS) || (page.userCount > 0 && !page.turns.some((x) => x.role === "assistant") && !gen && waited > UNREADABLE_MS);
       let src = "page", R = page, dataErr = "";
       if (pageBroken && M.sitedata) {
-        const dd = await M.sitedata.read(A.platform, id);
+        // asked again every 10 s while it helps; once a minute while it doesn't (a failed reply, a chat the site won't give)
+        const dd = await M.sitedata.read(A.platform, id, dataHelps.get(id) ? 10000 : 60000);
         if (dd.turns) { const fromData = M.reader.read({ messages: () => dd.turns }, HK); if (fromData.total > page.total) { R = fromData; src = "data"; } }
         else dataErr = dd.error || "";
+        dataHelps.set(id, src === "data");
       }
       const { turns, hk, userCount, total, uh, rh, empty } = R;
       const health = src === "data" ? "data" : total === 0 && waited > UNREADABLE_MS ? "unreadable" : "page";
@@ -175,10 +178,20 @@
       //    With your own API key it is asked in the background instead: nothing is typed, nothing appears in the chat.
       const d = POL.due(settings, st, userCount);
       const r3 = apiResults.get(key);
-      if (r3) { apiResults.delete(key); if (r3.ok) saved(st, r3.w, r3.note, r3.replyLen); else if (!r3.busy) fail(st, r3.error, userCount); }
+      if (r3) {
+        apiResults.delete(key);
+        // the chat changed while the summary was being made (an edit, a regenerated reply, another tab's save): don't move
+        // forward on it — the change is summarized again from where it happened
+        const stale = r3.ok && (st.summarizedUpTo !== r3.from - 1 || JSON.stringify(st.rewound || null) !== JSON.stringify(r3.rewound || null) ||
+          (src === r3.w.src && rh[r3.to - 1] !== r3.w.rhashes[r3.to - 1]));
+        if (stale) st.note = "تغيّرت المحادثة أثناء التلخيص؛ سيُلخَّص ما تغيّر من موضعه.";
+        else if (r3.ok) saved(st, r3.w, r3.note, r3.replyLen);
+        else if (r3.later) apiWait.set(key, Date.now() + r3.later);
+        else fail(st, r3.error, userCount);
+      }
       const want = (force.summarize || (d.isDue && d.auto)) && d.unsent && !st.pending && lastDone && !loading;
-      if (want && settings.byok && !r3) {
-        if (!apiJobs.has(key)) apiSummarize({ key, from: st.summarizedUpTo + 1, to: userCount, turns, uh, rh, src, rewound: st.rewound, label });
+      if (want && settings.byok && !r3 && !(apiWait.get(key) > Date.now())) {
+        if (!apiJobs.has(key)) apiSummarize({ key, from: st.summarizedUpTo + 1, to: userCount, turns, uh, rh, src, rewound: st.rewound, label, project: PID, scope: B.scope, scopeName: B.scopeName });
       }
       else if (want && !settings.byok && c && !CP.text(c)) {
         const claim = await B.call({ cmd: "claim", key: PID + ":" + key, ttl: TIMEOUT + 20000 });
@@ -211,25 +224,28 @@
 
   // ---------- with your own API key: the summary is asked in the background (background.js talks to the provider) ----------
   // The job never writes the chat's state itself (the page loop does, from apiResults), so the two can't overwrite each other.
-  const apiJobs = new Set(), apiResults = new Map();
+  const apiJobs = new Set(), apiResults = new Map(), apiWait = new Map();
   async function apiSummarize(o) {
     apiJobs.add(o.key); schedule(50);
+    // the project and the site project are those of the moment it started, even if you move to another page meanwhile
+    const at = { project: o.project, scope: o.scope, scopeName: o.scopeName };
+    const done = (r) => apiResults.set(o.key, { ...r, from: o.from, to: o.to, rewound: o.rewound });
     try {
-      const claim = await B.call({ cmd: "claim", key: PID + ":" + o.key, ttl: 180000 });
-      if (!claim.ok) return;   // another tab on this chat is doing it
-      const prep = await B.fs("prepare", { project: PID });
-      if (!prep.ok) { apiResults.set(o.key, { ok: false, error: B.why(prep.error) }); return; }
+      const claim = await B.call({ cmd: "claim", key: o.project + ":" + o.key, ttl: 180000 });
+      if (!claim.ok) { done({ ok: false, later: 15000 }); return; }   // another tab on this chat is doing it: look again later
+      const prep = await B.fs("prepare", at);
+      if (!prep.ok) { done({ ok: false, error: B.why(prep.error) }); return; }
       const batch = `api-${o.key.slice(0, 24)}-${o.from}-${o.to}-${nonce()}`;
       const req = M.summarizer.apiPrompt(batch, o.from, o.to, M.summarizer.convoText(o.turns, o.from, o.to), prep.state, o.rewound);
       const r = await B.call({ cmd: "byok", text: req });
-      if (!r.ok) { apiResults.set(o.key, { ok: false, error: "التلخيص بمفتاحك: " + B.why(r.error) }); return; }
+      if (!r.ok) { done({ ok: false, error: "التلخيص بمفتاحك: " + B.why(r.error) }); return; }
       // the plugin may hold the shared lock for a moment: keep the paid-for reply and try the write again, never the request
       let c;
-      for (let i = 0; i < 6; i++) { c = await B.fs("commit", { project: PID, reply: r.text, batch, base: prep.base, platform: A.platform, chat: o.label, range: `${o.from}–${o.to}`, evidence: evidenceOf(o.turns) }); if (!c.busy && !c.writeFailed) break; await sleep(4000); }
-      if (!c.ok) { apiResults.set(o.key, { ok: false, error: B.why(c.error) }); return; }
-      apiResults.set(o.key, { ok: true, replyLen: r.text.length, w: { to: o.to, hashes: o.uh.slice(0, o.to), rhashes: o.rh.slice(0, o.to), src: o.src, reqLen: req.length },
+      for (let i = 0; i < 6; i++) { c = await B.fs("commit", { ...at, reply: r.text, batch, base: prep.base, platform: A.platform, chat: o.label, range: `${o.from}–${o.to}`, evidence: evidenceOf(o.turns) }); if (!c.busy && !c.writeFailed) break; await sleep(4000); }
+      if (!c.ok) { done(c.busy ? { ok: false, later: 30000 } : { ok: false, error: B.why(c.error) }); return; }
+      done({ ok: true, replyLen: r.text.length, w: { to: o.to, hashes: o.uh.slice(0, o.to), rhashes: o.rh.slice(0, o.to), src: o.src, reqLen: req.length },
         note: [`🔑 لُخّص في الخلفية بمفتاحك (${r.model}).`, reviewNote(c), c.redacted ? "حُذفت بيانات حساسة من الملخص." : ""].filter(Boolean).join(" ") });
-    } catch (e) { apiResults.set(o.key, { ok: false, error: String((e && e.message) || e) }); }
+    } catch (e) { done({ ok: false, error: String((e && e.message) || e) }); }
     finally { apiJobs.delete(o.key); schedule(50); }
   }
 
@@ -277,7 +293,7 @@
     const probes = (A.probes || []).map((s) => { let k = -1; try { k = document.querySelectorAll(s).length; } catch {} return `${s} → ${k}`; });
     const diag = (await B.get("diag", [])).slice(-12).map((e) => `${e.t} ${e.kind} ${e.site} ${e.detail}`);
     const v = view || {};
-    const body = [`**الإصدار:** ${chrome.runtime.getManifest().version} · **الموقع:** ${location.hostname} · **الصفحة:** ${location.pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{20,}|[\w-]{20,}/gi, ":id")}`,
+    const body = [`**الإصدار:** ${chrome.runtime.getManifest().version} · **الموقع:** ${location.hostname} · **الصفحة:** ${location.pathname.split("/").map((x) => (["", "c", "g", "chat", "project", "new"].includes(x) ? x : ":x")).join("/")}`,
       `**المتصفح:** ${(navigator.userAgent.match(/Chrome\/[\d.]+/) || ["?"])[0]} · **التاريخ:** ${new Date().toISOString().slice(0, 16)}`,
       `**المصدر:** ${v.src || "?"}${v.dataErr ? ` (بيانات الموقع: ${v.dataErr})` : ""} · **الحالة:** ${v.phase || "?"}${v.unreadable ? " · تعذّرت القراءة" : ""}`,
       "", "**عناصر الصفحة المعروفة (عددها فقط):**", "```", ...probes, "```", "", "**آخر الأحداث التقنية:**", "```", ...(diag.length ? diag : ["(لا شيء)"]), "```",
@@ -313,7 +329,7 @@
     const r = await B.fs("review", { id, action });
     ui.toast(r.ok ? (action === "approve" ? `✓ اعتُمد ${id}` : `✕ أُلغي ${id}`) + " — يمكنك التراجع من «تراجع عن آخر تغيير»." : `لم يتغيّر شيء: ${B.why(r.error)}`);
     await folderStatus(true);
-    return review;
+    return { ok: !!r.ok, list: review };
   }
   const ui = M.ui.create({ onAction, onPinSave, onReview, validPinName: C.pinNameOk, why: B.why, maxAttempts: POL.MAX_ATTEMPTS, test: !!TEST });
 
