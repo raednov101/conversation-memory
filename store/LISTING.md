@@ -4,7 +4,7 @@
 
 ## الملف
 
-`downloads/conversation-memory-extension-1.4.0.zip`: يُرفع كما هو.
+`downloads/conversation-memory-extension-1.5.0.zip`: يُرفع كما هو.
 
 ## بطاقة المتجر
 
