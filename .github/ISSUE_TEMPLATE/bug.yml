@@ -1,0 +1,31 @@
+name: مشكلة
+description: شيء لا يعمل كما يجب في الإضافة أو البلقن
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "شكراً لك. لا تلصق نصوصاً من محادثاتك أو ذاكرتك؛ التقرير التقني وسجل التشخيص لا يحتويانها."
+  - type: dropdown
+    id: part
+    attributes:
+      label: أين حدثت؟
+      options: [إضافة المتصفح على chatgpt.com, إضافة المتصفح على claude.ai, بلقن Claude Code, صفحة الإعدادات]
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: رقم الإصدار
+      description: "الإضافة: من chrome://extensions. البلقن: من /conversation-memory:status"
+      placeholder: "1.4.0"
+  - type: textarea
+    id: what
+    attributes:
+      label: ماذا حدث، وماذا توقعت؟
+      placeholder: "مثال: بعد الرسالة العاشرة ظهرت ⚠️ وسبب الخطأ …"
+    validations: { required: true }
+  - type: textarea
+    id: report
+    attributes:
+      label: التقرير التقني أو سجل التشخيص (اختياري)
+      description: "من زر «🐞 أبلغ» في الشارة، أو «نزّل سجل التشخيص» في الإعدادات"
+      render: text

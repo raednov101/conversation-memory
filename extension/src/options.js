@@ -196,6 +196,17 @@ async function showPin(name, keep) {
 
 chrome.storage.onChanged.addListener((ch) => { if (ch.folderAt && !inPopup) { loadMemory(); loadBackups(); } });
 
+// ---------- the diagnostic diary (technical events only; see page/bridge.js) ----------
+$("diagExport").addEventListener("click", async () => {
+  const { diag = [] } = await chrome.storage.local.get("diag");
+  const data = { extension: chrome.runtime.getManifest().version, browser: (navigator.userAgent.match(/Chrome\/[\d.]+/) || ["?"])[0], exported: new Date().toISOString(), events: diag };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
+  a.download = `ذاكرة المحادثة - سجل التشخيص ${new Date().toLocaleDateString("sv-SE")}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  say("diagMsg", diag.length ? `✓ نُزّل السجل (عدد الأحداث: ${diag.length})، بلا أي نص من محادثاتك.` : "✓ السجل فارغ: لم يحدث شيء يُذكر.");
+});
+
 // ---------- optional: summaries in the background with your own API key ----------
 const MODEL = { anthropic: "claude-haiku-5-5", openai: "gpt-5-mini" };
 const ORIGIN = { anthropic: "https://api.anthropic.com/*", openai: "https://api.openai.com/*" };

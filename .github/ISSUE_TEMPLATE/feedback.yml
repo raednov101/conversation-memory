@@ -1,0 +1,23 @@
+name: رأي أو اقتراح
+description: لمن يجرّب الإصدار التجريبي، أو عنده فكرة
+labels: [feedback]
+body:
+  - type: dropdown
+    id: use
+    attributes:
+      label: كم مرة رجعت إلى ذاكرة محفوظة («أدرج الذاكرة» أو جلسة جديدة في Claude Code) هذا الأسبوع؟
+      options: [لم أرجع, مرة أو مرتين, 3 إلى 5 مرات, أكثر من 5]
+    validations: { required: true }
+  - type: dropdown
+    id: trust
+    attributes:
+      label: هل وجدت في الذاكرة قراراً منسوباً إليك لم تقله؟
+      options: [لا, نعم ونبّهتني «راجع القرارات», نعم ولم أُنبَّه]
+  - type: textarea
+    id: best
+    attributes:
+      label: ما الذي أفادك أكثر؟
+  - type: textarea
+    id: worst
+    attributes:
+      label: ما الذي أزعجك أو كاد يجعلك تتوقف؟
