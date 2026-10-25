@@ -16,5 +16,8 @@
   ],
   "homepage": "https://github.com/raednov101/conversation-memory",
   "repository": "https://github.com/raednov101/conversation-memory",
+  "documentationUrl": "https://github.com/raednov101/conversation-memory/tree/main/plugin#readme",
+  "supportUrl": "https://github.com/raednov101/conversation-memory/issues",
+  "privacyPolicyUrl": "https://github.com/raednov101/conversation-memory/blob/main/PRIVACY.md",
   "license": "MIT"
 }
