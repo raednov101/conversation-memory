@@ -52,7 +52,8 @@
     turns: turns.map((t) => ({ role: t.role, text: t.text, ...(t.role === "user" && Number.isInteger(t.n) ? { n: t.n } : {}) })) });
   // ask the model whether the chat belongs to this memory: on its first summary into a memory that already holds something,
   // unless the user has said it does
-  const askTopic = (st, prep) => !!(prep && prep.hasMemory && st && !st.topicOk && !st.summarizedUpTo && !B.scope.startsWith(`${P}-c-`));
+  // (a chat's own memory inside the browser is its own: nothing to ask; with a linked folder every chat writes to that folder)
+  const askTopic = (st, prep) => !!(prep && prep.hasMemory && st && !st.topicOk && !st.summarizedUpTo && !(B.scope.startsWith(`${P}-c-`) && folder.v && folder.v.inBrowser));
   const reviewNote = (r) => { const k = (r.unverified ? r.unverified.length : 0) + (r.pending ? r.pending.length : 0);
     return k ? `🔎 ${k === 1 ? "شيء واحد لم يثبت" : k === 2 ? "شيئان لم يثبتا" : k + " أشياء لم تثبت"} من كلامك في المحادثة، فلم يُعتمد وينتظر مراجعتك من «راجع القرارات».` : ""; };
   const saved = (st, w, note, replyLen) => (saves++, Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], hashSrc: w.src || "page", rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen)));
