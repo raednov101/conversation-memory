@@ -1,6 +1,6 @@
 {
   "name": "conversation-memory",
-  "displayName": "ذاكرة · Conversation Memory",
+  "displayName": "ذاكرة",
   "version": "1.4.0",
   "description": "ذاكرة للمحادثات الطويلة: القرارات بمصدرها وتاريخها واقتباس من كلامك يثبتها، والنصوص المعتمدة حرفياً، في CONVERSATION_MEMORY.json/.md داخل مشروعك. تُلخَّص عند حدود الجلسة (قبل ضغط السياق وعند الإغلاق) بلا كلفة أثناء العمل، وتشترك مع إضافة المتصفح لـ ChatGPT وClaude.",
   "author": {
