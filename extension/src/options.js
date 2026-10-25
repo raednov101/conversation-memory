@@ -107,13 +107,13 @@ $("unlink").addEventListener("click", async () => {
 });
 async function loadSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
-  $("every").value = settings.every || 5;
+  $("every").value = settings.every || 10;
   $("mode").value = settings.mode || "auto";
   $("autoLink").checked = settings.autoLink !== false;
 }
 async function saveSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
-  const every = Math.min(self.MemoryCore.LIMITS.every, Math.max(1, parseInt($("every").value, 10) || 5));
+  const every = Math.min(self.MemoryCore.LIMITS.every, Math.max(1, parseInt($("every").value, 10) || 10));
   await chrome.storage.local.set({ settings: { ...settings, every, mode: $("mode").value, autoLink: $("autoLink").checked } });
   $("saved").textContent = "حُفظت الإعدادات ✓";
   setTimeout(() => ($("saved").textContent = ""), 2000);

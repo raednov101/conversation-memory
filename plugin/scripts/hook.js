@@ -16,6 +16,16 @@
  *
  * Modes: prompt | stop | precompact | end | start | pretool.  Any internal error exits 0 (the chat is never blocked by a bug). */
 "use strict";
+// Fast exit first: most PreToolUse calls (Claude reading any file) have nothing to do with the memory, so they are
+// answered before any module loads. The input is kept for lib/context.js.
+{
+  let raw = ""; try { raw = require("fs").readFileSync(0, "utf8"); } catch {}
+  global.__cmRaw = raw;
+  if (process.argv[2] === "pretool") {
+    let fp = ""; try { const j = JSON.parse(raw); fp = String((j.tool_input && j.tool_input.file_path) || ""); } catch {}
+    if (!/\.conversation-memory[\\/]/.test(fp)) process.exit(0);   // only its own drafts and copies concern the plugin
+  }
+}
 // Entry point: decides the mode, takes the process lock, dispatches to lib/handlers.js.
 // lib/: config (limits) · util · fsx (safe files) · context (input, paths) · state (private state, lock)
 //       transcript (read + capture) · requests (what is due) · store (memory files) · handlers (one per event)

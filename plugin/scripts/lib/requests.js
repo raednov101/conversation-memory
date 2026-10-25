@@ -54,8 +54,8 @@ function statusText(s, mem, backups, cfg) {
   const m = mem.memory;
   return `[conversation-memory] حالة الذاكرة (من النظام؛ انقلها للمستخدم بإيجاز ولا تخمّن):\n` +
     `- الملف: ${P.json}${mem.bad ? ` (${mem.bad})` : mem.exists ? "" : " (لم يُنشأ بعد)"}\n` +
-    `- طريقة التلخيص: ${cfg.mode === "manual" ? "يدوي (بالأمر /conversation-memory:save فقط)" : `تلقائي كل ${cfg.every} رسائل`} — للتغيير: /conversation-memory:settings\n` +
-    `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}${cfg.mode === "manual" ? "" : "/" + cfg.every}، آخر تحديث للملخص: ${s.lastSave || "لا يوجد بعد"}${s.lastCapture ? `، آخر نسخ للنص: ${s.lastCapture}` : ""}\n` +
+    `- طريقة التلخيص: ${modeText(cfg)} — للتغيير: /conversation-memory:settings\n` +
+    `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}${cfg.mode === "auto" ? "/" + cfg.every : ""}، آخر تحديث للملخص: ${s.lastSave || "لا يوجد بعد"}${s.lastCapture ? `، آخر نسخ للنص: ${s.lastCapture}` : ""}\n` +
     `- الكلفة: ${costText(s)}\n` +
     `- بانتظار الحفظ: ${by("pending")}\n- متعثرة: ${by("stuck")}${s.lastError ? ` (آخر خطأ: ${s.lastError})` : ""}\n- نُسخت قبل الضغط/الإغلاق: ${by("captured")}\n` +
     (m ? `- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => `${p.name} (ن${p.version})`).join("، ") || "لا شيء"}، دفعات السجل: ${m.log.length}\n` : "") +
@@ -104,7 +104,11 @@ function recordPrompt(s, pid, h, cmd, cfg) {
   return changed;
 }
 
-// /conversation-memory:settings [every N | auto | manual] → { cfg, changed } | { err }
+// the project's setting in words (status, settings, notes)
+const modeText = (cfg) => cfg.mode === "manual" ? "يدوي: بالأمر /conversation-memory:save فقط"
+  : cfg.mode === "auto" ? `تلقائي كل ${cfg.every} رسائل`
+  : "عند حدود الجلسة: قبل ضغط السياق وعند الإغلاق، دون كلفة أثناء العمل";
+// /conversation-memory:settings [session | every N | auto | manual] → { cfg, changed } | { err }
 function parseSettings(args, cfg) {
   const a = String(args || "").trim();
   if (!a) return { cfg, changed: false };
@@ -112,7 +116,8 @@ function parseSettings(args, cfg) {
   if (n) { const every = +n[1]; if (every < 1 || every > C.LIMITS.every) return { err: `العدد بين 1 و${C.LIMITS.every}` }; return { cfg: { every, mode: "auto" }, changed: true }; }
   if (/^(manual|يدوي)$/i.test(a)) return { cfg: { ...cfg, mode: "manual" }, changed: true };
   if (/^(auto|تلقائي)$/i.test(a)) return { cfg: { ...cfg, mode: "auto" }, changed: true };
-  return { err: `لم أفهم «${a.slice(0, 40)}». الصيغ: every 10 (أو كل 10)، manual (يدوي)، auto (تلقائي)` };
+  if (/^(session|الجلسة|نهاية الجلسة)$/i.test(a)) return { cfg: { ...cfg, mode: "session" }, changed: true };
+  return { err: `لم أفهم «${a.slice(0, 40)}». الصيغ: session (نهاية الجلسة، الافتراضي)، every 10 (أو كل 10)، manual (يدوي)، auto (تلقائي)` };
 }
 
-module.exports = { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, costText, backupsText, parseCommand, recordPrompt, parseSettings };
+module.exports = { modeText, draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, costText, backupsText, parseCommand, recordPrompt, parseSettings };

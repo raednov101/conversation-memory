@@ -3,7 +3,7 @@
 "use strict";
 const OFFSCREEN = "src/offscreen.html";
 const SITES = ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"];
-const DEFAULTS = { every: 5, mode: "auto", paused: false, autoLink: true };
+const DEFAULTS = { every: 10, mode: "auto", paused: false, autoLink: true };
 
 let creating = null;
 async function ensureOffscreen() {

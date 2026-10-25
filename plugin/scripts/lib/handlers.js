@@ -11,7 +11,7 @@ const { loadState, session, writeStatus, loadCfg, saveCfg } = require("./state")
 const { listBackups, describeBackup, restoreBackup, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin, isTrusted, migrateTrust } = require("./store");
 const { readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture } = require("./transcript");
 const { fixRequest, commitFix, pinsCommand, shareCommand, trustCommand, memoryContext, changesLine } = require("./features");
-const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt, parseSettings, costText } = require("./requests");
+const { draftPath, labelOf, readDraft, batchRequest, pinRequest, statusText, backupsText, parseCommand, recordPrompt, parseSettings, costText, modeText } = require("./requests");
 
 function onPrompt(state, out) {
   const s = session(state);
@@ -20,7 +20,7 @@ function onPrompt(state, out) {
   if (cmd.settings) {
     const r = parseSettings(cmd.args, cfg);
     if (r.err) notes.push(`⚠️ ذاكرة المحادثة: ${r.err}.`);
-    else if (r.changed) { try { saveCfg(r.cfg); cfg = r.cfg; notes.push(`⚙️ ذاكرة المحادثة: ${cfg.mode === "manual" ? "التلخيص يدوي الآن (بالأمر /conversation-memory:save)" : `التلخيص التلقائي كل ${cfg.every} رسائل`}.`); } catch { notes.push("⚠️ ذاكرة المحادثة: تعذّر حفظ الإعداد."); } }
+    else if (r.changed) { try { saveCfg(r.cfg); cfg = r.cfg; notes.push(`⚙️ ذاكرة المحادثة: التلخيص الآن ${modeText(cfg)}.`); } catch { notes.push("⚠️ ذاكرة المحادثة: تعذّر حفظ الإعداد."); } }
   }
   const changed = recordPrompt(s, input.prompt_id, fullHash(input.prompt || ""), cmd, cfg) || replayedDue;
   const mem = readMemory(), ctx = [];
@@ -33,8 +33,8 @@ function onPrompt(state, out) {
   // backups the user can restore: the same numbering in the status list and in /conversation-memory:restore N
   const restorable = () => listBackups().map(describeBackup).filter((b) => b.ok && b.text !== mem.jsonText);
   if (cmd.status) ctx.push(statusText(s, mem, restorable(), cfg));
-  if (cmd.settings) ctx.push(`[conversation-memory] إعداد التلخيص لهذا المشروع (من النظام؛ أخبر المستخدم بإيجاز): ${cfg.mode === "manual" ? "يدوي: لا يُطلب تلخيص إلا بالأمر /conversation-memory:save" : `تلقائي كل ${cfg.every} رسائل`}. ` +
-    `الكلفة: ${costText(s)}. للتغيير: /conversation-memory:settings every 10، أو manual، أو auto. والرسائل لا تضيع في الوضعين: تُنسخ كاملة قبل ضغط السياق وعند الإغلاق.`);
+  if (cmd.settings) ctx.push(`[conversation-memory] إعداد التلخيص لهذا المشروع (من النظام؛ أخبر المستخدم بإيجاز): ${modeText(cfg)}. ` +
+    `الكلفة: ${costText(s)}. للتغيير: /conversation-memory:settings session (عند حدود الجلسة)، أو every 10، أو manual. والرسائل لا تضيع في أي وضع: تُنسخ كاملة قبل ضغط السياق وعند الإغلاق.`);
   if (cmd.listOnly) ctx.push(`[conversation-memory] النسخ السابقة من الذاكرة (من النظام؛ اعرضها للمستخدم كما هي، والاسترجاع بالأمر /conversation-memory:restore ورقم النسخة):\n${backupsText(restorable())}`);
   else if (cmd.restore) {
     let r;

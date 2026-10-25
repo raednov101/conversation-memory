@@ -20,9 +20,9 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ---------- settings and per-chat state ----------
-  const defaults = { every: 5, mode: "auto", paused: false, autoLink: true };
+  const defaults = { every: 10, mode: "auto", paused: false, autoLink: true };
   let settings = { ...defaults };
-  const loadSettings = async () => { const s = await B.get("settings", {}); settings = { ...defaults, ...s, every: Math.min(C.LIMITS.every, Math.max(1, parseInt(s.every, 10) || 5)) }; };
+  const loadSettings = async () => { const s = await B.get("settings", {}); settings = { ...defaults, ...s, every: Math.min(C.LIMITS.every, Math.max(1, parseInt(s.every, 10) || 10)) }; };
   // PID: the id stored inside the chosen project folder. A chat's link and progress belong to (project, chat),
   // so choosing another folder never carries a chat's state or writes into the new folder.
   let folder = { at: 0, v: { ok: false } }, PID = "";

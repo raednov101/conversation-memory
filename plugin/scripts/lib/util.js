@@ -4,7 +4,8 @@ const fs = require("fs");
 const crypto = require("crypto");
 
 // ---------------- small helpers ----------------
-const readStdin = () => { try { return JSON.parse(fs.readFileSync(0, "utf8") || "{}") || {}; } catch { return {}; } };
+// hook.js may have read stdin already (for its fast exits): then that text is used
+const readStdin = () => { try { const raw = typeof global.__cmRaw === "string" ? global.__cmRaw : fs.readFileSync(0, "utf8"); return JSON.parse(raw || "{}") || {}; } catch { return {}; } };
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const lst = (p) => { try { return fs.lstatSync(p); } catch { return null; } };
 const sha256 = (t) => crypto.createHash("sha256").update(t).digest("hex");

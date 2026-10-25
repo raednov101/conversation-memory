@@ -4,6 +4,7 @@
 # Usage from the plugin folder:  bash tests/integration.sh        (costs a few cents of usage)
 set -u
 PLUGIN="$(cd "$(dirname "$0")/.." && pwd)"
+export CONV_MEMORY_MODE=auto   # this run walks the periodic path (every 5); the session-edge path is the "recovered" batch below
 WORK="$(mktemp -d)"; PROJ="$WORK/proj"; LOG="$WORK/log"; mkdir -p "$PROJ" "$LOG"
 # test copy whose indicator also writes what it would show, so it can be checked without a screen
 TPL="$WORK/plugin"; cp -r "$PLUGIN" "$TPL"
@@ -71,9 +72,9 @@ const t9 = J("t9.json").result || "";
 ok(/رسائل|رسالة|دفع/.test(t9) && /\b\d+\b/.test(t9) && !/لا أعرف|لا أستطيع/.test(t9), "status command reports real numbers", t9.slice(0, 200));
 const probe = (() => { try { return fs.readFileSync(path.join(os.homedir(), ".conversation-memory", "indicator-probe.txt"), "utf8"); } catch { return ""; } })();
 ok(/^🧠 (⏳ |⚠️ )?\d\/5( · (✓ \d\d:\d\d( · ≈[\d,]+ توكن)?|📝 \d\d:\d\d|يحفظ|تعثّر الحفظ))?$/.test(probe), `status-line indicator reads the status and formats it: «${probe}»`);
-// the correction applies to what is in force (decisions, summary); the log stays a faithful history of what was said.
+// the correction applies to what is in force (decisions, constraints, summary — the model decides where a fact lives); the log stays a faithful history of what was said.
 // Mentioning the old figure as context («كانت 40 ألفاً») is fine; stating the budget as 40 without the new figure is not.
-const inForce = memNow ? [...memNow.decisions.filter((d) => d.status === "active").map((d) => d.text), memNow.summary.status, memNow.summary.goal] : [];
+const inForce = memNow ? [...memNow.decisions.filter((d) => d.status === "active").map((d) => d.text), ...memNow.constraints, memNow.summary.status, memNow.summary.goal] : [];
 const stale = inForce.filter((t) => /ميزانية/.test(t) && /(40|٤٠) ألف/.test(t) && !/(55|٥٥) ألف/.test(t));
 ok(inForce.some((t) => /(55|٥٥) ألف/.test(t)) && !stale.length, "/fix: the budget is corrected in the decisions and the summary", stale.join(" | ") || inForce.join(" | ").slice(0, 300));
 const bk = path.join(P, ".conversation-memory", "backups");

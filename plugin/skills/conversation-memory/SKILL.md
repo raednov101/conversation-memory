@@ -1,6 +1,6 @@
 ---
 name: conversation-memory
-description: Keeps long conversations from being forgotten. Every few messages Claude writes a JSON draft of what was discussed and decided; the system validates it and saves CONVERSATION_MEMORY.json/.md in the project. Use when a "[conversation-memory]" note asks for a draft, a pin or a status report, or when the user asks what was agreed earlier, wants the memory saved, shown, corrected, restored or pinned.
+description: Keeps long conversations from being forgotten. At the session's edges (before compaction, at exit; or every few messages if the project chooses) Claude writes a JSON draft of what was discussed and decided; the system validates it and saves CONVERSATION_MEMORY.json/.md in the project. Use when a "[conversation-memory]" note asks for a draft, a pin or a status report, or when the user asks what was agreed earlier, wants the memory saved, shown, corrected, restored or pinned.
 ---
 
 # ذاكرة المحادثة
@@ -86,7 +86,7 @@ description: Keeps long conversations from being forgotten. Every few messages C
 | سجل نسخ نص معتمد، أو مقارنته، أو العودة لنسخة سابقة | `/conversation-memory:pins` |
 | نقل معلومات مختارة إلى محادثة أخرى | `/conversation-memory:share` |
 | الحالة والكلفة | `/conversation-memory:status` |
-| تغيير عدد الرسائل بين كل تلخيص، أو جعله يدوياً | `/conversation-memory:settings` (مثل `every 10` أو `manual`) |
+| متى يُلخَّص: عند حدود الجلسة (الافتراضي)، أو كل N رسائل، أو يدوياً | `/conversation-memory:settings` (مثل `session` أو `every 10` أو `manual`) |
 
 إن طلب أحدها بكلامه («صحّح القرار الثالث»، «ارجع للنسخة السابقة») فاذكر له الأمر المناسب في سطر.
 

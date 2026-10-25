@@ -1,10 +1,10 @@
-# بيانات النشر في متجر Chrome — ذاكرة المحادثة 1.2.1
+# بيانات النشر في متجر Chrome — ذاكرة المحادثة 1.3.0
 
 كل ما يطلبه نموذج النشر في [لوحة مطوّري متجر Chrome](https://chrome.google.com/webstore/devconsole)، جاهزاً للنسخ.
 
 ## الملف
 
-`downloads/conversation-memory-extension-1.2.1.zip`: يُرفع كما هو.
+`downloads/conversation-memory-extension-1.3.0.zip`: يُرفع كما هو.
 
 ## بطاقة المتجر
 
@@ -28,7 +28,7 @@
 ```
 النقاش الطويل لا يضيع.
 
-كل 5 رسائل منك تلخّص «ذاكرة المحادثة» ما نوقش وتقرر في محادثتك على chatgpt.com أو claude.ai، وتحفظه ذاكرةً للمشروع: الهدف والوضع الحالي، والقرارات ومن اتخذها، والقيود، والنصوص التي اعتمدتها حرفياً. وفي محادثة جديدة تُدرج الذاكرة بضغطة، فتكمل من حيث توقفت.
+كل 10 رسائل منك (أو العدد الذي تختاره) تلخّص «ذاكرة المحادثة» ما نوقش وتقرر في محادثتك على chatgpt.com أو claude.ai، وتحفظه ذاكرةً للمشروع: الهدف والوضع الحالي، والقرارات ومن اتخذها، والقيود، والنصوص التي اعتمدتها حرفياً. وفي محادثة جديدة تُدرج الذاكرة بضغطة، فتكمل من حيث توقفت.
 
 ما تجده فيها:
 • لكل مشروع في ChatGPT أو Claude ذاكرته، تُحفظ داخل متصفحك تلقائياً بلا إعداد.
@@ -54,7 +54,7 @@
 ```
 Long conversations, not forgotten.
 
-Every 5 of your messages, Conversation Memory summarizes what was discussed and decided in your chat on chatgpt.com or claude.ai and keeps it as the project's memory: the goal and current state, the decisions and who made them, the constraints, and texts you approved word for word. In a new chat, insert the memory with one click and continue where you left off.
+Every 10 of your messages (or the number you choose), Conversation Memory summarizes what was discussed and decided in your chat on chatgpt.com or claude.ai and keeps it as the project's memory: the goal and current state, the decisions and who made them, the constraints, and texts you approved word for word. In a new chat, insert the memory with one click and continue where you left off.
 
 • Each ChatGPT or Claude project gets its own memory, kept inside your browser, no setup.
 • The full transcript is saved after every reply.

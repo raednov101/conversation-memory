@@ -5,7 +5,7 @@
 const C = self.MemoryCore;
 // file names, backup naming, sizes and the shared lock come from the core: the plugin follows the same definition
 const { json: JSON_FILE, md: MD_FILE, pins: PINS, data: DATA, maxJson: MAX_JSON, trimAt: TRIM_AT, maxBackups: MAX_BACKUPS, writeLockStale: WLOCK_STALE, futureSkew: FUTURE_SKEW } = C.PROTOCOL;
-const STATE_BUDGET = 3000, COMPACT_BUDGET = 5000;
+const STATE_BUDGET = 1800, COMPACT_BUDGET = 5000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nonce = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const today = () => new Date().toLocaleString("sv-SE").slice(0, 16);
@@ -205,15 +205,16 @@ async function writeMemory(r, mutate, confirm, held) {
 }
 
 // the current state the model needs to write a correct draft: summary, active decisions with ids, constraints
+// Only what the model cannot see in the chat itself, kept short (it is sent with every summary request and stays in the
+// chat): the project's goal and state (other chats feed them too), the decisions in force with their ids (to revoke one)
+// and the constraints (not to repeat them). Next steps and open questions are rewritten from the chat anyway.
 function stateForPrompt(m) {
   const s = m.summary, L = [];
   if (s.goal) L.push(`الهدف: ${s.goal}`);
   if (s.status) L.push(`الوضع: ${s.status}`);
-  if (s.next.length) L.push(`الخطوة التالية: ${s.next.join("؛ ")}`);
-  if (s.open.length) L.push(`أسئلة مفتوحة: ${s.open.join("؛ ")}`);
   const act = m.decisions.filter((d) => d.status === "active");
-  if (act.length) L.push("القرارات السارية:", ...act.slice(-40).map((d) => `- ${d.id} [${d.source}] ${d.text}`));
-  if (m.constraints.length) L.push("القيود:", ...m.constraints.slice(-30).map((c) => `- ${c}`));
+  if (act.length) L.push("القرارات السارية:", ...act.slice(-30).map((d) => `${d.id} [${d.source}] ${d.text}`));
+  if (m.constraints.length) L.push("القيود: " + m.constraints.slice(-20).join("؛ "));
   const t = L.join("\n") || "(لا توجد ذاكرة محفوظة بعد)";
   return t.length > STATE_BUDGET ? t.slice(0, STATE_BUDGET) + "\n…" : t;
 }

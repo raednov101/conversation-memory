@@ -61,6 +61,10 @@ with sync_playwright() as pw:
         try: opt.goto(f"chrome-extension://{ext_id}/src/options.html"); break
         except Exception: time.sleep(1)
     opt.wait_for_load_state()
+    d0 = opt.evaluate("async () => (await chrome.storage.local.get('settings')).settings")
+    ok(d0 and d0.get("every") == 10, "a fresh install summarizes every 10 messages (half the requests of 5)", d0)
+    # the checks below walk the 5-message path, which is quicker to drive
+    opt.evaluate("async () => { const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, every: 5 } }); }")
 
     def use_folder(name):
         opt.evaluate(f"""async () => {{ const kv = {KV}; const r = await navigator.storage.getDirectory();

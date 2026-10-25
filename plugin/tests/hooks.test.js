@@ -9,7 +9,8 @@ const C = require("../core/memory-core.js");
 const S = path.join(__dirname, "..", "scripts", "hook.js");
 const tmp = (p = "cm-") => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const HOME = tmp("cm-home-"), CWD = tmp("cm-cwd-");
-const ENV = { ...process.env, HOME, USERPROFILE: HOME, CLAUDE_PROJECT_DIR: "" };
+// most tests exercise the periodic mode (every 5); the session-boundary default has its own tests below
+const ENV = { ...process.env, HOME, USERPROFILE: HOME, CLAUDE_PROJECT_DIR: "", CONV_MEMORY_MODE: "auto" };
 function run(mode, input, env = {}) {
   const r = spawnSync(process.execPath, [S, mode], { cwd: CWD, input: typeof input === "string" ? input : JSON.stringify(input), env: { ...ENV, ...env }, encoding: "utf8" });
   let j = {}; try { j = JSON.parse(r.stdout || "{}"); } catch { j = { raw: r.stdout }; }
@@ -533,7 +534,7 @@ test("settings: every N and manual mode per project; /save still works; the choi
   assert.equal(status("m").since, 7, "the indicator shows how many messages wait");
   const sv = requests(prompt(M, "m", "/conversation-memory:save"));
   assert.equal(sv.length, 1, "manual: /save asks for the summary"); assert.match(sv[0].id, /-1-7-/, "…of all 7 waiting messages");
-  assert.match(ctx(prompt(M, "m", "/conversation-memory:status")), /يدوي \(بالأمر/);
+  assert.match(ctx(prompt(M, "m", "/conversation-memory:status")), /يدوي: بالأمر/);
   assert.match(prompt(P, "a", "/conversation-memory:settings كل 500").systemMessage, /بين 1 و50/);
   assert.match(prompt(P, "a", "/conversation-memory:settings أحياناً").systemMessage, /لم أفهم/);
   assert.equal(requests(prompts(tmp(), "b", 5)[4]).length, 1, "another project keeps the default");
@@ -553,7 +554,7 @@ test("cost: measured from the request and the draft, announced after saving, sho
 
 test("indicator: text copied (📝) vs summary updated (✓) vs failure (⚠️) are distinct states", { skip: !(process.features && process.features.typescript) && "this Node cannot load TypeScript (needs 22.18+); Claude Code loads it itself" }, async () => {
   const { format } = await import("../hooks/indicator.ts");
-  const base = { v: 1, every: 5, since: 2, pending: 0, stuck: 0, lastSave: "2026-10-19 10:00", error: "", updated: 0 };
+  const base = { v: 1, every: 5, mode: "auto", since: 2, pending: 0, stuck: 0, lastSave: "2026-10-19 10:00", error: "", updated: 0 };
   assert.equal(format({ ...base, cost: 612 }), "🧠 2/5 · ✓ 10:00 · ≈612 توكن");
   assert.equal(format({ ...base, lastCapture: "2026-10-19 10:05" }), "🧠 2/5 · 📝 10:05");
   assert.equal(format({ ...base, lastCapture: "2026-10-19 09:00" }), "🧠 2/5 · ✓ 10:00", "an older copy is superseded by the summary");
@@ -714,4 +715,29 @@ test("test review: CONV_MEMORY_EVERY sets the default count, within 1–50", () 
   assert.equal(requests(j).length, 1, "due after 3");
   for (let i = 0; i < 50; i++) j = runE(e("999"), "y", `م${i}`);
   assert.equal(requests(j).length, 1, "999 is capped at 50");
+});
+
+test("default mode «session»: no summary request while working; copied before compaction and summarized once, after the next answer", () => {
+  const P = tmp(), D = { CONV_MEMORY_MODE: "" };   // unset → the default
+  const js = []; for (let i = 0; i < 12; i++) { const j = run("prompt", { session_id: "s", cwd: P, prompt: `عمل ${i}`, prompt_id: `q${i}` }, D); j._pid = `q${i}`; j._text = `عمل ${i}`; js.push(j); }
+  assert.ok(js.every((j) => requests(j).length === 0), "nothing is asked for during the session (no extra model calls)");
+  const st = run("prompt", { session_id: "s", cwd: P, prompt: "/conversation-memory:status", prompt_id: "st" }, D);
+  assert.match(ctx(st), /عند حدود الجلسة/);
+  run("precompact", { session_id: "s", cwd: P, transcript_path: tfrom(P, js) }, D);
+  assert.ok(capText(P).includes("عمل 0") && capText(P).includes("عمل 11"), "all twelve copied before compaction");
+  run("start", { session_id: "s", cwd: P, source: "compact" }, D);
+  const s = run("stop", { session_id: "s", cwd: P }, D);
+  assert.equal(s.decision, "block", "after the first answer, one summary of what was copied is asked for"); assert.match(s.reason, /رسائل منسوخة/);
+  const r = (s.reason.match(/"([^"]+c-[a-z0-9]+-[a-f0-9]{8}\.json)"/) || [])[1]; assert.ok(r, s.reason);
+});
+
+test("settings: session / every N / manual, and the indicator shows each", () => {
+  const P = tmp(), D = { CONV_MEMORY_MODE: "" };
+  assert.match(run("prompt", { session_id: "a", cwd: P, prompt: "/conversation-memory:settings every 4", prompt_id: "x1" }, D).systemMessage, /تلقائي كل 4/);
+  assert.match(run("prompt", { session_id: "a", cwd: P, prompt: "/conversation-memory:settings session", prompt_id: "x2" }, D).systemMessage, /عند حدود الجلسة/);
+});
+test("indicator: the session mode reads «N · نهاية الجلسة»", { skip: !(process.features && process.features.typescript) && "this Node cannot load TypeScript (needs 22.18+)" }, async () => {
+  const { format } = await import("../hooks/indicator.ts");
+  const base = { v: 1, every: 5, since: 7, pending: 0, stuck: 0, lastSave: "2026-10-25 10:00", error: "", updated: 0 };
+  assert.equal(format({ ...base, mode: "session" }), "🧠 7 · نهاية الجلسة · ✓ 10:00");
 });

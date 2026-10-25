@@ -8,7 +8,8 @@ import type { EngineInterface, Register } from "claude-code";
 type Status = { v: number; every: number; mode?: string; since: number; pending: number; stuck: number; lastSave: string; lastCapture?: string; cost?: number; error: string; updated: number };
 
 export function format(s: Status): string {
-  const prog = s.mode === "manual" ? `${s.since} · يدوي` : `${Math.min(s.since, s.every)}/${s.every}`;
+  // auto: «3/5»; manual: «3 · يدوي»; session (the default): «3 · نهاية الجلسة» (summarized before compaction and at exit)
+  const prog = s.mode === "auto" ? `${Math.min(s.since, s.every)}/${s.every}` : `${s.since} · ${s.mode === "manual" ? "يدوي" : "نهاية الجلسة"}`;
   if (s.stuck > 0) return `🧠 ⚠️ ${prog} · تعثّر الحفظ`;
   if (s.pending > 0) return `🧠 ⏳ ${prog} · يحفظ`;
   const cap = s.lastCapture || "";

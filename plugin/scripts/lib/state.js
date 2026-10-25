@@ -3,7 +3,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { EVERY, MAX_JSON, MAX_SESSIONS, LOCK_WAIT, LOCK_STALE } = require("./config");
+const { EVERY, MODE, MODES, MAX_JSON, MAX_SESSIONS, LOCK_WAIT, LOCK_STALE } = require("./config");
 const { sleep, lst, nonce, int } = require("./util");
 const { readSafe, writeAtomic, unlinkSafe, breakStale } = require("./fsx");
 const { input, sid, HOME, PRIV, notes } = require("./context");
@@ -97,7 +97,7 @@ function loadCfg() {
   const r = readSafe(path.join(PRIV, "settings.json"), 4096);
   let o = {}; try { o = JSON.parse(r.text || "{}") || {}; } catch {}
   const every = Math.min(100, Math.max(1, Math.floor(Number(o.every)) || EVERY));
-  return { every, mode: o.mode === "manual" ? "manual" : "auto" };
+  return { every, mode: MODES.includes(o.mode) ? o.mode : MODE };
 }
 function saveCfg(c) { writeAtomic(path.join(PRIV, "settings.json"), JSON.stringify({ every: c.every, mode: c.mode })); }
 // what the status-line indicator reads
@@ -105,7 +105,7 @@ function writeStatus(s) {
   try {
     const pend = s.batches.filter((b) => b.status === "pending").length, stuck = s.batches.filter((b) => b.status === "stuck").length, cfg = loadCfg();
     const since = Math.max(0, s.count - s.lastBatchEnd);
-    const st = { v: 1, every: cfg.every, mode: cfg.mode, since: cfg.mode === "manual" ? since : Math.min(since, cfg.every), pending: pend, stuck, lastSave: s.lastSave, lastCapture: s.lastCapture,
+    const st = { v: 1, every: cfg.every, mode: cfg.mode, since: cfg.mode === "auto" ? Math.min(since, cfg.every) : since, pending: pend, stuck, lastSave: s.lastSave, lastCapture: s.lastCapture,
       cost: s.lastCost.chars ? C.estTokens(s.lastCost.chars) : 0, error: s.lastError, updated: Date.now() };
     writeAtomic(path.join(HOME, "status", `${sid.replace(/[^A-Za-z0-9-]/g, "").slice(0, 80) || "default"}.json`), JSON.stringify(st));
   } catch {}
