@@ -1,10 +1,10 @@
-# بيانات النشر في متجر Chrome — ذاكرة المحادثة 1.3.0
+# بيانات النشر في متجر Chrome — ذاكرة المحادثة 1.4.0
 
 كل ما يطلبه نموذج النشر في [لوحة مطوّري متجر Chrome](https://chrome.google.com/webstore/devconsole)، جاهزاً للنسخ.
 
 ## الملف
 
-`downloads/conversation-memory-extension-1.3.0.zip`: يُرفع كما هو.
+`downloads/conversation-memory-extension-1.4.0.zip`: يُرفع كما هو.
 
 ## بطاقة المتجر
 
@@ -37,6 +37,8 @@
 • نقل أجزاء مختارة إلى محادثة أخرى، بمعاينة وطول قبل الإدراج، دون إرسال.
 • تراجع عن آخر تغيير، وآخر 20 نسخة سابقة.
 • نسخة كاملة في ملف واستعادتها.
+• كل قرار بمصدره وتاريخه واقتباس من كلامك يثبته؛ وما لا دليل عليه يُعرض عليك للمراجعة.
+• اختيارياً بمفتاحك من Anthropic أو OpenAI: التلخيص في الخلفية، فلا يظهر شيء في المحادثة.
 • شارة صغيرة تقول لك الحالة: كم بقي حتى التلخيص، وهل حُفظ، ولماذا تعثّر إن تعثّر.
 
 الخصوصية:
@@ -61,6 +63,8 @@ Every 10 of your messages (or the number you choose), Conversation Memory summar
 • Pin a text verbatim, with numbered versions and a fingerprint.
 • Carry chosen parts to another chat, previewed before insertion, never sent for you.
 • Undo the last change; the last 20 versions are kept. Full backup to a file and restore.
+• Every decision carries its source, date and a quote of your own words; anything unbacked is shown to you for review.
+• Optional: with your own Anthropic or OpenAI key, summaries run in the background and nothing appears in the chat.
 
 Privacy: no developer server, no account, no analytics. Common keys and passwords are removed before saving. Summarizing sends a message as you in the same chat, so the memory text reaches ChatGPT or Claude like any message you type, and counts toward your usage.
 
@@ -81,11 +85,12 @@ Arabic interface. Open source (MIT). Not affiliated with OpenAI or Anthropic.
 | `offscreen` | An offscreen document reads and writes the memory files in the extension's own origin storage, or in a folder the user linked; file handles cannot be used from the service worker. |
 | `contextMenus` | Adds "Pin selected text" to the right-click menu on chatgpt.com and claude.ai, to save a selected text verbatim. |
 | Host access (content scripts on chatgpt.com, chat.openai.com, claude.ai) | Reads the conversation on the page to summarize it, shows the status indicator, and types the summary request or the memory into the message box. |
+| Optional host access (api.anthropic.com, api.openai.com) | Requested only when the user saves their own API key, for the provider they chose, to summarize in the background instead of in the chat. Removed when the key is deleted. |
 | Remote code | **No.** All code is in the package. |
 
 ### البيانات (Data usage)
 
-- **ما يُجمع:** اختر **Website content** فقط، لأن الإضافة تقرأ نص المحادثة في الصفحة. وهي تعالجه على الجهاز ولا ترسله للمطوّر.
+- **ما يُجمع:** اختر **Website content**، لأن الإضافة تقرأ نص المحادثة في الصفحة. واختر **Authentication information**، لأنها تحفظ مفتاح API إن أضافه المستخدم (اختياري، محلياً)، وتستخدم رمز جلسة ChatGPT لقراءة المحادثة من الموقع نفسه حين تتعذر قراءة الصفحة. لا يُرسل شيء من ذلك للمطوّر.
 - **أقرّ بالثلاثة:**
   - لا بيع للبيانات ولا نقلها لطرف ثالث خارج الاستخدامات المسموحة.
   - لا استخدام لها في غير الغرض الوحيد.
