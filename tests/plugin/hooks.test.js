@@ -1,12 +1,12 @@
-// node --test tests/      — drives scripts/hook.js exactly as Claude Code does (JSON on stdin), in temp folders and a temp HOME.
+// node --test tests/plugin/      — drives scripts/hook.js exactly as Claude Code does (JSON on stdin), in temp folders and a temp HOME.
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { spawnSync, spawn } = require("node:child_process");
 const fs = require("node:fs"), path = require("node:path"), os = require("node:os"), crypto = require("node:crypto");
-const C = require("../core/memory-core.js");
+const C = require("../../plugin/core/memory-core.js");
 
-const S = path.join(__dirname, "..", "scripts", "hook.js");
+const S = path.join(__dirname, "..", "..", "plugin", "scripts", "hook.js");
 const tmp = (p = "cm-") => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const HOME = tmp("cm-home-"), CWD = tmp("cm-cwd-");
 // most tests exercise the periodic mode (every 5); the session-boundary default has its own tests below
@@ -553,7 +553,7 @@ test("cost: measured from the request and the draft, announced after saving, sho
 });
 
 test("indicator: text copied (📝) vs summary updated (✓) vs failure (⚠️) are distinct states", { skip: !(process.features && process.features.typescript) && "this Node cannot load TypeScript (needs 22.18+); Claude Code loads it itself" }, async () => {
-  const { format } = await import("../hooks/indicator.ts");
+  const { format } = await import("../../plugin/hooks/indicator.ts");
   const base = { v: 1, every: 5, mode: "auto", since: 2, pending: 0, stuck: 0, lastSave: "2026-10-19 10:00", error: "", updated: 0 };
   assert.equal(format({ ...base, cost: 612 }), "🧠 2/5 · ✓ 10:00 · ≈612 توكن");
   assert.equal(format({ ...base, lastCapture: "2026-10-19 10:05" }), "🧠 2/5 · 📝 10:05");
@@ -566,7 +566,7 @@ test("indicator: text copied (📝) vs summary updated (✓) vs failure (⚠️)
 });
 
 test("locks: a stale lock is removed only if it is still the one judged stale; a newer live lock is put back", () => {
-  const { breakStale } = require("../scripts/lib/fsx.js");
+  const { breakStale } = require("../../plugin/scripts/lib/fsx.js");
   const d = tmp(), f = path.join(d, "lock");
   fs.writeFileSync(f, "111 host 1 aaaa"); breakStale(f, "111 host 1 aaaa");
   assert.ok(!fs.existsSync(f), "the lock judged stale is removed");
@@ -597,7 +597,7 @@ test("security: stored text can't pose as the plugin's own notes", () => {
 });
 
 test("correctness review: a stale lock is removed only if it still holds what was judged stale, one breaker at a time", () => {
-  const { breakStale } = require("../scripts/lib/fsx");
+  const { breakStale } = require("../../plugin/scripts/lib/fsx");
   const d = tmp(), f = path.join(d, "lock");
   fs.writeFileSync(f, "new-holder"); breakStale(f, "old-holder");
   assert.equal(fs.readFileSync(f, "utf8"), "new-holder", "someone else's fresh lock is never removed");
@@ -737,7 +737,7 @@ test("settings: session / every N / manual, and the indicator shows each", () =>
   assert.match(run("prompt", { session_id: "a", cwd: P, prompt: "/conversation-memory:settings session", prompt_id: "x2" }, D).systemMessage, /عند حدود الجلسة/);
 });
 test("indicator: the session mode reads «N · نهاية الجلسة»", { skip: !(process.features && process.features.typescript) && "this Node cannot load TypeScript (needs 22.18+)" }, async () => {
-  const { format } = await import("../hooks/indicator.ts");
+  const { format } = await import("../../plugin/hooks/indicator.ts");
   const base = { v: 1, every: 5, since: 7, pending: 0, stuck: 0, lastSave: "2026-10-25 10:00", error: "", updated: 0 };
   assert.equal(format({ ...base, mode: "session" }), "🧠 7 · نهاية الجلسة · ✓ 10:00");
 });
@@ -776,7 +776,7 @@ test("status names the Claude Code version, and says when it is newer than the o
   const tp = path.join(P, "t-cv.jsonl");
   const status = (v) => { fs.writeFileSync(tp, [{ type: "user", version: v, promptId: j._pid, message: { role: "user", content: "سؤال" } }].map((x) => JSON.stringify(x)).join("\n"));
     return ctx(run("prompt", { session_id: "cv", cwd: P, prompt: "/conversation-memory:status", prompt_id: "p-" + v, transcript_path: tp })); };
-  const { TESTED_CC } = require("../scripts/lib/config");
+  const { TESTED_CC } = require("../../plugin/scripts/lib/config");
   assert.match(status(TESTED_CC), new RegExp(`Claude Code: ${TESTED_CC.replace(/\./g, "\\.")} \\(جُرّب`));
   assert.match(status("99.0.0"), /Claude Code: 99\.0\.0 — أحدث من آخر نسخة جُرّب عليها/);
 });

@@ -1,8 +1,8 @@
 // Test helper: writes the memory over and over through the real store (lib/store.js) until it is killed.
 // Used by the "killed mid-write" test; never shipped to users' projects.
 "use strict";
-const C = require("../../core/memory-core.js");
-const { writeMemory } = require("../../scripts/lib/store");
+const C = require("../../../plugin/core/memory-core.js");
+const { writeMemory } = require("../../../plugin/scripts/lib/store");
 const big = "ن".repeat(3000);
 for (let i = 0; ; i++) {
   writeMemory((m) => {

@@ -19,7 +19,7 @@ jobs:
       - run: npm run lint
       - name: unit and hook tests
         shell: bash
-        run: node --no-warnings --test plugin/tests/*.test.js extension/tests/*.test.js
+        run: node --no-warnings --test tests/plugin/*.test.js extension/tests/*.test.js
   extension-e2e:
     runs-on: ubuntu-latest
     steps:

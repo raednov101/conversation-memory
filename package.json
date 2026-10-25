@@ -3,12 +3,12 @@
   "private": true,
   "description": "Development scripts for the conversation-memory plugin and browser extension. Not published; each package under plugin/ and extension/ is self-contained.",
   "scripts": {
-    "test": "node --no-warnings --test plugin/tests/*.test.js extension/tests/*.test.js",
-    "lint": "eslint plugin extension",
+    "test": "node --no-warnings --test tests/plugin/*.test.js extension/tests/*.test.js",
+    "lint": "eslint plugin extension tests",
     "check-core": "node scripts/check-core.js",
     "sync-core": "node scripts/check-core.js --write",
     "e2e": "python3 extension/tests/e2e.py",
-    "integration": "bash plugin/tests/integration.sh",
+    "integration": "bash tests/plugin/integration.sh",
     "package": "node scripts/package.js"
   },
   "devDependencies": {

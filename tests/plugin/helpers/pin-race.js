@@ -7,5 +7,5 @@ process.env.CLAUDE_PROJECT_DIR = P;
 const d = path.join(P, "CONVERSATION_PINS", name), real = fs.readdirSync;
 let once = true;
 fs.readdirSync = function (p, ...a) { const r = real.call(fs, p, ...a); if (once && String(p) === d) { once = false; fs.writeFileSync(path.join(d, "v2.md"), "نص كاتب آخر"); } return r; };
-const { savePin } = require("../../scripts/lib/store");
+const { savePin } = require("../../../plugin/scripts/lib/store");
 process.stdout.write(JSON.stringify(savePin(name, "نصي أنا")));

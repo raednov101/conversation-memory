@@ -3,7 +3,7 @@
 "use strict";
 const fs = require("fs"), path = require("path");
 const P = process.argv[2];
-const C = require("../../core/memory-core.js");
+const C = require("../../../plugin/core/memory-core.js");
 const real = C.applyDraft; let once = true;
 C.applyDraft = function (m, ...rest) {
   const out = real.call(this, m, ...rest);
@@ -17,5 +17,5 @@ C.applyDraft = function (m, ...rest) {
   }
   return out;
 };
-process.argv = [process.argv[0], path.join(__dirname, "..", "..", "scripts", "hook.js"), "stop"];
-require("../../scripts/hook.js");
+process.argv = [process.argv[0], path.join(__dirname, "..", "..", "..", "plugin", "scripts", "hook.js"), "stop"];
+require("../../../plugin/scripts/hook.js");

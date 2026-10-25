@@ -1,8 +1,8 @@
-// node --test tests/        (Node 18+)
+// node --test tests/plugin/        (Node 18+)
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const C = require("../core/memory-core.js");
+const C = require("../../plugin/core/memory-core.js");
 
 const ENTRY = { raised: ["نقاش حول الهوية البصرية للمقهى"], decided: ["اعتماد اللون الزيتوني"], changed: [] };
 const D = (o) => ({ batch: "b-1", entry: ENTRY, ...o });

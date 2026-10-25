@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Real end-to-end test inside Claude Code (needs the `claude` CLI, logged in). Default permission mode on purpose:
 # it proves the memory drafts are written without prompting the user.
-# Usage from the plugin folder:  bash tests/integration.sh        (costs a few cents of usage)
+# Usage from the repository root:  bash tests/plugin/integration.sh        (costs a few cents of usage)
 set -u
-PLUGIN="$(cd "$(dirname "$0")/.." && pwd)"
+PLUGIN="$(cd "$(dirname "$0")/../../plugin" && pwd)"
 export CONV_MEMORY_MODE=auto   # this run walks the periodic path (every 5); the session-edge path is the "recovered" batch below
 WORK="$(mktemp -d)"; PROJ="$WORK/proj"; LOG="$WORK/log"; mkdir -p "$PROJ" "$LOG"
 # test copy whose indicator also writes what it would show, so it can be checked without a screen
