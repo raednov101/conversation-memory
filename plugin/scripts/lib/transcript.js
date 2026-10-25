@@ -20,6 +20,7 @@ function readTranscript(tp) {
     raw = buf.toString("utf8"); raw = raw.slice(raw.indexOf("\n") + 1);
   } else raw = fs.readFileSync(tp, "utf8");
   const turns = [];
+  turns.truncated = s.size > MAX_TRANSCRIPT;   // only the newest part was read: the messages' numbers are unknown
   for (const line of raw.split("\n")) {
     let o; try { o = JSON.parse(line); } catch { continue; }
     if (!o || typeof o !== "object" || o.isSidechain || o.isMeta || o.isCompactSummary || o.isVisibleInTranscriptOnly || !o.message) continue;

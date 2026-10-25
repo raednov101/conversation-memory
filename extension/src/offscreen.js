@@ -152,14 +152,19 @@ async function takeWriteLock(r) {
     let mine = false; try { mine = String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " "); } catch {}
     if (mine) {
       // while held, the time in the lock is refreshed: a slow write is never taken for an abandoned one
-      const lk = { d, me };
-      lk.beat = setInterval(async () => { try { if (String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " ")) await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`); } catch {} }, Math.floor(WLOCK_STALE / 3));
+      // a refresh in flight when the lock is released must not write it back: each one checks «done» right before
+      // writing, and the release waits for it to finish (lk.beating)
+      const lk = { d, me, done: false, beating: null };
+      lk.beat = setInterval(() => {
+        if (lk.done || lk.beating) return;
+        lk.beating = (async () => { try { if (!lk.done && String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " ") && !lk.done) await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`); } catch {} finally { lk.beating = null; } })();
+      }, Math.floor(WLOCK_STALE / 3));
       return lk;
     }
   }
   return null;
 }
-async function dropWriteLock(lk) { if (!lk || lk.browser) return; clearInterval(lk.beat); try { if (String(await readText(lk.d, C.PROTOCOL.writeLock)).startsWith(lk.me + " ")) await lk.d.removeEntry(C.PROTOCOL.writeLock); } catch {} }
+async function dropWriteLock(lk) { if (!lk || lk.browser) return; lk.done = true; clearInterval(lk.beat); if (lk.beating) await lk.beating; try { if (String(await readText(lk.d, C.PROTOCOL.writeLock)).startsWith(lk.me + " ")) await lk.d.removeEntry(C.PROTOCOL.writeLock); } catch {} }
 async function archive(r, entries) {
   if (!entries.length) return;
   await writeVerified(await dir(await dataDir(r), ["archive"]), `${stamp()}-${nonce().slice(0, 4)}.json`, JSON.stringify(entries, null, 1));
@@ -222,7 +227,8 @@ const evidenceArg = (e) => {
   let size = 0; const turns = [];
   for (const x of Array.isArray(e.turns) ? e.turns.slice().reverse() : []) {
     if (!x || (x.role !== "user" && x.role !== "assistant") || typeof x.text !== "string" || (size += x.text.length) > EVIDENCE_MAX) break;
-    turns.unshift({ role: x.role, text: x.text, ...(Number.isInteger(x.n) ? { n: x.n } : {}) });
+    // a user message's number as on the page; without it (and once older turns are cut off) it is unknown, never guessed
+    turns.unshift({ role: x.role, text: x.text, n: Number.isInteger(x.n) && x.n > 0 ? x.n : null });
   }
   return { user: e.user.slice(-EVIDENCE_MAX), all: e.all.slice(-EVIDENCE_MAX), ...(turns.length ? { turns } : {}) };
 };

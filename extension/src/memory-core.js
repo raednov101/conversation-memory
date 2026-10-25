@@ -100,15 +100,17 @@
     for (const k of Object.keys(o)) {
       if (known.has(k) || !/^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(k) || k in Object.prototype) continue;
       let v; try { v = JSON.stringify(o[k]); } catch { continue; }
-      if (v === undefined || (size += v.length + k.length) > max) continue;
-      out[k] = JSON.parse(v);
+      if (v === undefined || size + v.length + k.length > max) continue;   // one too large is skipped; the others are still kept
+      size += v.length + k.length; out[k] = JSON.parse(v);
     }
     return out;
   }
   // the format's version: a file written by a later format is read, but never written over (formatNewer)
   const formatVersion = (f) => { const x = /^conversation-memory\/(\d{1,4})$/.exec(String(f || "")); return x ? +x[1] : 1; };
   const formatNewer = (input) => isObj(input) && formatVersion(input.format) > formatVersion(FORMAT);
-  const pendingItems = (v) => (Array.isArray(v) ? v : []).filter(isObj).map((x) => ({ text: cleanStr(x.text), reason: cleanStr(x.reason, 200), date: cleanStr(x.date, 40), quote: cleanStr(x.quote, QUOTE_MAX) }))
+  const KNOWN_PEND = new Set(["text", "reason", "date", "quote"]), KNOWN_SUM = new Set(["goal", "status", "next", "open"]), KNOWN_PIN = new Set(["name", "version", "path", "sha", "date"]);
+  const KNOWN_LOG = new Set(["id", "platform", "chat", "range", "date", "raised", "decided", "changed"]);
+  const pendingItems = (v) => (Array.isArray(v) ? v : []).filter(isObj).map((x) => ({ text: cleanStr(x.text), reason: cleanStr(x.reason, 200), date: cleanStr(x.date, 40), quote: cleanStr(x.quote, QUOTE_MAX), ...extras(x, KNOWN_PEND, 500) }))
     .filter((x) => x.text).slice(-LIMITS.list);
   // accept anything (hand-edited, older, partial) and return a well-formed memory; never throws
   function normalizeMemory(input) {
@@ -116,7 +118,7 @@
     if (!isObj(input)) return m;
     m.updated = cleanStr(input.updated, 40);
     const s = isObj(input.summary) ? input.summary : {};
-    m.summary = { goal: cleanStr(s.goal), status: cleanStr(s.status), next: cleanList(s.next), open: cleanList(s.open) };
+    m.summary = { goal: cleanStr(s.goal), status: cleanStr(s.status), next: cleanList(s.next), open: cleanList(s.open), ...extras(s, KNOWN_SUM, 8000) };
     const seen = new Set();
     m.decisions = (Array.isArray(input.decisions) ? input.decisions : []).filter(isObj).map((d) => ({
       id: isId(d.id) ? d.id : "", text: cleanStr(d.text), source: SOURCES.includes(d.source) ? d.source : "user",
@@ -134,15 +136,15 @@
     m.constraints = [...new Set(cleanList(input.constraints, LIMITS.constraints))];
     const pc = isObj(input.pending) && isObj(input.pending.constraints) ? input.pending.constraints : {};
     m.pending = { ...extras(isObj(input.pending) ? input.pending : {}, new Set(["constraints"]), 16000),
-      constraints: { add: pendingItems(pc.add).filter((x) => !m.constraints.includes(x.text)), remove: pendingItems(pc.remove).filter((x) => m.constraints.includes(x.text)) } };
+      constraints: { ...extras(pc, new Set(["add", "remove"]), 4000), add: pendingItems(pc.add).filter((x) => !m.constraints.includes(x.text)), remove: pendingItems(pc.remove).filter((x) => m.constraints.includes(x.text)) } };
     // the path is rebuilt from a validated name and version, never taken from the file (no "..", no other folders)
     m.pins = (Array.isArray(input.pins) ? input.pins : []).filter(isObj).filter((p) => typeof p.name === "string" && pinNameOk(p.name)).map((p) => {
       const name = p.name.trim().replace(/\s+/g, " "), version = Math.min(999999, Math.max(1, Math.floor(+p.version) || 1));
-      return { name, version, path: pinPath(name, version), sha: typeof p.sha === "string" && /^[0-9a-f]{8,64}$/.test(p.sha) ? p.sha : "", date: cleanStr(p.date, 40) };
+      return { name, version, path: pinPath(name, version), sha: typeof p.sha === "string" && /^[0-9a-f]{8,64}$/.test(p.sha) ? p.sha : "", date: cleanStr(p.date, 40), ...extras(p, KNOWN_PIN, 1000) };
     });
     m.log = (Array.isArray(input.log) ? input.log : []).filter(isObj).map((e) => ({
       id: cleanStr(e.id, 100), platform: PLATFORMS[e.platform] ? e.platform : "claude-code", chat: cleanStr(e.chat, 200), range: cleanStr(e.range, 40), date: cleanStr(e.date, 40),
-      raised: cleanList(e.raised), decided: cleanList(e.decided), changed: cleanList(e.changed),
+      raised: cleanList(e.raised), decided: cleanList(e.decided), changed: cleanList(e.changed), ...extras(e, KNOWN_LOG, 1000),
     })).filter((e) => e.id).slice(-LIMITS.log);
     if (isObj(input.imported) && typeof input.imported.text === "string") m.imported = { date: cleanStr(input.imported.date, 40), text: cut(wellFormed(input.imported.text), LIMITS.imported) };
     m.mdHash = typeof input.mdHash === "string" ? input.mdHash.slice(0, 32) : "";
@@ -197,7 +199,7 @@
     if (Array.isArray(ev.turns)) {
       let k = 0;
       turns = ev.turns.filter((t) => isObj(t) && (t.role === "user" || t.role === "assistant") && typeof t.text === "string")
-        .map((t) => ({ role: t.role, t: evNorm(t.text), n: t.role === "user" ? (Number.isInteger(t.n) && t.n > 0 ? (k = t.n) : ++k) : 0 }));
+        .map((t) => ({ role: t.role, t: evNorm(t.text), n: t.role !== "user" || t.n === null ? 0 : Number.isInteger(t.n) && t.n > 0 ? (k = t.n) : ++k }));   // n: null = number unknown
       if (!turns.some((t) => t.role === "user")) turns = null;
     }
     return { user: typeof ev.user === "string" ? evNorm(ev.user) : all, all, numbers: numbersIn(ev.all, true), turns };
@@ -212,36 +214,55 @@
   const STOP = new Set(("في من على الى عن مع هذا هذه ذلك تلك ان او ثم كل بعد قبل عند اللي الذي التي الذين هو هي هم انا نحن احنا انت انتم هل قد لقد كان يكون " +
     "ايضا بس يعني شي شيء كذا هنا هناك عشان علشان لان لكن بل حتى اذا لو وش ايش كيف متى ليش اي ايه نعم تمام اوكي طيب خلاص " +
     "the a an to of in on for and or is are was be we i you it this that with as at by from so then just ok okay yes").split(" "));
-  const NEG = new Set(("لا لم لن ليس ليست لست لسنا مو مب مش ماني مانيب بلاش بدون عدم ممنوع يمنع منع نمنع تمنع امنع رفض نرفض ارفض يرفض ترفض " +
-    "ولا فلا ولم ولن وليس وبدون وعدم ومنع لاتنشر " +
-    "not no never without cannot nor avoid stop dont").split(" "));
-  const NEG_AFTER_MA = new Set("ابي ابغي ابغا ابغى نبي نبغي نبغا نبغى ودي اريد نريد احب نحب يصلح ينفع ابيه نبيه ابغاه نبغاه عاد ابيها نبيها احتاج نحتاج".split(" "));
-  // idioms that read as negative but agree («لا بأس», «ما عندي مانع», «why not»)
-  const AGREE_IDIOM = /(لا باس|لا مانع|ما فيه مانع|ما في مانع|ما عندي مانع|مافي مانع|ليش لا|ولا يهمك|لا شك|no problem|why not|not a problem|no doubt)/g;
+  const NEG = new Set(("لا لاء لاا لم لن ليس ليست لست لسنا مو مب مش ماني مانيب بلاش بدون عدم ممنوع يمنع منع نمنع تمنع امنع رفض نرفض ارفض يرفض ترفض " +
+    "ولا فلا ولم ولن وليس وبدون وعدم ومنع لاتنشر مابي مابغي مابغا مابغى ماابي مانبي مانبغي ماودي " +
+    "not no never without cannot nor avoid stop dont nope nah").split(" "));
+  // «ما» negates a verb or a «there is / I have»: «ما نستخدم»، «ما راح»، «ما ابي»، «ما عندي»، «ما فيه»
+  const MA_NEG = (w) => !!w && (/^[ايتنب]/.test(w) || ["راح", "رح", "عاد", "عندي", "عندنا", "فيه", "في", "بقى", "صار", "لي", "لنا"].includes(w));
+  // idioms that read as negative but agree («لا بأس», «ما عندي مانع», «why not») — whole words only (never «لا شكراً»)
+  const AGREE_IDIOM = /(?:^| )(?:لا باس|لا مانع|ما فيه مانع|ما في مانع|ما عندي مانع|مافي مانع|ليش لا|ولا يهمك|لا شك|no problem|why not|not a problem|no doubt)(?= |$)/g;
   const tokens = (t) => evNorm(t).replace(AGREE_IDIOM, " ").split(" ").filter(Boolean);
-  function negated(t) {
-    const w = tokens(t);
+  function negatedTokens(w) {
     for (let i = 0; i < w.length; i++) {
       if (NEG.has(w[i])) return true;
-      if ((w[i] === "ما" || w[i] === "وما") && NEG_AFTER_MA.has(w[i + 1] || "")) return true;
+      if ((w[i] === "ما" || w[i] === "وما") && MA_NEG(w[i + 1])) return true;
       if (/^(don|doesn|didn|isn|aren|wasn|weren|won|can|couldn|shouldn|wouldn|mustn)$/.test(w[i]) && w[i + 1] === "t") return true;
     }
     return false;
   }
+  const negated = (t) => negatedTokens(tokens(t));
+  // a change of mind in words: «ألغِ»، «خلاص بدلها»، «ما عاد»، «instead», «cancel»… (or the opposite polarity, checked apart)
+  const CHANGE = /(?:^| )(?:الغ|الغي|الغيه|الغيها|الغوه|الغيت|الغينا|نلغي|نلغيه|نلغيها|الغاء|ملغي|خلاص|بدل\S*|نبدل\S*|غيره|غيرها|غيروا|غيرت|غيرنا|نغير\S*|تغيير|تغير|انس|انسى|انساه|انسها|شيل\S*|احذف\S*|حذف\S*|نحذف\S*|امسح\S*|تراجع\S*|نرجع|عدل|عدله|عدلها|نعدل\S*|ما عاد|لا عاد|عاد ما|بلاش|ماعاد|لا داعي|ما له داعي|مو لازم|مب لازم|ما يحتاج|ما نحتاج|no need|not needed|cancel\S*|revok\S*|drop\S*|remov\S*|instead|chang\S*|switch\S*|replac\S*|no longer|forget|scrap\S*|undo|delete\S*)(?= |$)/;
+  const changeWords = (t) => CHANGE.test(evNorm(t));
   // a rough stem: without the conjunction, the article and common suffixes (enough to compare two words, never shown)
   const stem = (w) => w.replace(/^(و|ف)(?=.{3,})/, "").replace(/^(ب|ل|ك)?ال(?=.{2,})|^لل(?=.{2,})/, "").replace(/(ها|هم|هن|كم|نا|ات|ون|ين|ان|ه|ي|ك)$/, (s, _, i) => (i >= 3 ? "" : s));
   const content = (t) => [...new Set(tokens(t).filter((w) => !STOP.has(w) && !NEG.has(w) && (w.length >= 3 || /^\d{2,}$/.test(w))).map(stem).filter((w) => w.length >= 2))];
-  const grams = (w) => { const g = new Set(); if (w.length <= 3) g.add(w); else for (let i = 0; i + 3 <= w.length; i++) g.add(w.slice(i, i + 3)); return g; };
-  const near = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && [...grams(a)].some((g) => grams(b).has(g)));
-  const shares = (a, b) => { const B = content(b); return content(a).some((x) => B.some((y) => near(x, y))); };
-  // why a quote does not back a text, or "" (polarity and subject)
-  function meaningGap(quote, text) {
-    if (negated(quote) !== negated(text)) return "المعنى قد يعاكس كلامك (نفي في أحدهما فقط)";
-    if (!shares(quote, text)) return "الاقتباس لا يذكر موضوع القرار";
+  // two words are the same word, roughly: equal, one inside the other (3+ letters), or the same 4-letter start (a leading
+  // verb or plural letter aside: «اعتمدنا» ~ «اعتماد», «تنشر» ~ «نشر»). Never a shared fragment in the middle.
+  const lead = (w) => (w.length > 4 ? w.replace(/^[ايتن]/, "") : w);
+  const near = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.includes(b) || b.includes(a))) ||
+    [[a, b], [lead(a), b], [a, lead(b)], [lead(a), lead(b)]].some(([x, y]) => x.length >= 4 && y.length >= 4 && x.slice(0, 4) === y.slice(0, 4));
+  const shared = (a, b) => { const B = content(b); return content(a).filter((x) => B.some((y) => near(x, y))).length; };
+  const shares = (a, b) => shared(a, b) > 0;
+  // names and numbers written in Latin letters (a library, a product, a code) are the most often swapped: each must be in the quote
+  const latinMissing = (quote, text) => { const Q = content(quote); return content(text).filter((w) => /^[a-z]{2,}$/.test(w) && !Q.some((y) => near(w, y))); };
+  // the quote in its message: the words just before it may negate it («لا أريد [نشر بياناتي]»), so its polarity is read with them
+  function polarityIn(q, ev, at) {
+    if (!at || at.i < 0 || !ev.turns) return negatedTokens(q.split(" "));
+    const msg = ev.turns[at.i].t, k = msg.lastIndexOf(q);
+    const before = (k > 0 ? msg.slice(0, k) : "").replace(AGREE_IDIOM, " ").split(" ").filter(Boolean).slice(-4);
+    return negatedTokens([...before, ...q.replace(AGREE_IDIOM, " ").split(" ").filter(Boolean)]);
+  }
+  // why a quote does not back a text, or "" (polarity, subject, names)
+  function meaningGap(quote, text, negQuote) {
+    if (negQuote !== negated(text)) return "المعنى قد يعاكس كلامك (نفي في أحدهما فقط)";
+    const n = content(text).length, s = shared(quote, text);
+    if (!s || s < Math.min(2, Math.ceil(n / 4))) return "الاقتباس لا يذكر موضوع القرار";
+    const lm = latinMissing(quote, text); if (lm.length) return `اسم في القرار ليس في كلامك: ${lm.slice(0, 2).join("، ")}`;
     return "";
   }
-  // where your words are: the number of your message that holds q (the newest one), 0 when only the joined text has it,
-  // -1 when it is not yours at all
+  // where your words are: the number of your message that holds q (the newest one; 0 when unknown), and its place among the
+  // turns (-1 when only the joined text is known); null when they are not yours at all
   function findUserQuote(q, ev) {
     if (ev.turns) { for (let i = ev.turns.length - 1; i >= 0; i--) if (ev.turns[i].role === "user" && ev.turns[i].t.includes(q)) return { n: ev.turns[i].n, i }; return null; }
     return ev.user.includes(q) ? { n: 0, i: -1 } : null;
@@ -258,27 +279,37 @@
       const at = findUserQuote(q, ev);
       if (!at) return { why: notYours(q, ev), msg };
       msg = at.n;
-      if (a.source === "user") { const gap = meaningGap(a.quote, a.text); if (gap) return { why: gap, msg }; }
+      if (a.source === "user") { const gap = meaningGap(a.quote, a.text, polarityIn(q, ev, at)); if (gap) return { why: gap, msg }; }
       else {
-        if (negated(a.quote)) return { why: "اقتباس الموافقة فيه رفض أو نفي", msg };
+        // an approval is a plain yes: no refusal or reservation anywhere in that message («نعم، لكن لا تحذف…» is not one)
+        if (negated(a.quote) || (at.i >= 0 && negatedTokens(ev.turns[at.i].t.replace(AGREE_IDIOM, " ").split(" ").filter(Boolean)))) return { why: "اقتباس الموافقة فيه رفض أو نفي أو تحفّظ", msg };
         if (ev.turns && at.i >= 0) {
           let j = at.i - 1; while (j >= 0 && ev.turns[j].role !== "assistant") j--;
-          if (j < 0 || !shares(a.text, ev.turns[j].t)) return { why: "موافقتك لا تتبع اقتراحاً بهذا المضمون", msg };
+          const n = content(a.text).length;
+          if (j < 0 || shared(a.text, ev.turns[j].t) < Math.max(1, Math.ceil(n / 2)) || latinMissing(ev.turns[j].t, a.text).length) return { why: "موافقتك لا تتبع اقتراحاً بهذا المضمون", msg };
         }
       }
     }
     const miss = numbersIn(a.text, false).filter((n) => !ev.numbers.has(n) && !known.has(n));
     return { why: miss.length ? `رقم لا يظهر في المحادثة: ${miss.slice(0, 3).join("، ")}` : "", msg };
   }
-  // a change to something you decided (revoking a decision, adding or removing a constraint) needs your words for it too
-  function checkChange(quote, text, ev, wantPolarity) {
+  // A change to something you decided (revoking or replacing a decision, removing a constraint) needs your words for that
+  // change: from a message after the one it came from, not the words it was made with, and saying so — a change of mind
+  // («ألغِ»، «بدل»، «ما عاد»…) or the opposite of it. Adding a constraint needs your words stating it (polarity kept).
+  // target: { text, quote?, msg? } — what is changed (a constraint has no quote or message of its own)
+  function checkChange(quote, target, ev, kind) {
     if (!ev) return { why: "لم يتوفر نص المحادثة للتحقق", msg: 0 };
     const q = evNorm(quote || "");
     if (q.replace(/\s/g, "").length < QUOTE_MIN) return { why: "بلا اقتباس من كلامك", msg: 0 };
     const at = findUserQuote(q, ev);
     if (!at) return { why: notYours(q, ev), msg: 0 };
-    if (wantPolarity && negated(quote) !== negated(text)) return { why: "المعنى قد يعاكس كلامك (نفي في أحدهما فقط)", msg: at.n };
-    if (!shares(quote, text)) return { why: "الاقتباس لا يذكر موضوعه", msg: at.n };
+    const neg = polarityIn(q, ev, at);
+    if (kind === "add") { const gap = meaningGap(quote, target.text, neg); return { why: gap ? gap.replace("القرار", "القيد") : "", msg: at.n }; }
+    if (!shares(quote, target.text)) return { why: "الاقتباس لا يذكر ما يُلغى", msg: at.n };
+    if (target.quote && (q.includes(evNorm(target.quote)) || evNorm(target.quote).includes(q))) return { why: "الاقتباس هو كلامك الذي قررته به، لا كلامك الذي ألغيته به", msg: at.n };
+    if (target.msg && at.n && at.n <= target.msg) return { why: "الاقتباس من رسالة قبل القرار أو منها", msg: at.n };
+    // a mere opposite («بيانات العملاء مهمة» against «لا ننشر…») is not a change of mind: the words must say it
+    if (kind !== "replace" && !changeWords(quote)) return { why: "الاقتباس لا يقول إنك ألغيته أو غيّرته", msg: at.n };
     return { why: "", msg: at.n };
   }
 
@@ -348,14 +379,14 @@
       pending.push({ key: "x-" + d.id, text: d.text, reason: why });
     };
     if (draft.summary) {
-      if (ctx.allowSummary) m.summary = { goal: R(draft.summary.goal), status: R(draft.summary.status), next: RL(draft.summary.next), open: RL(draft.summary.open) };
+      if (ctx.allowSummary) m.summary = { ...extras(m.summary, KNOWN_SUM, 8000), goal: R(draft.summary.goal), status: R(draft.summary.status), next: RL(draft.summary.next), open: RL(draft.summary.open) };
       else skipped.push("summary");
     }
     if (draft.decisions) {
       for (const r of draft.decisions.revoke) {
         const d = m.decisions.find((x) => x.id === r.id && x.status === "active"); if (!d) continue;
         // the model's own suggestions it may withdraw; one of yours needs your words for it
-        revokeOrHold(d, r.quote, yours(d) ? checkChange(r.quote, d.text, ev, false).why : "");
+        revokeOrHold(d, r.quote, yours(d) ? checkChange(r.quote, d, ev, "revoke").why : "");
       }
       let next = 1 + Math.max(0, ...m.decisions.map((d) => +d.id.slice(1) || 0));
       for (const a of draft.decisions.add) {
@@ -366,12 +397,16 @@
         // an unbacked decision never replaces one in force: it waits as a suggestion until the user approves it — and then
         // it becomes what the model said it was (the user's decision, or an approved suggestion) and replaces what it meant to.
         // A backed one replaces a decision of yours only if its words are about that decision too; else the old one waits for you.
+        // A backed one replaces a decision of yours only with your words for the change (checkChange); the model's own
+        // suggestion never replaces one of yours, it only proposes. It claims to replace only what it really replaced.
+        let replaced = "";
         if (a.replaces && !why) {
           const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active");
-          if (old) revokeOrHold(old, a.quote, yours(old) && !shares(a.quote || a.text, old.text) ? "الاقتباس لا يذكر القرار الذي يحل محله" : "");
+          if (old && !yours(old)) { revokeOrHold(old, a.quote, ""); replaced = old.id; }
+          else if (old && a.source !== "assistant") { const ch = checkChange(a.quote, old, ev, "replace").why; revokeOrHold(old, a.quote, ch); if (!ch) replaced = old.id; }
         }
         const id = "d" + next++;
-        m.decisions.push({ id, text, source: why ? "assistant" : a.source, date, status: "active", revokedOn: "", replaces: why ? "" : a.replaces, quote: R(a.quote || ""), unverified: !!why,
+        m.decisions.push({ id, text, source: why ? "assistant" : a.source, date, status: "active", revokedOn: "", replaces: replaced, quote: R(a.quote || ""), unverified: !!why,
           ...(c.msg > 0 ? { msg: c.msg } : {}), ...(why && a.source !== "assistant" ? { claimed: a.source } : {}), ...(why && a.replaces ? { pendingReplaces: a.replaces } : {}) });
         if (why) unverified.push({ id, text, reason: why });
       }
@@ -381,16 +416,16 @@
       const P = m.pending.constraints;
       for (const r of draft.constraints.remove) {
         const c = m.constraints.find((x) => x === r.text); if (!c) continue;
-        const why = checkChange(r.quote, c, ev, false).why;
+        const why = checkChange(r.quote, { text: c }, ev, "remove").why;
         if (!why) { m.constraints = m.constraints.filter((x) => x !== c); P.remove = P.remove.filter((x) => x.text !== c); continue; }
-        if (!P.remove.some((x) => x.text === c)) { P.remove.push({ text: c, reason: why, date, quote: R(r.quote) }); pending.push({ key: "c-" + hash(c).slice(0, 6), text: c, reason: why }); }
+        if (!P.remove.some((x) => x.text === c)) { P.remove.push({ text: c, reason: why, date, quote: R(r.quote) }); pending.push({ key: ckey("-", c), text: c, reason: why }); }
       }
       for (const a of draft.constraints.add) {
         const text = R(a.text);
         if (m.constraints.includes(text)) continue;
-        const why = checkChange(a.quote, text, ev, true).why;
+        const why = checkChange(a.quote, { text }, ev, "add").why;
         if (!why) { m.constraints.push(text); P.add = P.add.filter((x) => x.text !== text); continue; }
-        if (!P.add.some((x) => x.text === text)) { P.add.push({ text, reason: why, date, quote: R(a.quote) }); pending.push({ key: "c+" + hash(text).slice(0, 6), text, reason: why }); }
+        if (!P.add.some((x) => x.text === text)) { P.add.push({ text, reason: why, date, quote: R(a.quote) }); pending.push({ key: ckey("+", text), text, reason: why }); }
       }
       m.constraints = [...new Set(m.constraints)].slice(-LIMITS.constraints);
       P.add = P.add.slice(-LIMITS.list); P.remove = P.remove.slice(-LIMITS.list);
@@ -541,9 +576,9 @@
   }
   // ---------- what waits for you, and your answer to it ----------
   // keys: "d3" a decision not backed by your words · "x-d3" revoking d3 was proposed without your words ·
-  // "c+<6>" / "c-<6>" adding / removing a constraint was proposed without your words (<6> = the constraint's fingerprint)
-  const isReviewKey = (k) => typeof k === "string" && /^(d\d{1,6}|x-d\d{1,6}|c[+-][0-9a-f]{6})$/.test(k);
-  const ckey = (sign, text) => "c" + sign + hash(text).slice(0, 6);
+  // "c+<8>" / "c-<8>" adding / removing a constraint was proposed without your words (<8> = the constraint's fingerprint)
+  const isReviewKey = (k) => typeof k === "string" && /^(d\d{1,6}|x-d\d{1,6}|c[+-][0-9a-f]{8})$/.test(k);
+  const ckey = (sign, text) => "c" + sign + hash(text).slice(-8);   // the low 32 bits (the hash's first digits carry fewer)
   function reviewItems(memory) {
     const m = normalizeMemory(memory), out = [];
     for (const d of m.decisions) {
@@ -590,8 +625,8 @@
     const R = (t) => { const r = redact(t); if (r.changed) redacted = true; return r.text; };
     const find = (id) => { const d = m.decisions.find((x) => x.id === id); if (!d) missing.push(id); return d; };
     if (fix.decisions) {
-      // your own correction: the text is now yours as written (confirmed), unless it still waits for your approval
-      for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); if (!d.unverified && d.source !== "assistant") d.confirmed = true; changes.push(`عُدّل نص ${d.id}`); } }
+      // a corrected text is no longer what was confirmed: confirming it again is a separate, explicit approval
+      for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); delete d.confirmed; changes.push(`عُدّل نص ${d.id}`); } }
       for (const id of fix.decisions.approve) {
         const d = find(id); if (!d || d.status !== "active") continue;
         // a flagged decision, approved: it is what the model said it was, and it replaces what it was meant to replace
@@ -614,7 +649,7 @@
       for (const k of fix.pending.approve) answerReview(m, k, true, date, changes, missing);
       for (const k of fix.pending.reject) answerReview(m, k, false, date, changes, missing);
     }
-    if (fix.summary) { m.summary = { goal: R(fix.summary.goal), status: R(fix.summary.status), next: fix.summary.next.map(R), open: fix.summary.open.map(R) }; changes.push("استُبدلت الخلاصة الحالية"); }
+    if (fix.summary) { m.summary = { ...extras(m.summary, KNOWN_SUM, 8000), goal: R(fix.summary.goal), status: R(fix.summary.status), next: fix.summary.next.map(R), open: fix.summary.open.map(R) }; changes.push("استُبدلت الخلاصة الحالية"); }
     if (fix.log) for (const id of fix.log.remove) { const before = m.log.length; m.log = m.log.filter((e) => e.id !== id); if (m.log.length < before) changes.push(`حُذفت دفعة من السجل (${id})`); else missing.push(id); }
     if (changes.length) m.updated = date || m.updated;
     return { memory: normalizeMemory(m), changes, missing: [...new Set(missing)], redacted };

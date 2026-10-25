@@ -112,7 +112,7 @@ function evidenceSource(s) {
       const last = typeof input.last_assistant_message === "string" ? input.last_assistant_message : "";
       base = turns ? { user: turns.map((t) => t.raw).join("\n"), all: turns.map((t) => t.raw + "\n" + t.assistant.join("\n")).join("\n") + "\n" + last,
         // in order, so a quote is tied to one of your messages, and an approval to the reply it answers
-        turns: [...turns.flatMap((t) => [{ role: "user", text: t.raw }, { role: "assistant", text: t.assistant.join("\n") }]), ...(last ? [{ role: "assistant", text: last }] : [])] } : null;
+        turns: [...turns.flatMap((t) => [{ role: "user", text: t.raw, ...(turns.truncated ? { n: null } : {}) }, { role: "assistant", text: t.assistant.join("\n") }]), ...(last ? [{ role: "assistant", text: last }] : [])] } : null;
     }
     if (b.kind !== "recovered") return base;
     const c = readCapture(b.id);
@@ -120,7 +120,9 @@ function evidenceSource(s) {
     const body = c.parts.map((p) => p.body).join("");
     const user = [...body.matchAll(CAP_USER_RE)].map((m) => m[1]).join("\n");
     const capTurns = [...body.matchAll(CAP_TURN_RE)].flatMap((m) => [{ role: "user", text: m[2], n: +m[1] }, { role: "assistant", text: m[3] }]);
-    return { user: (base ? base.user + "\n" : "") + user, all: (base ? base.all + "\n" : "") + body, turns: capTurns.length ? capTurns : base ? base.turns : undefined };
+    // the captured messages first (with their numbers), then this session's (their numbers unknown in this mix)
+    const rest = base && base.turns ? base.turns.map((x) => (x.role === "user" ? { ...x, n: null } : x)) : [];
+    return { user: (base ? base.user + "\n" : "") + user, all: (base ? base.all + "\n" : "") + body, turns: capTurns.length ? [...capTurns, ...rest] : base ? base.turns : undefined };
   };
 }
 // what waits for the user after a save: decisions not backed by their words, and changes to what they decided

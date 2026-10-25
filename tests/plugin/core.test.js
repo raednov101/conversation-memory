@@ -396,7 +396,77 @@ test("property: random drafts never make an unbacked trusted decision, never rev
       if (d.source === "user") assert.equal(C.negated(d.quote), C.negated(d.text), "same polarity");
     }
     const was = m0.decisions[0], now = r.memory.decisions.find((d) => d.id === was.id);
-    if (was.source !== "assistant" && was.status === "active" && now.status === "revoked") assert.ok(ev, "a decision of yours is revoked only with the conversation at hand");
+    if (was.source !== "assistant" && was.status === "active" && now.status === "revoked") {
+      assert.ok(ev, "a decision of yours is revoked only with the conversation at hand");
+      const d = draft.draft.decisions, why = d.revoke.some((x) => x.quote) || d.add.some((a) => a.replaces === was.id && a.quote && a.source !== "assistant");
+      assert.ok(why, "…and only with your words for it: " + JSON.stringify(d));
+    }
     assert.equal(C.serialize(C.normalizeMemory(JSON.parse(C.serialize(r.memory)))), C.serialize(r.memory), "normalize is stable");
   }
+});
+
+// ---------- 1.5, independent review: each finding reproduced, then closed ----------
+test("review: the model's own suggestion never replaces your decision, with or without the conversation", () => {
+  const ev = EVQ(["user", "نستخدم PostgreSQL قاعدة بيانات"]);
+  const m = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "نستخدم PostgreSQL قاعدة بيانات", source: "user", quote: "نستخدم PostgreSQL قاعدة بيانات" }] } }), { evidence: ev }).memory;
+  for (const evidence of [undefined, ev]) {
+    const r = C.applyDraft(m, DR({ decisions: { add: [{ text: "نستخدم MongoDB بدل PostgreSQL", source: "assistant", replaces: "d1" }] } }), { evidence }).memory;
+    assert.equal(r.decisions[0].status, "active"); assert.equal(r.decisions[1].replaces, "", "it claims nothing it did not replace");
+  }
+});
+test("review: revoking needs your words for the change — later, not the words you decided with, saying so", () => {
+  const ev = EVQ(["user", "قررت: لا ننشر بيانات العملاء أبداً"], ["assistant", "تم"], ["user", "بيانات العملاء مهمة"], ["assistant", "نعم"], ["user", "خلاص ألغ قرار عدم نشر بيانات العملاء"]);
+  const m = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "لا ننشر بيانات العملاء", source: "user", quote: "لا ننشر بيانات العملاء" }] } }), { evidence: EVQ(["user", "قررت: لا ننشر بيانات العملاء أبداً"]) }).memory;
+  const rv = (quote) => C.applyDraft(m, DR({ decisions: { revoke: [{ id: "d1", quote }] } }), { evidence: ev });
+  assert.match(rv("لا ننشر بيانات العملاء").pending[0].reason, /قررته به/);
+  assert.match(rv("بيانات العملاء مهمة").pending[0].reason, /لا يقول إنك ألغيته/, "mentioning the topic is not revoking it");
+  assert.equal(rv("خلاص ألغ قرار عدم نشر بيانات العملاء").memory.decisions[0].status, "revoked");
+  // a constraint likewise
+  const c = C.applyDraft(C.emptyMemory(), DR({ constraints: { add: [{ text: "لا ننشر بيانات العملاء", quote: "لا ننشر بيانات العملاء" }] } }), { evidence: ev }).memory;
+  assert.deepEqual(C.applyDraft(c, DR({ constraints: { remove: [{ text: "لا ننشر بيانات العملاء", quote: "بيانات العملاء مهمة" }] } }), { evidence: ev }).memory.constraints, ["لا ننشر بيانات العملاء"]);
+});
+test("review: a quote cut short of its negation is read with it; an approval with a reservation is no approval", () => {
+  const one = (text, quote, ev, source = "user") => C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text, source, quote }] } }), { evidence: ev }).unverified;
+  assert.match(one("نشر بيانات العملاء على الموقع", "نشر بيانات العملاء على الموقع", EVQ(["user", "لا أريد نشر بيانات العملاء على الموقع"]))[0].reason, /يعاكس/);
+  assert.match(one("Delete the old backups", "delete the old backups", EVQ(["user", "don't delete the old backups"]))[0].reason, /يعاكس/);
+  assert.match(one("حذف النسخ القديمة", "نعم", EVQ(["assistant", "أقترح حذف النسخ القديمة"], ["user", "نعم، لكن لا تحذف الأحدث"]), "assistant-approved")[0].reason, /تحفّظ/);
+  const c = C.applyDraft(C.emptyMemory(), DR({ constraints: { add: [{ text: "انشر بيانات العملاء", quote: "نشر بيانات العملاء" }] } }), { evidence: EVQ(["user", "لا أريد نشر بيانات العملاء"]) });
+  assert.deepEqual(c.memory.constraints, []);
+});
+test("review: your old words don't back a contrary replacement; a name swapped is caught", () => {
+  const ev = EVQ(["user", "نستخدم PostgreSQL لقاعدة البيانات"]);
+  const m = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "نستخدم PostgreSQL لقاعدة البيانات", source: "user", quote: "نستخدم PostgreSQL لقاعدة البيانات" }] } }), { evidence: ev }).memory;
+  const r = C.applyDraft(m, DR({ decisions: { add: [{ text: "نستخدم MongoDB لقاعدة البيانات", source: "user", quote: "نستخدم PostgreSQL لقاعدة البيانات", replaces: "d1" }] } }), { evidence: ev });
+  assert.equal(r.memory.decisions[0].status, "active"); assert.match(r.unverified[0].reason, /mongodb/);
+  // the real change, said later, replaces it
+  const ev2 = EVQ(["user", "نستخدم PostgreSQL لقاعدة البيانات"], ["assistant", "تم"], ["user", "نبدل قاعدة البيانات إلى MongoDB"]);
+  const ok = C.applyDraft(m, DR({ decisions: { add: [{ text: "قاعدة البيانات MongoDB", source: "user", quote: "نبدل قاعدة البيانات إلى MongoDB", replaces: "d1" }] } }), { evidence: ev2 }).memory;
+  assert.equal(ok.decisions[0].status, "revoked"); assert.equal(ok.decisions[1].replaces, "d1");
+});
+test("review: an approval answers a reply that really proposed it (no shared word fragments)", () => {
+  const r = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "Wipe production backups", source: "assistant-approved", quote: "ok" }] } }), { evidence: EVQ(["assistant", "This module reads its configuration and prints it."], ["user", "ok"]) });
+  assert.match(r.unverified[0].reason, /لا تتبع اقتراحاً/);
+  const a = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "نوقف الاستضافة", source: "assistant-approved", quote: "تمام" }] } }), { evidence: EVQ(["assistant", "أقترح تحسين الاستيراد من الملفات"], ["user", "تمام"]) });
+  assert.match(a.unverified[0].reason, /لا تتبع اقتراحاً/);
+});
+test("review: refusals read as refusals («لا، شكراً»، «مابي»، «ما نستخدم»، nope); «لا بأس» still agrees", () => {
+  for (const q of ["لا، شكراً", "مابي", "مابغى", "ماابي", "ما نستخدم ريأكت", "ما راح ننشر", "nope", "nah", "لاء", "لا باسورد"]) assert.equal(C.negated(q), true, q);
+  for (const q of ["لا بأس", "ما عندي مانع", "why not", "نعتمد الأزرق"]) assert.equal(C.negated(q), false, q);
+});
+test("review: unknown fields survive everywhere, and one too large never drops the rest", () => {
+  const p = C.normalizeMemory({ newTop: "x".repeat(70000), small: 1, summary: { goal: "g", sx: 1 }, log: [{ id: "a", lx: 2 }], pins: [{ name: "n", version: 1, px: 5 }], pending: { constraints: { add: [{ text: "q", px: 3 }], cx: 4 } } });
+  assert.equal(p.small, 1); assert.equal(p.newTop, undefined); assert.equal(p.summary.sx, 1); assert.equal(p.log[0].lx, 2); assert.equal(p.pins[0].px, 5);
+  assert.equal(p.pending.constraints.add[0].px, 3); assert.equal(p.pending.constraints.cx, 4);
+  const r = C.applyDraft(p, DR({ summary: { goal: "جديد" } }), { allowSummary: true }).memory;
+  assert.equal(r.summary.sx, 1, "a new summary keeps what a later version added to it");
+});
+test("review: a held replacement claims nothing; a corrected text is no longer «confirmed»; keys use 32 bits", () => {
+  const ev = EVQ(["user", "اللون أخضر"], ["assistant", "تم"], ["user", "نغير الخط إلى لاتيني"]);
+  const m = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "اللون أخضر", source: "user", quote: "اللون أخضر" }] } }), { evidence: ev }).memory;
+  const r = C.applyDraft(m, DR({ decisions: { add: [{ text: "الخط لاتيني", source: "user", quote: "نغير الخط إلى لاتيني", replaces: "d1" }] } }), { evidence: ev }).memory;
+  assert.ok(r.decisions[0].pendingRevoke); assert.equal(r.decisions[1].replaces, "");
+  const f = C.applyFix(C.applyFix(m, C.validateFix({ decisions: { approve: ["d1"] } }).fix, "x").memory, C.validateFix({ decisions: { edit: [{ id: "d1", text: "اللون أحمر" }] } }).fix, "x").memory;
+  assert.equal(f.decisions[0].confirmed, undefined);
+  const keys = new Set(); for (let i = 0; i < 5000; i++) keys.add(C.reviewItems({ pending: { constraints: { add: [{ text: "قيد " + i }] } } })[0].key);
+  assert.equal(keys.size, 5000, "no collision in 5000 constraints");
 });

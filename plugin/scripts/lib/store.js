@@ -56,7 +56,9 @@ function savedHere() {
 }
 function migrateTrust(mem) {
   const t = readTrust();
+  // …and its Markdown view is the one generated from this very JSON: a hand edit or a pull of the JSON alone breaks that
   if (!t.migrate || !mem.exists || mem.bad || !mem.memory.log.length || !savedHere().has(mem.memory.log[mem.memory.log.length - 1].id)) return false;
+  if (mem.mdText == null || !C.isGeneratedView(mem.mdText, mem.memory, null) || C.hash(mem.mdText) !== mem.memory.mdHash) return false;
   trust(mem.jsonText, mem.memory); return true;
 }
 

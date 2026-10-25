@@ -49,7 +49,7 @@
   // the conversation as read from the page: the writer checks each decision's quote against it (never the extension's own requests)
   // in order too, so a quote is tied to one of your messages (numbered as on the page) and an approval to the reply it answers
   const evidenceOf = (turns) => ({ user: turns.filter((t) => t.role === "user").map((t) => t.text).join("\n"), all: turns.map((t) => t.text).join("\n"),
-    turns: turns.map((t) => ({ role: t.role, text: t.text })) });
+    turns: turns.map((t) => ({ role: t.role, text: t.text, ...(t.role === "user" && Number.isInteger(t.n) ? { n: t.n } : {}) })) });
   const reviewNote = (r) => { const k = (r.unverified ? r.unverified.length : 0) + (r.pending ? r.pending.length : 0);
     return k ? `🔎 ${k === 1 ? "شيء واحد لم يثبت" : k === 2 ? "شيئان لم يثبتا" : k + " أشياء لم تثبت"} من كلامك في المحادثة، فلم يُعتمد وينتظر مراجعتك من «راجع القرارات».` : ""; };
   const saved = (st, w, note, replyLen) => (saves++, Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], hashSrc: w.src || "page", rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen)));
