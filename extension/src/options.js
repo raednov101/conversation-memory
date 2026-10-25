@@ -196,6 +196,44 @@ async function showPin(name, keep) {
 
 chrome.storage.onChanged.addListener((ch) => { if (ch.folderAt && !inPopup) { loadMemory(); loadBackups(); } });
 
+// ---------- optional: summaries in the background with your own API key ----------
+const MODEL = { anthropic: "claude-haiku-5-5", openai: "gpt-5-mini" };
+const ORIGIN = { anthropic: "https://api.anthropic.com/*", openai: "https://api.openai.com/*" };
+async function loadKey() {
+  const { byokKey: k } = await chrome.storage.local.get("byokKey"), { settings: s = {} } = await chrome.storage.local.get("settings");
+  $("provider").value = (k && k.provider) || "anthropic";
+  $("model").value = (k && k.model) || MODEL[$("provider").value];
+  $("apiKey").value = ""; $("apiKey").placeholder = k && k.key ? "محفوظ ••••" + k.key.slice(-4) : "sk-…";
+  say("keyMsg", s.byok && k && k.key ? `✓ مفعّل: يُلخَّص في الخلفية بـ ${k.model || MODEL[k.provider]}.` : "غير مفعّل: يُلخَّص داخل المحادثة.");
+}
+$("provider").addEventListener("change", () => { if (Object.values(MODEL).includes($("model").value) || !$("model").value) $("model").value = MODEL[$("provider").value]; });
+$("keySave").addEventListener("click", async () => {
+  const provider = $("provider").value, model = $("model").value.trim() || MODEL[provider];
+  const { byokKey: old } = await chrome.storage.local.get("byokKey");
+  const key = $("apiKey").value.trim() || (old && old.provider === provider ? old.key : "");
+  if (!/^[\x21-\x7e]{20,300}$/.test(key)) { say("keyMsg", "اكتب المفتاح أولاً."); return; }
+  let granted = false; try { granted = await chrome.permissions.request({ origins: [ORIGIN[provider]] }); } catch {}
+  if (!granted) { say("keyMsg", "لم يُمنح إذن الاتصال بموقع المزوّد، فلم يُفعَّل."); return; }
+  await chrome.storage.local.set({ byokKey: { provider, model, key } });
+  const { settings: s = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...s, byok: true } });
+  loadKey();
+});
+$("keyTest").addEventListener("click", async () => {
+  say("keyMsg", "يختبر…");
+  const r = await chrome.runtime.sendMessage({ cmd: "byok", text: "Reply with the single word OK.", test: true }).catch((e) => ({ ok: false, error: String(e) }));
+  say("keyMsg", r && r.ok ? `✓ المفتاح يعمل (${r.model}).` : `لم ينجح: ${(r && r.error) || "خطأ غير معروف"}`);
+});
+$("keyOff").addEventListener("click", async () => {
+  const { byokKey: k } = await chrome.storage.local.get("byokKey");
+  await chrome.storage.local.remove("byokKey");
+  const { settings: s = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...s, byok: false } });
+  if (k && ORIGIN[k.provider]) chrome.permissions.remove({ origins: [ORIGIN[k.provider]] }).catch(() => {});
+  loadKey();
+});
+loadKey();
+
 // ---------- a full copy of what is kept inside the browser (removing the extension deletes it) ----------
 $("exportAll").addEventListener("click", async () => {
   const r = await fsOp("exportAll"), msg = $("keepMsg");

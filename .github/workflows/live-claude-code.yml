@@ -1,0 +1,29 @@
+# Every Monday: the plugin inside the newest Claude Code, for real (npm run integration). It is the early warning if a
+# Claude Code update changes how hooks behave — a failed run emails the repository owner before any user notices.
+# Needs one repository secret: ANTHROPIC_API_KEY (Settings → Secrets and variables → Actions). Without it the run is skipped.
+# Cost: one run is a dozen short turns, a few cents.
+name: live Claude Code (weekly)
+on:
+  schedule: [{ cron: "17 5 * * 1" }]
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: skip without a key
+        if: env.ANTHROPIC_API_KEY == ''
+        run: echo "::notice::ANTHROPIC_API_KEY is not set; the weekly live test is skipped."
+      - name: newest Claude Code
+        if: env.ANTHROPIC_API_KEY != ''
+        run: npm install -g @anthropic-ai/claude-code && claude --version | tee claude-version.txt
+      - name: the plugin, live
+        if: env.ANTHROPIC_API_KEY != ''
+        run: npm run integration 2>&1 | tee integration.log; exit ${PIPESTATUS[0]}
+      - uses: actions/upload-artifact@v4
+        if: always() && env.ANTHROPIC_API_KEY != ''
+        with: { name: live-claude-code, path: "integration.log\nclaude-version.txt" }

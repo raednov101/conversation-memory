@@ -18,6 +18,7 @@ build = tempfile.mkdtemp(prefix="cm-ext-")
 shutil.copytree(EXT, build, dirs_exist_ok=True, ignore=shutil.ignore_patterns("tests"))
 m = json.load(open(os.path.join(build, "manifest.json")))
 m["content_scripts"][0]["matches"].append("http://127.0.0.1/*")
+m["host_permissions"] = ["http://127.0.0.1/*"]   # the fake model provider below (the real build asks for the provider's site when a key is saved)
 json.dump(m, open(os.path.join(build, "manifest.json"), "w"), ensure_ascii=False)
 bg = os.path.join(build, "src", "background.js")   # the worker treats the local test host like the real sites
 open(bg, "w", encoding="utf8").write('self.CM_TEST_HOSTS = ["http://127.0.0.1/*"];\n' + open(EXT + "/src/background.js", encoding="utf8").read())
@@ -25,13 +26,13 @@ open(bg, "w", encoding="utf8").write('self.CM_TEST_HOSTS = ["http://127.0.0.1/*"
 # ---- fake sites ----
 site = tempfile.mkdtemp(prefix="cm-site-")
 shutil.copy(os.path.join(EXT, "tests", "mock.js"), site)
-def page(platform, path, title, pre=(), timeout=0, after="", variant=""):
+def page(platform, path, title, pre=(), timeout=0, after="", variant="", thread_html=None):
     d = os.path.join(site, path.strip("/")); os.makedirs(d, exist_ok=True)
     cid = ("composer-2026" if variant else "prompt-textarea") if platform == "chatgpt" else "composer"
     def msg(role, text):
         if platform == "chatgpt": return f'<div data-message-author-role="{role}">{text}</div>'
         return f'<div data-testid="user-message">{text}</div>' if role == "user" else f'<div data-is-streaming="false" class="font-claude-response">{text}</div>'
-    thread = "".join(msg("user", f"رسالة قديمة {i}") + msg("assistant", f"رد قديم {i}") for i in pre)
+    thread = thread_html if thread_html is not None else "".join(msg("user", f"رسالة قديمة {i}") + msg("assistant", f"رد قديم {i}") for i in pre)
     to = (f' data-cm-test-timeout="{timeout}"' if timeout else "") + (f' data-cm-test-after-send="{after}"' if after else "") + (f' data-cm-test-variant="{variant}"' if variant else "")
     open(os.path.join(d, "index.html"), "w").write(f"""<!doctype html><html data-cm-test-platform="{platform}"{to}><head><meta charset="utf-8"><title>{title}</title></head>
 <body><main id="thread">{thread}</main><div id="{cid}" class="ProseMirror" contenteditable="true"></div><div id="bar"></div><script src="/mock.js"></script></body></html>""")
@@ -40,11 +41,24 @@ def page(platform, path, title, pre=(), timeout=0, after="", variant=""):
 def new_chat(platform, chat_path, title, **kw):
     page(platform, chat_path, title)   # the chat's own address also exists (another tab may open it directly)
     return page(platform, "/new" + chat_path.rstrip("/").replace("/", "-") + "/", title, after=chat_path, **kw)
+API_CALLS = []
 class Quiet(SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+    # a fake Anthropic Messages API for the «your own key» mode: answers a summary request with a valid draft
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers.get("content-length") or 0)) or b"{}")
+        text = body["messages"][0]["content"]
+        API_CALLS.append({"key": self.headers.get("x-api-key"), "browser": self.headers.get("anthropic-dangerous-direct-browser-access"), "model": body.get("model"), "text": text})
+        rng = re.search(r"من (\d+) إلى (\d+)", text)
+        draft = {"summary": {"goal": "هوية مقهى بالمفتاح", "status": "اعتُمد اللون"}, "decisions": {"add": [{"text": "اللون الأزرق الداكن", "source": "user", "quote": "اعتمدنا اللون الأزرق الداكن"}], "revoke": []},
+                 "entry": {"raised": [f"نقاش الهوية في الرسائل {rng.group(1) if rng else '?'}–{rng.group(2) if rng else '?'} عبر المفتاح"], "decided": [], "changed": []}}
+        out = json.dumps({"content": [{"type": "text", "text": "⟦ذاكرة:بداية⟧\n```json\n" + json.dumps(draft, ensure_ascii=False) + "\n```\n⟦ذاكرة:نهاية⟧"}], "usage": {"input_tokens": 900, "output_tokens": 200}}, ensure_ascii=False).encode()
+        self.send_response(200); self.send_header("content-type", "application/json"); self.send_header("content-length", str(len(out))); self.end_headers(); self.wfile.write(out)
 srv = ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=site))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 BASE = f"http://127.0.0.1:{srv.server_port}"
+_bg = open(bg, encoding="utf8").read()
+open(bg, "w", encoding="utf8").write(f'self.CM_TEST_API = {{ anthropic: "{BASE}/v1/messages", openai: "{BASE}/v1/chat" }};\n' + _bg)
 
 KV = """async (k, v) => { const db = await new Promise((res, rej) => { const r = indexedDB.open('cm', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   return new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); const q = tx.objectStore('kv').put(v, k); q.onsuccess = () => res(true); q.onerror = () => rej(q.error); }); }"""
@@ -609,10 +623,74 @@ with sync_playwright() as pw:
         ok((mem(proj) or {}).get("log", [{}])[0].get("chat") == "هيكل حقيقي", f"{name} (2026 structure): the chat title is read without the site name", (mem(proj) or {}).get("log", [{}])[0].get("chat"))
         p.close()
 
-    print("— a page the extension can't read says so —")
-    use_folder("proj-chatgpt")
+    print("— with your own API key: summarized in the background, nothing typed into the chat —")
+    proj = "proj-key"; use_folder(proj)
+    opt.evaluate("""async () => { await chrome.storage.local.set({ byokKey: { provider: 'anthropic', model: 'test-model', key: 'test-key-0123456789abcdef' } });
+        const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, byok: true } }); }""")
+    p = ctx.new_page(); p.goto(BASE + new_chat("chatgpt", "/c/chat-key/", "مفتاح - ChatGPT"))
+    wait(lambda: "🧠" in pill(p), 10)
+    for i in range(1, 5): say(p, f"مفتاح {i}")
+    say(p, "الرسالة الخامسة: اعتمدنا اللون الأزرق الداكن")
+    jk = wait(lambda: (lambda m: m if m and m["log"] else None)(mem(proj)), 25) or {}
+    ok(jk.get("log") and jk["log"][0]["range"] == "1–5" and jk["summary"]["goal"] == "هوية مقهى بالمفتاح", "the summary is made through your key and saved", jk.get("log"))
+    ok(len(requests(p)) == 0, "nothing was typed into the chat: no request, no reply in its context", requests(p))
+    call = API_CALLS[-1] if API_CALLS else {}
+    ok(call.get("key") == "test-key-0123456789abcdef" and call.get("browser") == "true" and call.get("model") == "test-model", "the key goes to the provider only, in its own header, with the model you chose", {k: v for k, v in call.items() if k != "text"})
+    ok("<conversation>" in call.get("text", "") and "مفتاح 3" in call.get("text", "") and "test-key" not in call.get("text", ""), "the messages travel with the request as data, the key never in the text", call.get("text", "")[:200])
+    ok(jk.get("decisions") and jk["decisions"][0]["source"] == "user", "…and the decision, backed by your words, is yours", jk.get("decisions"))
+    ok(wait(lambda: "✓" in pill(p), 10) and "بمفتاحك" in panel_text(p), "the indicator says it was summarized with your key", panel_text(p))
+    opt.evaluate("""async () => { await chrome.storage.local.remove('byokKey'); const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, byok: false } }); }""")
+    p.close()
+
+    print("— the site changed its page: the conversation is read from the site's own data —")
+    use_folder("proj-data")
+    def site_file(path, obj):
+        f = os.path.join(site, path.strip("/")); os.makedirs(os.path.dirname(f), exist_ok=True)
+        open(f, "w", encoding="utf8").write(json.dumps(obj, ensure_ascii=False))
+    unknown = "".join(f'<div class="x-turn-2027">{t}</div>' for t in ["سؤال الصفحة الجديدة", "جواب"])   # markup no adapter knows
+    # ChatGPT: a tree with an abandoned branch, a hidden system message and a tool call — only the visible branch counts
+    site_file("/api/auth/session", {"accessToken": "test-token-not-real"})
+    node = lambda i, par, role, text, **kw: {"id": i, "parent": par, "children": [], "message": None if role is None else {"author": {"role": role}, "content": {"content_type": kw.get("ct", "text"), "parts": [text]}, "metadata": kw.get("md", {}), "recipient": kw.get("rcp", "all")}}
+    site_file("/backend-api/conversation/datachat-gpt", {"current_node": "a2", "mapping": {
+        "root": node("root", None, None, ""), "sys": node("sys", "root", "system", "تعليمات مخفية", md={"is_visually_hidden_from_conversation": True}),
+        "u1": node("u1", "sys", "user", "نعتمد الخط الكوفي للشعار"), "a1": node("a1", "u1", "assistant", "تمام، الخط الكوفي."),
+        "old": node("old", "a1", "user", "فرع متروك لا يظهر"), "u2": node("u2", "a1", "user", "والميزانية 40 ألف"),
+        "tool": node("tool", "u2", "assistant", "search(\"x\")", rcp="browser"), "a2": node("a2", "tool", "assistant", "سجّلت الميزانية.")}})
+    for platform, path, f, sitename in [("chatgpt", "/c/datachat-gpt/", "chatgpt-datachat-gpt", "ChatGPT"), ("claude", "/chat/datachat-cl/", "claude-datachat-cl", "Claude")]:
+        if platform == "claude":
+            ctx.add_cookies([{"name": "lastActiveOrg", "value": "0abc-0000-1111", "url": BASE}])
+            site_file("/api/organizations/0abc-0000-1111/chat_conversations/datachat-cl", {"current_leaf_message_uuid": "m4", "chat_messages": [
+                {"uuid": "m1", "parent_message_uuid": "00000000", "sender": "human", "index": 0, "text": "", "content": [{"type": "text", "text": "نعتمد الخط الكوفي للشعار"}]},
+                {"uuid": "m2", "parent_message_uuid": "m1", "sender": "assistant", "index": 1, "content": [{"type": "thinking", "thinking": "تفكير داخلي"}, {"type": "text", "text": "تمام، الخط الكوفي."}]},
+                {"uuid": "mx", "parent_message_uuid": "m2", "sender": "human", "index": 2, "text": "فرع متروك لا يظهر"},
+                {"uuid": "m3", "parent_message_uuid": "m2", "sender": "human", "index": 2, "text": "والميزانية 40 ألف"},
+                {"uuid": "m4", "parent_message_uuid": "m3", "sender": "assistant", "index": 3, "text": "سجّلت الميزانية."}]})
+        p = ctx.new_page(); p.goto(BASE + page(platform, path, f"بيانات - {sitename}", thread_html=unknown))
+        ok(wait(lambda: "غير مربوطة" in pill(p), 20), f"{sitename}: a page whose design is unknown is not «unreadable» when the site's data can be read", pill(p))
+        t = wait(lambda: (lambda x: x if "بيانات الموقع نفسه" in x else None)(panel_text(p)), 15) or panel_text(p)
+        ok("بيانات الموقع نفسه" in t and "أبلغ" in t, f"{sitename}: the panel says it reads from the site's data, and offers a report", t[:300])
+        p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=link]").click()
+        raw = wait(lambda: read("proj-data", f".conversation-memory/chats/{f}.md"), 15) or ""
+        ok("نعتمد الخط الكوفي للشعار" in raw and "سجّلت الميزانية." in raw and "والميزانية 40 ألف" in raw, f"{sitename}: the full text is saved from the site's data", raw[-300:])
+        ok(not any(x in raw for x in ["فرع متروك", "تعليمات مخفية", "search(", "تفكير داخلي"]), f"{sitename}: only the visible branch — no abandoned branch, hidden message, tool call or reasoning", raw[-300:])
+        if platform == "chatgpt":
+            asked = []; ctx.on("request", lambda r: asked.append(r.url) if "/issues/new" in r.url else None)
+            with ctx.expect_page(timeout=8000) as rp:
+                p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=report]").click()
+            rurl = wait(lambda: asked[0] if asked else None, 8) or rp.value.url
+            from urllib.parse import urlparse, parse_qs
+            q = parse_qs(urlparse(rurl).query)
+            if "return_to" in q: rurl = q["return_to"][0]; q = parse_qs(urlparse(rurl).query)   # GitHub asks a signed-out browser to sign in first
+            body = (q.get("body") or [""])[0]
+            ok(rurl.startswith("https://github.com/raednov101/conversation-memory/issues/new") and "data-message-author-role" in body and "الخط الكوفي" not in body and "الميزانية" not in body,
+               "«report» opens the project's issue page with a technical report that holds no word of the conversation", rurl[:300] + " | " + body[:300])
+            rp.value.close()
+        p.close()
+
+    print("— a page the extension can't read says so, calmly —")
     p = ctx.new_page(); p.goto(BASE + page("chatgpt", "/c/empty-chat/", "فارغ - ChatGPT"))
-    ok(wait(lambda: "تعذّرت قراءة المحادثة" in pill(p), 25), "no readable messages on a chat page → visible warning", pill(p))
+    ok(wait(lambda: "الموقع تغيّر" in pill(p), 25), "no readable messages and no readable data → «the site changed», memory safe", pill(p))
+    ok("ذاكرتك المحفوظة سليمة" in panel_text(p), "…saying the saved memory is safe", panel_text(p))
     p.close()
 
     ctx.close()

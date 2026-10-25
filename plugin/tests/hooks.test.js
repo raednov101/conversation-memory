@@ -770,3 +770,13 @@ test("evidence: messages recovered from a capture are their own evidence (the ol
   const d = memJson(P).decisions;
   assert.equal(d.length, 1); assert.equal(d[0].source, "user"); assert.equal(d[0].unverified, false);
 });
+
+test("status names the Claude Code version, and says when it is newer than the one the plugin was tried on", () => {
+  const P = tmp(); const j = prompt(P, "cv", "سؤال");
+  const tp = path.join(P, "t-cv.jsonl");
+  const status = (v) => { fs.writeFileSync(tp, [{ type: "user", version: v, promptId: j._pid, message: { role: "user", content: "سؤال" } }].map((x) => JSON.stringify(x)).join("\n"));
+    return ctx(run("prompt", { session_id: "cv", cwd: P, prompt: "/conversation-memory:status", prompt_id: "p-" + v, transcript_path: tp })); };
+  const { TESTED_CC } = require("../scripts/lib/config");
+  assert.match(status(TESTED_CC), new RegExp(`Claude Code: ${TESTED_CC.replace(/\./g, "\\.")} \\(جُرّب`));
+  assert.match(status("99.0.0"), /Claude Code: 99\.0\.0 — أحدث من آخر نسخة جُرّب عليها/);
+});

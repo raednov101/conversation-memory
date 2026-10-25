@@ -48,6 +48,8 @@
       composer: () => pick(["#prompt-textarea", "div.ProseMirror[contenteditable='true']", "textarea[name='prompt']", "form textarea"]),
       sendButton: () => pick(['[data-testid="send-button"]', 'button[aria-label*="Send" i]', 'button[aria-label*="إرسال"]']),
       title: () => document.title.replace(/\s*[-|]\s*ChatGPT\s*$/i, "").replace(/^ChatGPT(:.*)?$/i, "").trim(),
+      // what a bug report counts (how many of each known structure is on the page — never their text)
+      probes: ["[data-message-author-role]", "li[data-message-role]", "[data-content-search-unit-key]", "[data-user-message-bubble]", "[data-assistant-markdown-root]", ".markdown", "#prompt-textarea", '[data-testid="send-button"]', '[data-testid="stop-button"]'],
       // a ChatGPT project: /g/g-p-<id>-<name>/… (its chats and its new-chat page)
       scope: () => {
         const m = location.pathname.match(/\/g\/(g-p-[a-z0-9]+)(?:-([^/]+))?/i);
@@ -68,6 +70,7 @@
       composer: () => pick(["div.ProseMirror[contenteditable='true']", "[contenteditable='true'][role='textbox']", "fieldset textarea"]),
       sendButton: () => pick(['button[aria-label*="Send" i]', 'button[aria-label*="إرسال"]']),
       title: () => document.title.replace(/\s*[-|]\s*Claude\s*$/i, "").replace(/^Claude$/i, "").trim(),
+      probes: ['[data-testid="user-message"]', '[data-testid="assistant-message"]', "[data-is-streaming]", ".font-claude-response", "[data-perf-reply-text]", ".standard-markdown", "div.ProseMirror[contenteditable='true']", 'button[aria-label*="Send" i]'],
       // a Claude project: its own page /project/<id>, or the project link shown in a chat (not the sidebar's list)
       scope: () => {
         const m = location.pathname.match(/^\/project\/([0-9a-f-]{8,64})/i);

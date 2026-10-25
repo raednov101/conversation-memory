@@ -38,6 +38,17 @@ function readTranscript(tp) {
   return turns;
 }
 
+// the Claude Code version that wrote the transcript (each line carries it): read from the file's end only
+function claudeCodeVersion(tp) {
+  const s = tp && lst(tp);
+  if (!s || !s.isFile() || s.isSymbolicLink()) return "";
+  const n = Math.min(s.size, 262144), buf = Buffer.alloc(n), fd = fs.openSync(tp, "r");
+  try { fs.readSync(fd, buf, 0, n, s.size - n); } finally { fs.closeSync(fd); }
+  const all = [...buf.toString("utf8").matchAll(/"version"\s*:\s*"(\d+\.\d+\.\d+)"/g)];
+  return all.length ? all[all.length - 1][1] : "";
+}
+const newerThan = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+
 // ---------------- capture: every unsummarized message, complete, before it can be lost ----------------
 const PART_RE = /^(c-[a-z0-9]+-[a-f0-9]{8})\.p(\d{1,4})\.json$/;
 function capture(s, reason, tp, forSid = sid) {
@@ -96,4 +107,4 @@ function readCapture(id) {
 const captureIds = () => { try { return [...new Set(fs.readdirSync(path.join(PRIV, "captures")).map((f) => (f.match(PART_RE) || [])[1]).filter(Boolean))].sort(); } catch { return []; } };
 const deleteCapture = (id) => { try { for (const f of fs.readdirSync(path.join(PRIV, "captures"))) if ((f.match(PART_RE) || [])[1] === id) unlinkSafe(path.join(PRIV, "captures", f)); } catch {} };
 
-module.exports = { readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture };
+module.exports = { claudeCodeVersion, newerThan, readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture };

@@ -12,6 +12,14 @@
   b.fs = (op, args) => b.call({ cmd: "fs", op, args: { scope: b.scope, scopeName: b.scopeName, ...(args || {}) } });
   b.get = async (k, d) => { try { return (await chrome.storage.local.get(k))[k] ?? d; } catch { b.dead = true; return d; } };
   b.set = async (k, v) => { try { await chrome.storage.local.set({ [k]: v }); } catch { b.dead = true; } };
+  // a short technical diary for bug reports: what happened, never what was said (no message text, no memory content).
+  // Kept in the extension's storage (last 60 events); exported from the settings page, or attached to «أبلغ».
+  const scrub = (t) => String(t || "").replace(/"[^"]*"|«[^»]*»|'[^']*'/g, "…").slice(0, 100);
+  b.diag = async (kind, detail) => {
+    try { const l = (await chrome.storage.local.get("diag")).diag || [], last = l[l.length - 1];
+      if (last && last.kind === String(kind).slice(0, 30) && last.detail === scrub(detail) && Date.now() - Date.parse(last.t + "Z") < 600000) return;   // the same thing again: once per 10 minutes
+      l.push({ t: new Date().toISOString().slice(0, 19), kind: String(kind).slice(0, 30), site: location.hostname, detail: scrub(detail) }); await chrome.storage.local.set({ diag: l.slice(-60) }); } catch {}
+  };
   const ERR = { needPermission: "يلزم منح إذن الكتابة للمجلد", inactive: "حُدّثت الإضافة؛ حدّث هذه الصفحة (F5) لتعمل النسخة الجديدة" };
   // errors raised by the browser itself arrive in English: say what they mean instead
   const RAW = [

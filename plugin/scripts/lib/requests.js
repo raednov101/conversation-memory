@@ -2,11 +2,11 @@
 // What is due and what Claude is asked: batches, pin requests, status text, commands.
 const path = require("path");
 const C = require("../../core/memory-core.js");
-const { MAX_DRAFT, KEEP_MSGS, MAX_UNDONE, PIN_TURNS, CMD } = require("./config");
+const { MAX_DRAFT, KEEP_MSGS, MAX_UNDONE, PIN_TURNS, CMD, TESTED_CC } = require("./config");
 const { nonce, int } = require("./util");
 const { readSafe, unlinkSafe } = require("./fsx");
 const { sid8, P, PRIV, notes, pubSafe } = require("./context");
-const { readCapture } = require("./transcript");
+const { readCapture, claudeCodeVersion, newerThan } = require("./transcript");
 
 // ---------------- drafts & requests ----------------
 const draftPath = (id) => path.join(P.inbox, `${id}.json`);
@@ -49,6 +49,12 @@ function costText(s) {
   if (s.injected) L.push(`الذاكرة المحمّلة عند بداية الجلسة ${fmt(s.injected)} حرفاً ≈ ${fmt(C.estTokens(s.injected))} توكن`);
   return L.length ? L.join("؛ ") + " (تقدير من عدد الحروف؛ لا يشمل ما قد يقرؤه Claude من ملف الذاكرة)" : "لم يُلخَّص شيء في هذه الجلسة بعد";
 }
+// which Claude Code runs here, against the newest one the plugin was tried on live
+function ccLine(s) {
+  let v = ""; try { v = claudeCodeVersion(s.tp); } catch {}
+  if (!v) return "";
+  return `\n- Claude Code: ${v}` + (newerThan(v, TESTED_CC) ? ` — أحدث من آخر نسخة جُرّب عليها البلقن حياً (${TESTED_CC}). يعمل عادة كما هو؛ وإن لاحظت خللاً بعد التحديث فأبلغ في github.com/raednov101/conversation-memory/issues` : ` (جُرّب عليها البلقن حياً حتى ${TESTED_CC})`);
+}
 function statusText(s, mem, backups, cfg) {
   const by = (st) => s.batches.filter((b) => b.status === st).map(labelOf).join("، ") || "لا شيء";
   const m = mem.memory;
@@ -61,7 +67,7 @@ function statusText(s, mem, backups, cfg) {
     (m && m.decisions.some((d) => d.status === "active" && d.unverified) ? `- ⚠️ تنتظر مراجعتك (لم يُعثر على دليلها في المحادثة): ${m.decisions.filter((d) => d.status === "active" && d.unverified).map((d) => `${d.id} «${d.text.slice(0, 60)}»`).join("، ")} — اعتمدها أو ألغها بـ /conversation-memory:fix\n` : "") +
     (m ? `- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => `${p.name} (ن${p.version})`).join("، ") || "لا شيء"}، دفعات السجل: ${m.log.length}\n` : "") +
     `- النسخ السابقة (للاسترجاع: /conversation-memory:restore رقم، أو /conversation-memory:undo للأحدث):\n${backupsText(backups || [])}\n` +
-    `- البيانات الخاصة: ${PRIV}`;
+    `- البيانات الخاصة: ${PRIV}` + ccLine(s);
 }
 
 // ---------------- modes ----------------

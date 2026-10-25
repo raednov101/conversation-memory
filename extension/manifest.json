@@ -10,6 +10,10 @@
     "offscreen",
     "contextMenus"
   ],
+  "optional_host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*"
+  ],
   "background": {
     "service_worker": "src/background.js"
   },
@@ -26,6 +30,7 @@
         "src/page/policy.js",
         "src/page/adapters.js",
         "src/page/reader.js",
+        "src/page/sitedata.js",
         "src/page/composer.js",
         "src/page/summarizer.js",
         "src/page/bridge.js",

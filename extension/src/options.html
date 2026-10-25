@@ -107,7 +107,22 @@
       <p id="saved" class="muted" style="margin:4px 0 0"></p>
       <p class="muted" style="margin:6px 0 0">للعلم: التلخيص يرسل رسالة قصيرة باسمك في المحادثة نفسها، فتُحتسب من رصيد رسائلك في الموقع، ويذهب نص الذاكرة معها إلى ChatGPT أو Claude.</p>
       <details><summary>كيف يعمل؟</summary>
+        <p>إن أضفت مفتاحك أدناه يُلخَّص في الخلفية بدل ذلك، فلا يظهر شيء في المحادثة.</p>
         <p>عند الاستحقاق ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» والخانة فارغة والنموذج متوقف، وتتحقق من رده قبل الحفظ. هذه الرسائل لا تُحتسب ولا تُحفظ في نص المحادثة، والنص الكامل يُحفظ بعد كل رد. المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة.</p>
+      </details>
+    </section>
+
+    <section class="card" id="keyCard">
+      <h2>التلخيص في الخلفية بمفتاحك (اختياري)</h2>
+      <p class="muted" style="margin:0 0 6px">بمفتاح API من Anthropic أو OpenAI يُلخَّص في الخلفية: لا يظهر طلب التلخيص في المحادثة، ولا يُحتسب من رسائلك في الموقع ولا من سياقها. الكلفة على حسابك لدى المزوّد، وهي صغيرة بنموذج صغير.</p>
+      <div class="field"><label for="provider">المزوّد</label>
+        <select id="provider"><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></div>
+      <div class="field"><label for="model">النموذج</label><input id="model" type="text" dir="ltr" autocomplete="off" spellcheck="false" style="width:190px"></div>
+      <div class="field"><label for="apiKey">المفتاح</label><input id="apiKey" type="password" dir="ltr" autocomplete="off" spellcheck="false" style="width:190px" placeholder="sk-…"></div>
+      <div class="row"><button id="keySave" class="primary" type="button">احفظ وفعّل</button><button id="keyTest" type="button">اختبر</button><button id="keyOff" type="button">أوقفه واحذف المفتاح</button></div>
+      <p id="keyMsg" class="muted" style="margin:6px 0 0" role="status"></p>
+      <details><summary>أين يذهب المفتاح والنص؟</summary>
+        <p>المفتاح يبقى في متصفحك داخل تخزين الإضافة، ولا يُرسل إلا إلى المزوّد الذي اخترته. ورسائل الدفعة التي تُلخَّص تذهب إليه مباشرة من متصفحك، لا عبرنا. عند الحفظ يطلب المتصفح إذنك بالاتصال بموقع المزوّد وحده.</p>
       </details>
     </section>
   </div>
