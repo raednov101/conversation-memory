@@ -175,7 +175,7 @@ with sync_playwright() as pw:
         path = "/c/chat-one/" if platform == "chatgpt" else "/chat/chat-one/"
         p = ctx.new_page(); p.goto(BASE + new_chat(platform, path, f"هوية المقهى - {name}"))
         wait(lambda: "🧠" in pill(p), 10)
-        say(p, "الرسالة الأولى: نبدأ هوية مقهى في جدة، ومفتاح الخادم sk-proj-" + "Z" * 32)
+        say(p, "الرسالة الأولى: نبدأ هوية مقهى في جدة، والميزانية 40 ألف ريال، ومفتاح الخادم sk-proj-" + "Z" * 32)
         ok(wait(lambda: "1/5" in pill(p), 8), f"{name}: indicator shows 1/5", pill(p))
         for i in range(2, 5): say(p, f"الرسالة رقم {i}")
         ok(wait(lambda: "4/5" in pill(p), 8), f"{name}: indicator shows 4/5", pill(p))
@@ -584,18 +584,24 @@ with sync_playwright() as pw:
     for i in range(1, 6): say(p, f"تجربة {i}")
     ok(wait(lambda: "✓" in pill(p), 20), "after the summary: ✓", pill(p))
     say(p, "تجربة 6")
-    ok(wait(lambda: re.fullmatch(r"🧠 1/5 · 📝 \d\d:\d\d( · 🔎1)?", pill(p)), 10), "a new reply saved as text only: 📝, a different state", pill(p))
-    # nothing the user said here backs the model's «decision» (the messages were «تجربة 1…5»): it waits for review
+    ok(wait(lambda: re.fullmatch(r"🧠 1/5 · 📝 \d\d:\d\d( · 🔎\d)?", pill(p)), 10), "a new reply saved as text only: 📝, a different state", pill(p))
+    # nothing the user said here backs the model's «decision» nor its constraint (the messages were «تجربة 1…5»): both wait for review
     jr = mem(proj) or {}
     ok([(d["source"], d.get("unverified"), d.get("quote")) for d in jr.get("decisions", [])] == [("assistant", True, "اعتمدنا اللون الأزرق الداكن")], "a decision whose quote isn't in the conversation is kept as a suggestion marked for review", jr.get("decisions"))
-    ok("🔎1" in pill(p), "the indicator says one decision waits for review", pill(p))
+    ok("🔎2" in pill(p), "the indicator says two things wait for review (the decision and the constraint)", pill(p))
+    jc = mem(proj) or {}
+    ok(jc.get("constraints") == [] and [x["text"] for x in (jc.get("pending") or {}).get("constraints", {}).get("add", [])] == ["الميزانية 40 ألف ريال"], "an unbacked constraint is not applied: it waits", jc.get("pending"))
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=review]").click()
     rv = wait(lambda: (lambda t: t if "الاقتباس" in t else None)(p.locator("#cm-memory-indicator .panel").inner_text()), 8) or p.locator("#cm-memory-indicator .panel").inner_text()
     ok("اعتماد اللون الأزرق الداكن" in rv and "اعتمدنا اللون الأزرق الداكن" in rv, "the review panel shows the decision and the words it was saved from", rv[:300])
-    p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").click()
+    p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").first.click()
+    ok(wait(lambda: p.locator("#cm-memory-indicator .panel").inner_text().count("اقتُرح قيد جديد") == 1 and p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").count() == 1, 10), "the panel stays open with what is left (the constraint)", p.locator("#cm-memory-indicator .panel").inner_text()[:300])
+    p.locator("#cm-memory-indicator .panel button[data-a=rv-revoke]").first.click()
     ja = wait(lambda: (lambda j: j if j and not j["decisions"][0].get("unverified") else None)(mem(proj)), 10) or mem(proj) or {}
     ok(ja.get("decisions") and ja["decisions"][0]["source"] == "user" and not ja["decisions"][0].get("unverified"), "approving it makes it what it claimed to be (your decision), and the mark goes", ja.get("decisions"))
     ok(wait(lambda: "🔎" not in pill(p), 15), "…and the indicator no longer asks for review", pill(p))
+    jz = mem(proj) or {}
+    ok(jz.get("constraints") == [] and not (jz.get("pending") or {}).get("constraints", {}).get("add"), "the rejected constraint is dropped, never applied", jz.get("pending"))
     ok("النص الكامل محفوظ" in panel_text(p) and "آخر تحديث للملخص" in panel_text(p), "…and the panel tells the two apart")
     opt.evaluate("async () => { const { settings = {} } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, mode: 'manual' } }); }")
     for i in range(7, 12): say(p, f"تجربة {i}")

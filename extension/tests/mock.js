@@ -62,7 +62,7 @@
       const draft = {
         summary: { goal: `هوية بصرية لمقهى (حتى الرسالة ${to})`, status: "اعتُمد اللون", next: ["اختيار الخط"], open: [] },
         decisions: { add: [{ text: "اعتماد اللون الأزرق الداكن للمشروع", source: "user", quote: "اعتمدنا اللون الأزرق الداكن" }], revoke: [] },
-        constraints: { add: ["الميزانية 40 ألف ريال"], remove: [] },
+        constraints: { add: [{ text: "الميزانية 40 ألف ريال", quote: "والميزانية 40 ألف ريال" }], remove: [] },
         entry: { raised: [`نقاش تجريبي حول الهوية البصرية في الرسائل ${from}–${to}`], decided: ["اعتماد اللون الأزرق الداكن للمشروع"], changed: [] },
       };
       const json = JSON.stringify(draft, null, 1);
