@@ -164,7 +164,10 @@
             else if (r.writeFailed && (p.wf = (p.wf || 0) + 1) <= 5) { st.note = `${B.why(r.error)} — الرد محفوظ وتُعاد المحاولة بعد قليل (${p.wf} من 5).`; schedule(10000); }
             else fail(st, B.why(r.error), userCount);
           }
-        } else if (Date.now() - st.pending.sentAt > TIMEOUT) { const e = st.pending; fail(st, "لم يصل رد الملخص خلال 5 دقائق", userCount); st.expired = e; }
+        // a slow reply is not a failure: while the site is still writing (long replies, models that think first) it waits;
+        // only 5 minutes with nothing being written is
+        } else if (gen) st.pending.genAt = Date.now();
+        else if (Date.now() - Math.max(st.pending.sentAt, st.pending.genAt || 0) > TIMEOUT) { const e = st.pending; fail(st, "لم يصل رد الملخص خلال 5 دقائق", userCount); st.expired = e; }
       }
 
       // 2) the full transcript after every completed turn (never replace a fuller copy with a shorter one)

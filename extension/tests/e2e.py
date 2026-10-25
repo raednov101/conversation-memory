@@ -384,16 +384,17 @@ with sync_playwright() as pw:
     ok(j and j["log"][-1]["range"] == "7–11" and "أعدتُ توليد ردك على رسالتي رقم 7" in requests(p)[-1], "messages 7–11 are summarized again, and the model is told why", [x["range"] for x in j.get("log", [])])
     p.close()
 
-    print("— a reply that arrives after the timeout is still saved —")
+    print("— a slow reply (the site still writing past the timeout) is waited for, never reported as failed —")
     proj = "proj-late"; use_folder(proj)
     p = ctx.new_page(); p.goto(BASE + new_chat("chatgpt", "/c/chat-late/", "متأخر - ChatGPT", timeout=3000))
     wait(lambda: "🧠" in pill(p), 10)
     for i in range(1, 5): say(p, f"رسالة متأخرة {i}")
     p.evaluate("window.__delay = 7000"); p.evaluate("t => window.__user(t)", "رسالة متأخرة 5")
-    p.wait_for_timeout(7500)   # the user's reply lands, then the request is sent; its reply takes 7 s, the timeout is 3 s
-    ok(wait(lambda: "⚠️" in pill(p), 10), "timeout → ⚠️", pill(p))
+    seen = []; t_end = time.time() + 16
+    while time.time() < t_end and not (mem(proj) or {}).get("log"): seen.append(pill(p)); time.sleep(0.4)   # its reply takes 7 s, the timeout is 3 s
+    ok(not any("⚠️" in s for s in seen), "no ⚠️ while the site is still writing the reply", [s for s in seen if "⚠️" in s][:2])
     j = wait(lambda: (lambda m: m if m and m["log"] else None)(mem(proj)), 15) or {}
-    ok(j and j["log"][0]["range"] == "1–5" and wait(lambda: "✓" in pill(p), 6), "the late reply is still accepted and saved", pill(p))
+    ok(j and j["log"][0]["range"] == "1–5" and wait(lambda: "✓" in pill(p), 6), "the slow reply is saved", pill(p))
     ok(len(requests(p)) == 1, "no second request was sent for it")
     p.evaluate("window.__delay = 400"); p.close()
 
