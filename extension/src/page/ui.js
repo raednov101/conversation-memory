@@ -48,6 +48,7 @@
     if (!v.fsSt || !v.fsSt.ok || !v.fsSt.folder) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = "تعذّر تجهيز مكان حفظ الذاكرة" + (v.fsSt && v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : "") + "."; btns.push(["⚙️ الإعدادات", "options"]); }
     else if (v.fsSt.permission === "granted" && !v.fsOk) { cls = "warn"; text = "🧠 ⚠️ الحفظ غير متاح"; info = `تعذّر تجهيز ذاكرة ${q(v.fsSt.folder)}${v.fsSt.error ? ": " + esc(why(v.fsSt.error)) : ""}.`; btns.push(["⚙️ الإعدادات", "options"]); }
     else if (!v.fsOk) { cls = "warn"; text = "🧠 🔓 امنح الإذن"; info = `يلزم إذن الكتابة في ${q(v.fsSt.folder)}.`; btns.push(["🔓 منح الإذن", "options"]); }
+    else if (v.phase === "wait") { text = "🧠 …"; info = "أتعرّف على ذاكرة هذه المحادثة…"; }
     else if (v.phase === "unlinked" && v.unreadable) { cls = "warn"; text = "🧠 ⏸️ الموقع تغيّر"; info = BROKEN; btns.push(REPORT); }
     else if (v.phase === "unlinked") {
       text = "🧠 غير مربوطة"; info = `هذه المحادثة غير مربوطة بالذاكرة ${q(v.fsSt.folder)}، فلا تُلخَّص ولا تُحفظ.` +

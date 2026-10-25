@@ -52,7 +52,7 @@
     turns: turns.map((t) => ({ role: t.role, text: t.text, ...(t.role === "user" && Number.isInteger(t.n) ? { n: t.n } : {}) })) });
   // ask the model whether the chat belongs to this memory: on its first summary into a memory that already holds something,
   // unless the user has said it does
-  const askTopic = (st, prep) => !!(prep && prep.hasMemory && st && !st.topicOk && !st.summarizedUpTo);
+  const askTopic = (st, prep) => !!(prep && prep.hasMemory && st && !st.topicOk && !st.summarizedUpTo && !B.scope.startsWith(`${P}-c-`));
   const reviewNote = (r) => { const k = (r.unverified ? r.unverified.length : 0) + (r.pending ? r.pending.length : 0);
     return k ? `🔎 ${k === 1 ? "شيء واحد لم يثبت" : k === 2 ? "شيئان لم يثبتا" : k + " أشياء لم تثبت"} من كلامك في المحادثة، فلم يُعتمد وينتظر مراجعتك من «راجع القرارات».` : ""; };
   const saved = (st, w, note, replyLen) => (saves++, Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], hashSrc: w.src || "page", rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen)));
@@ -64,11 +64,14 @@
   // or summarized twice. Inside a site project, the chats share the project's memory, as before.
   const GENERAL = { key: `${P}-general`, name: "" };
   const ownScope = (id) => ({ key: chatKey(id).replace(`${P}-`, `${P}-c-`), name: "", own: true });
-  const legacy = new Map();   // chat key → linked in the shared memory of an earlier version (asked once per page)
+  const legacy = new Map(), topicYes = new Set();   // chat key → linked in the shared memory of an earlier version (asked once per page)
+  // only inside the browser: with a linked folder every scope is that one folder, so "linked there" says nothing about the
+  // old shared memory. A failed look (the writer starting) is not an answer: asked again on the next pass.
   async function linkedInGeneral(key) {
     if (legacy.has(key)) return legacy.get(key);
     const st = await B.fs("status", { scope: GENERAL.key, scopeName: "" });
-    const raw = st.ok && st.projectId ? await B.get(`chat:${st.projectId}:${key}`, null) : null;
+    if (!st.ok) return null;
+    const raw = st.inBrowser && st.projectId ? await B.get(`chat:${st.projectId}:${key}`, null) : null;
     const v = !!(raw && raw.linked); legacy.set(key, v); return v;
   }
   let newPageScope = null;
@@ -77,13 +80,17 @@
     if (!id) { newPageScope = s ? { ...s, at: Date.now() } : null; return s || { ...GENERAL, newOutside: true }; }
     const k = `scope:${chatKey(id)}`, known = await B.get(k, null);
     if (known && known.key) return known;
-    const sc = s || (newPageScope && Date.now() - newPageScope.at < 120000 ? newPageScope : null);
+    // the project of the new-chat page you just left counts only for the chat you created there (a send from it, a chat
+    // with one message of yours), never for another chat you opened from the sidebar
+    const fresh = newPageScope && newPageScope.sentAt && Date.now() - newPageScope.sentAt < 120000 && A.messages().filter((m) => m.role === "user").length <= 1;
+    if (s && loaded) { await B.set(k, { key: s.key, name: s.name || "" }); return s; }
+    if (s) return s;
+    if (loaded && !fresh) { const g = await linkedInGeneral(chatKey(id)); if (g) { await B.set(k, { key: GENERAL.key, name: "" }); return GENERAL; } if (g === null) return { ...GENERAL, unsure: true }; }
     // only a project (or an earlier version's shared memory) is remembered: the page may show a chat's project link after
     // its messages, so a chat's own memory is never final
-    if (sc && loaded) await B.set(k, { key: sc.key, name: sc.name || "" });
-    if (sc) return sc;
-    if (loaded && (await linkedInGeneral(chatKey(id)))) { await B.set(k, { key: GENERAL.key, name: "" }); return GENERAL; }
-    return { ...ownScope(id), name: (A.title() || "").slice(0, 80) };
+    if (fresh) { if (loaded) await B.set(k, { key: newPageScope.key, name: newPageScope.name || "" }); return newPageScope; }
+    const settled = seen.url === location.pathname && Date.now() - seen.at > 3000;   // the title may still be the previous chat's
+    return { ...ownScope(id), name: settled ? (A.title() || "").slice(0, 80) : "" };
   }
 
   // ---------- proof that you created a chat here (see linking.js): a real send from a new-chat page ----------
@@ -91,7 +98,7 @@
   function noteSend(e) {
     if (A.chatId() || ui.host.contains(e.target)) return;
     const p = L.proofFromSend(CP.text(A.composer()), Date.now());
-    if (p) sentOnNew = p;
+    if (p) { sentOnNew = p; if (newPageScope) newPageScope.sentAt = p.at; }
   }
 
   // ---------- the main loop: one pass over the page ----------
@@ -107,13 +114,16 @@
       const moved = sc.key !== B.scope;
       if (moved || (sc.own && sc.name && sc.name !== B.scopeName)) { B.scope = sc.key; B.scopeName = sc.name || ""; }   // a chat's own memory is named after it
       outside = !!sc.newOutside;
+      if (sc.unsure) { view = { phase: "wait", fsSt: folder.v }; return; }   // not known yet which memory this chat is in: look again shortly
       const fsSt = await folderStatus(force.folder || moved);
       const fsOk = !!(fsSt.ok && fsSt.permission === "granted" && PID);
-      if (!id) { view = { phase: "new", fsSt, fsOk, review, outside: outside && !!fsSt.inBrowser }; return; }
+      // a new chat outside any project has no memory yet: the earlier shared memory's review items are not shown there
+      if (!id) { const out = outside && !!fsSt.inBrowser; view = { phase: "new", fsSt, fsOk, review: out ? [] : review, outside: out }; return; }
       if (!fsOk) { view = { phase: "nofolder", fsSt, fsOk }; return; }
       if (seen.url !== location.pathname) seen = { url: location.pathname, at: Date.now() };
       const key = chatKey(id);
       const st = await chatState(key);
+      if (topicYes.delete(key)) { Object.assign(st, { topicAsk: false, topicOk: true }); force = { ...force, summarize: true }; }
       // the page first; if it can't be read (the site changed its design), the same conversation from the site's own data
       const page = M.reader.read(A, HK), gen = A.generating(), waited = Date.now() - seen.at;
       const pageBroken = (page.total === 0 && waited > DATA_AFTER_MS) || (page.userCount > 0 && !page.turns.some((x) => x.role === "assistant") && !gen && waited > UNREADABLE_MS);
@@ -165,6 +175,7 @@
           if (e.to > st.summarizedUpTo) {
             const r = await B.fs("commit", { project: e.project, reply: late.reply, batch: e.batch, base: e.base, platform: A.platform, chat: label, range: `${e.from}–${e.to}`, evidence: evidenceOf(turns) });
             if (r.ok) saved(st, e, ["وصل الملخص متأخراً وحُفظ.", reviewNote(r)].filter(Boolean).join(" "), late.reply.length);
+            else if (r.different && e.asked) Object.assign(st, { topicAsk: true, expired: null, status: "idle", error: "" });
             else if (r.busy) { st.expired = e; schedule(4000); }
           }
         }
@@ -179,13 +190,14 @@
             const r = await B.fs("commit", { project: p.project, reply: mine.reply, batch: p.batch, base: p.base, platform: A.platform, chat: label, range: `${p.from}–${p.to}`, evidence: evidenceOf(turns) });
             if (r.ok) { saved(st, p, [reviewNote(r), r.redacted ? "حُذفت بيانات حساسة من الملخص." : "", r.summarySkipped ? "لم تُستبدل الخلاصة لأن الذاكرة تغيّرت أثناء التلخيص؛ حُفظ السجل والقرارات." : "", ...(r.notes || [])].filter(Boolean).join(" "), mine.reply.length); st.pending = null; }
             else if (r.busy) { st.note = "برنامج آخر (بلقن Claude Code؟) يكتب في الذاكرة الآن؛ سأحفظ بعد لحظات."; schedule(4000); }   // nothing written, nothing counted
-            else if (r.different) Object.assign(st, { topicAsk: true, pending: null, status: "idle", error: "" });   // not a failure: the user decides
+            else if (r.different && p.asked) Object.assign(st, { topicAsk: true, pending: null, status: "idle", error: "" });   // not a failure: the user decides
+            else if (r.different) fail(st, "رد النموذج بلا ملخص", userCount);   // «different» when it was not asked: no answer at all
             else if (r.writeFailed && (p.wf = (p.wf || 0) + 1) <= 5) { st.note = `${B.why(r.error)} — الرد محفوظ وتُعاد المحاولة بعد قليل (${p.wf} من 5).`; schedule(10000); }
             else fail(st, B.why(r.error), userCount);
           }
         // a slow reply is not a failure: while the site is still writing (long replies, models that think first) it waits;
         // only 5 minutes with nothing being written is
-        } else if (gen) st.pending.genAt = Date.now();
+        } else if (gen && Date.now() - st.pending.sentAt < 4 * TIMEOUT) st.pending.genAt = Date.now();   // never forever (a stuck page)
         else if (Date.now() - Math.max(st.pending.sentAt, st.pending.genAt || 0) > TIMEOUT) { const e = st.pending; fail(st, "لم يصل رد الملخص خلال 5 دقائق", userCount); st.expired = e; }
       }
 
@@ -207,7 +219,8 @@
         apiResults.delete(key);
         // the chat changed while the summary was being made (an edit, a regenerated reply, another tab's save): don't move
         // forward on it — the change is summarized again from where it happened
-        const stale = r3.ok && (st.summarizedUpTo !== r3.from - 1 || JSON.stringify(st.rewound || null) !== JSON.stringify(r3.rewound || null) ||
+        // …or it now belongs to another memory than the one the summary went to
+        const stale = r3.ok && (r3.scope !== B.scope || st.summarizedUpTo !== r3.from - 1 || JSON.stringify(st.rewound || null) !== JSON.stringify(r3.rewound || null) ||
           (src === r3.w.src && rh[r3.to - 1] !== r3.w.rhashes[r3.to - 1]));
         if (stale) st.note = "تغيّرت المحادثة أثناء التلخيص؛ سيُلخَّص ما تغيّر من موضعه.";
         else if (r3.ok) saved(st, r3.w, r3.note, r3.replyLen);
@@ -232,7 +245,7 @@
           if (!c2 || CP.text(c2) || A.generating()) { /* try again on a later pass */ }
           else if (await CP.typeInto(c2, (reqText = M.summarizer.prompt(batch, from, to, first && first.text, prep.state, st.rewound, askTopic(st, prep))))) {
             await CP.send(A, c2);
-            Object.assign(st, { pending: { batch, base: prep.base, project: PID, from, to, reqLen: reqText.length, hashes: uh.slice(0, to), rhashes: rh.slice(0, to), src, sentAt: Date.now(), len: -1, seenAt: 0 }, expired: null, status: "saving", error: "" });
+            Object.assign(st, { pending: { batch, base: prep.base, project: PID, scope: B.scope, asked: askTopic(st, prep), from, to, reqLen: reqText.length, hashes: uh.slice(0, to), rhashes: rh.slice(0, to), src, sentAt: Date.now(), len: -1, seenAt: 0 }, expired: null, status: "saving", error: "" });
           } else fail(st, "تعذّرت الكتابة في خانة الرسالة", userCount);
         }
       }
@@ -255,20 +268,21 @@
     apiJobs.add(o.key); schedule(50);
     // the project and the site project are those of the moment it started, even if you move to another page meanwhile
     const at = { project: o.project, scope: o.scope, scopeName: o.scopeName };
-    const done = (r) => apiResults.set(o.key, { ...r, from: o.from, to: o.to, rewound: o.rewound });
+    const done = (r) => apiResults.set(o.key, { ...r, from: o.from, to: o.to, rewound: o.rewound, scope: o.scope });
     try {
       const claim = await B.call({ cmd: "claim", key: o.project + ":" + o.key, ttl: 180000 });
       if (!claim.ok) { done({ ok: false, later: 15000 }); return; }   // another tab on this chat is doing it: look again later
       const prep = await B.fs("prepare", at);
       if (!prep.ok) { done({ ok: false, error: B.why(prep.error) }); return; }
       const batch = `api-${o.key.slice(0, 24)}-${o.from}-${o.to}-${nonce()}`;
-      const req = M.summarizer.apiPrompt(batch, o.from, o.to, M.summarizer.convoText(o.turns, o.from, o.to), prep.state, o.rewound, askTopic(o.st, prep));
+      const asked = askTopic(o.st, prep);
+      const req = M.summarizer.apiPrompt(batch, o.from, o.to, M.summarizer.convoText(o.turns, o.from, o.to), prep.state, o.rewound, asked);
       const r = await B.call({ cmd: "byok", text: req });
       if (!r.ok) { done({ ok: false, error: "التلخيص بمفتاحك: " + B.why(r.error) }); return; }
       // the plugin may hold the shared lock for a moment: keep the paid-for reply and try the write again, never the request
       let c;
       for (let i = 0; i < 6; i++) { c = await B.fs("commit", { ...at, reply: r.text, batch, base: prep.base, platform: A.platform, chat: o.label, range: `${o.from}–${o.to}`, evidence: evidenceOf(o.turns) }); if (!c.busy && !c.writeFailed) break; await sleep(4000); }
-      if (!c.ok) { done(c.busy ? { ok: false, later: 30000 } : c.different ? { ok: false, different: true } : { ok: false, error: B.why(c.error) }); return; }
+      if (!c.ok) { done(c.busy ? { ok: false, later: 30000 } : c.different && asked ? { ok: false, different: true } : c.different ? { ok: false, error: "رد النموذج بلا ملخص" } : { ok: false, error: B.why(c.error) }); return; }
       done({ ok: true, replyLen: r.text.length, w: { to: o.to, hashes: o.uh.slice(0, o.to), rhashes: o.rh.slice(0, o.to), src: o.src, reqLen: req.length },
         note: [`🔑 لُخّص في الخلفية بمفتاحك (${r.model}).`, reviewNote(c), c.redacted ? "حُذفت بيانات حساسة من الملخص." : ""].filter(Boolean).join(" ") });
     } catch (e) { done({ ok: false, error: String((e && e.message) || e) }); }
@@ -284,21 +298,22 @@
     if (a === "review") { await folderStatus(true); if (!review.length) { ui.toast("لا شيء ينتظر مراجعتك."); return; } ui.openReview(review); return; }
     if (a === "pause") { await B.set("settings", { ...settings, paused: !settings.paused }); return; }
     const id = A.chatId();
+    // «not this memory»: inside the browser the chat gets its own memory (from a project or the earlier shared one);
+    // with a linked folder (one memory for everything) it is only unlinked
+    const separate = a === "topic-no" && id && !B.scope.startsWith(`${P}-c-`) && folder.v && folder.v.inBrowser;
     if (a === "topic-no") a = "unlink";
     if (a === "link" || a === "unlink") {
       if (!id) return;
       const key = chatKey(id), st = await chatState(key);
-      Object.assign(st, a === "link" ? { linked: true, summarizedUpTo: 0, hashes: [], rhashes: [], rewound: null, attempts: 0, failedAt: -1, status: "idle", error: "", note: "", topicAsk: false } : { linked: false, pending: null, expired: null, topicAsk: false });
+      // linking by hand is your answer to «does it belong here?»: the model is not asked again
+      Object.assign(st, a === "link" ? { linked: true, summarizedUpTo: 0, hashes: [], rhashes: [], rewound: null, attempts: 0, failedAt: -1, status: "idle", error: "", note: "", topicAsk: false, topicOk: true } : { linked: false, pending: null, expired: null, topicAsk: false });
       await saveChat(key, st);
       // separated from the shared memory of an earlier version: the chat gets its own memory from now on (one click links it)
-      if (a === "unlink" && B.scope === GENERAL.key) { await B.set(`scope:${key}`, { key: ownScope(id).key, name: (A.title() || "").slice(0, 80) }); legacy.set(key, false); }
+      if (a === "unlink" && (B.scope === GENERAL.key || separate)) { await B.set(`scope:${key}`, { key: ownScope(id).key, name: (A.title() || "").slice(0, 80) }); legacy.set(key, false); }
       if (busy) await sleep(300); tick(); return;
     }
-    if (a === "topic-yes") {
-      if (!id) return;
-      const key = chatKey(id), st = await chatState(key);
-      Object.assign(st, { topicAsk: false, topicOk: true }); await saveChat(key, st); if (busy) await sleep(300); tick({ summarize: true }); return;
-    }
+    // applied by the next pass itself (a pass in progress would otherwise write its older state over it)
+    if (a === "topic-yes") { if (id) { topicYes.add(chatKey(id)); schedule(50); } return; }
     if (a === "undo") {
       const r = await B.fs("restore", { n: 1 });
       ui.toast(r.ok ? `↩️ استُرجعت نسخة ${r.when} (${C.count(r.decisions, C.W.decision)}، ${C.count(r.log, C.W.batch)}). التراجع مرة أخرى يعيد ما تراجعت عنه.${r.kept ? ` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}` : `لم يُسترجع شيء: ${B.why(r.error)}`);

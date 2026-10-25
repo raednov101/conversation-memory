@@ -83,7 +83,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       const host = (() => { try { return new URL(sender.url).hostname; } catch { return ""; } })();
       const site = host === "chatgpt.com" || host.endsWith(".chatgpt.com") || host === "chat.openai.com" ? "chatgpt" : host === "claude.ai" || host.endsWith(".claude.ai") ? "claude" : (self.CM_TEST_HOSTS ? "*" : "");
       const scope = String((msg.args && msg.args.scope) || "");
-      if (!site || ["exportAll", "importAll", "listScopes"].includes(msg.op) || (site !== "*" && !scope.startsWith(site + "-"))) { reply({ ok: false, error: "not allowed" }); return; }
+      if (!site || ["exportAll", "importAll", "listScopes"].includes(msg.op) || !/^[a-z0-9-]{1,80}$/.test(scope) || (site !== "*" && !scope.startsWith(site + "-"))) { reply({ ok: false, error: "not allowed" }); return; }
       // the list of memories to bring into a new chat: this site's only, whatever the page asks
       if (msg.op === "listSiteScopes") msg.args = { ...msg.args, site };
     }

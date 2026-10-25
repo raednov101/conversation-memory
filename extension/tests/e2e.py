@@ -197,6 +197,35 @@ with sync_playwright() as pw:
     ok(wait(lambda: opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')").get("scope:chatgpt-oldchat", {}).get("key") == "chatgpt-general", 8), "a chat already linked to the earlier shared memory keeps it", opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')"))
     po.close()
 
+    # a chat opened from the sidebar right after a project's new-chat page is not filed into that project
+    ps = ctx.new_page(); ps.goto(BASE + page("chatgpt", "/g/g-p-abc123-cafe/project/", "مشروع - ChatGPT"))
+    wait(lambda: "🧠" in pill(ps), 10); ps.wait_for_timeout(1500)
+    ps.evaluate("""() => { history.pushState({}, '', '/c/sidebar-x/'); document.getElementById('thread').innerHTML =
+      '<div data-message-author-role="user">موضوع قديم</div><div data-message-author-role="assistant">رد</div><div data-message-author-role="user">موضوع قديم 2</div><div data-message-author-role="assistant">رد 2</div>'; }""")
+    ps.wait_for_timeout(4000)
+    rec = opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-sidebar-x')").get("scope:chatgpt-sidebar-x")
+    ok(not rec or rec.get("key") != "chatgpt-g-p-abc123", "a chat opened from the sidebar after a project's new-chat page is not filed into that project", rec)
+    ps.close()
+    # «not this memory» inside a site project (in the browser): the chat gets its own memory
+    pt = ctx.new_page(); pt.goto(BASE + new_chat("chatgpt", "/g/g-p-abc123-cafe/c/tp/", "رحلة - ChatGPT"))
+    wait(lambda: "🧠" in pill(pt), 10)
+    for i in range(1, 5): say(pt, f"نخطط رحلة العلا {i}")
+    pt.evaluate("() => { window.__summaryOverride = (t) => { window.__summaryOverride = null; return '⟦ذاكرة:بداية⟧ {\"different\": true} ⟦ذاكرة:نهاية⟧'; }; }")
+    say(pt, "نخطط رحلة العلا 5")
+    ok(wait(lambda: "موضوع آخر" in pill(pt), 15), "inside a project: the model says the chat is about something else → ❓", pill(pt))
+    pt.locator("#cm-memory-indicator .pill").click(); pt.locator("#cm-memory-indicator .panel button[data-a=topic-no]").click()
+    rec = wait(lambda: (opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-tp')").get("scope:chatgpt-tp") or {}).get("key") == "chatgpt-c-tp" or None, 10)
+    ok(rec and wait(lambda: "غير مربوطة" in pill(pt), 10), "…«separate» gives it its own memory (one click links it there)", pill(pt))
+    pt.close()
+    # «different» when it was not asked (a chat's own memory is never asked): no answer, never the question
+    pu = ctx.new_page(); pu.goto(BASE + new_chat("chatgpt", "/c/unasked/", "سؤال - ChatGPT"))
+    wait(lambda: "🧠" in pill(pu), 10)
+    for i in range(1, 5): say(pu, f"سؤال {i}")
+    pu.evaluate("() => { window.__summaryOverride = (t) => { window.__summaryOverride = null; window.__asked = t; return '⟦ذاكرة:بداية⟧ {\"different\": true} ⟦ذاكرة:نهاية⟧'; }; }")
+    say(pu, "سؤال 5")
+    ok(wait(lambda: "⚠️" in pill(pu), 15) and "موضوع آخر" not in pill(pu) and "موضوع آخر" not in (pu.evaluate("window.__asked") or ""), "a chat's own memory is never asked, and an unasked «different» is a failed reply, not the question", pill(pu))
+    pu.close()
+
     for platform, name, pid in (("chatgpt", "ChatGPT", "chatgpt"), ("claude", "Claude", "claude-web")):
         print(f"— {name}: counter, full transcript, JSON summary every 5 —")
         proj = f"proj-{platform}"; use_folder(proj)

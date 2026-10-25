@@ -512,6 +512,8 @@ const ops = {
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   if (!msg || msg.target !== "offscreen" || !Object.prototype.hasOwnProperty.call(ops, msg.op)) return;
   const args = msg.args || {};
+  // a scope that is not a valid name is refused, never turned into another memory (it once fell back to the shared one)
+  if (args.scope !== undefined && !/^[a-z0-9-]{1,80}$/.test(String(args.scope))) { reply({ ok: false, error: "not allowed" }); return; }
   navigator.locks.request("cm-write", () => { SCOPE = cleanScope(args.scope); SCOPE_NAME = String(args.scopeName || ""); return ops[msg.op](args); })
     .then(reply, (e) => reply({ ok: false, error: e && e.name === "NotAllowedError" ? "needPermission" : String((e && e.message) || e) }));
   return true;
