@@ -436,6 +436,8 @@ with sync_playwright() as pw:
 
     print("— reliability: the writer closed mid-write, 40 times — the memory is always whole —")
     proj = "proj-kill"; use_folder(proj)
+    opt.reload(); opt.wait_for_load_state(); opt.wait_for_timeout(800)
+    ok(not opt.locator("#keepRow").is_visible() and opt.locator("#unlink").is_visible(), "with a linked folder: no full-copy buttons (they are about the in-browser memory), and the way back is shown")
     pid_ = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status' })")["projectId"]
     broken = 0; transient = 0; samples = []
     for k in range(40):

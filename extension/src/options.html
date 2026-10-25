@@ -13,6 +13,7 @@
   @media (prefers-color-scheme:dark){:root{--bg1:#05072B;--bg2:#00144F;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.10);--fg:#EAF0FF;
     --muted:#9AA7C7;--soft:rgba(255,255,255,.04);--primary:#1E3991;--primary2:#0952A8;--gold:#C9922F;--ok:#4CC38A;--warn:#E3B341;--err:#FF6B6B;--add:#4CC38A;--del:#FF8A8A}}
   *{box-sizing:border-box}
+  [hidden]{display:none!important}   /* .row and .field set display, which would otherwise win over the hidden attribute */
   body{margin:0;min-height:100vh;color:var(--fg);font:14px/1.7 "PlexAr",system-ui,"Segoe UI",Tahoma,sans-serif;
     background:linear-gradient(160deg,var(--bg1),var(--bg2)) fixed}
   main{max-width:760px;margin:0 auto;padding:22px 16px 28px}
