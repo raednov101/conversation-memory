@@ -18,5 +18,5 @@ const CMD = "/conversation-memory:";
 
 // the newest Claude Code this plugin was run against, live (npm run integration; weekly in CI). A newer one is reported by
 // /conversation-memory:status so a user knows where to look if something misbehaves after an update.
-const TESTED_CC = "2.1.309";
+const TESTED_CC = "2.1.310";
 module.exports = { TESTED_CC, EVERY, MODE, MODES, INJECT_BUDGET, CAPTURE_BUDGET, PART_CHARS, MAX_DRAFT, MAX_JSON, MAX_TRANSCRIPT, MAX_SESSIONS, KEEP_MSGS, MAX_UNDONE, MAX_ATTEMPTS, MAX_BACKUPS, TRIM_AT, WLOCK_STALE, LOCK_WAIT, LOCK_STALE, PIN_TURNS, ANCHOR_MIN, ANCHOR_MAX, CMD };

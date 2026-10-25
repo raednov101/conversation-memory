@@ -51,7 +51,8 @@ ok(md.includes("## القرارات السارية") && md.includes("## السج
 ok(mem && mem.log.length >= 2, "batch 1–5 and the recovered messages are both in the log", mem && mem.log.length);
 ok(/سُكّر وهيل|سكر وهيل/.test(all) && /556B2F/i.test(all), "name and colour saved");
 // the user said the name and the colour themselves: they must be saved as the user's (or approved), backed by a quote from the chat
-const named = mem ? mem.decisions.filter((d) => d.status === "active" && /سُكّر وهيل|سكر وهيل|556B2F/i.test(d.text)) : [];
+// (the name and the colour — not the slogan, which also holds the name and is Claude's own suggestion)
+const named = mem ? mem.decisions.filter((d) => d.status === "active" && (/556B2F/i.test(d.text) || (/سُكّر وهيل|سكر وهيل/.test(d.text) && !/شعار/.test(d.text)))) : [];
 ok(named.length && named.every((d) => d.source !== "assistant" && !d.unverified && d.quote), "the user's own decisions are saved as theirs, each backed by a quote from the conversation", JSON.stringify(named).slice(0, 300));
 ok(/15 نوفمبر|١٥ نوفمبر/.test(all) && /(40|٤٠)\s*(ألف|الف|,000|٬٠٠٠)/.test(all), "date and budget saved");
 const denials = fs.readdirSync(LOG).filter((f) => f.endsWith(".json")).flatMap((f) => (J(f).permission_denials || [])).filter((d) => JSON.stringify(d).includes("conversation-memory"));
