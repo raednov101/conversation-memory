@@ -78,6 +78,11 @@
             "text": "الإقامة من 10 إلى 17 نوفمبر",
             "source": "user",
             "quote": "احجزلي من ١٠ لـ ١٧ نوفمبر"
+          },
+          {
+            "text": "ميزانية الفندق حوالي 50 ألف جنيه",
+            "source": "user",
+            "quote": "الميزانية حوالي ١٥ ألف جنيه"
           }
         ],
         "revoke": []
@@ -99,6 +104,12 @@
         "verdict": "trust",
         "why": "same dates, Arabic vs Latin digits",
         "cat": "digits-normalized"
+      },
+      {
+        "item": "add:2",
+        "verdict": "hold",
+        "why": "15 thousand became 50 thousand",
+        "cat": "number-changed"
       }
     ]
   },
@@ -135,11 +146,6 @@
             "text": "عدم استخدام اللون الأبيض في كرت العرس",
             "source": "user",
             "quote": "ما بدي أبيض أبداً"
-          },
-          {
-            "text": "خط الكرت عربي بخط الثلث",
-            "source": "user",
-            "quote": "عربي، خط ثلث"
           }
         ],
         "revoke": []
@@ -161,12 +167,6 @@
         "verdict": "trust",
         "why": "negative kept as negative",
         "cat": "decision-negative-correct"
-      },
-      {
-        "item": "add:2",
-        "verdict": "trust",
-        "why": "paraphrase of user's choice",
-        "cat": "paraphrase"
       }
     ]
   },
@@ -251,11 +251,6 @@
             "text": "Analytics service database: MongoDB",
             "source": "user",
             "quote": "let's stick with PostgreSQL"
-          },
-          {
-            "text": "Analytics service stays on PostgreSQL because the team knows it",
-            "source": "user",
-            "quote": "For the analytics service, let's stick with PostgreSQL"
           }
         ],
         "revoke": []
@@ -271,12 +266,6 @@
         "verdict": "hold",
         "why": "user chose PostgreSQL, not MongoDB",
         "cat": "swapped-detail"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "matches user's choice",
-        "cat": "decision-correct"
       }
     ]
   },
@@ -308,11 +297,6 @@
             "text": "عدم ذكر اسم الشركة في الرسالة والإشارة إليها بـ«الشركة أ»",
             "source": "user",
             "quote": "لا أريد أن يُذكر اسم الشركة في الرسالة"
-          },
-          {
-            "text": "إبقاء اسم المدينة (جدة) ظاهراً في الرسالة",
-            "source": "user",
-            "quote": "المدينة عادي تبقى"
           }
         ],
         "revoke": []
@@ -328,12 +312,6 @@
         "verdict": "trust",
         "why": "negative decision stated correctly",
         "cat": "decision-negative-correct"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "user said the city can stay",
-        "cat": "paraphrase"
       }
     ]
   },
@@ -482,11 +460,6 @@
             "text": "عدم تقديم توصيل مجاني",
             "source": "user",
             "quote": "أبي التوصيل يكون مجاني للطلبات فوق ١٠٠ ريال"
-          },
-          {
-            "text": "رسوم توصيل 15 ريالاً للطلبات الأقل من 100 ريال",
-            "source": "user",
-            "quote": "وتحتها رسوم ١٥ ريال"
           }
         ],
         "revoke": []
@@ -502,12 +475,6 @@
         "verdict": "hold",
         "why": "negation added; user wants free delivery over 100",
         "cat": "meaning-flip"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "numbers match the message",
-        "cat": "digits-normalized"
       }
     ]
   },
@@ -594,11 +561,6 @@
             "quote": "نبي لون الهوية الأساسي أزرق غامق"
           },
           {
-            "text": "اللون الثانوي للهوية: رملي فاتح",
-            "source": "user",
-            "quote": "والثانوي رملي فاتح"
-          },
-          {
             "text": "عدم استخدام الأحمر في الهوية",
             "source": "user",
             "quote": "الأحمر لا، يذكرنا بمطاعم الوجبات السريعة"
@@ -620,12 +582,6 @@
       },
       {
         "item": "add:1",
-        "verdict": "trust",
-        "why": "matches user",
-        "cat": "decision-correct"
-      },
-      {
-        "item": "add:2",
         "verdict": "trust",
         "why": "negative kept",
         "cat": "decision-negative-correct"
@@ -662,16 +618,6 @@
             "quote": "والعروس سارة"
           },
           {
-            "text": "اسم العريس: محمد عبدالله الشهري",
-            "source": "user",
-            "quote": "اسم العريس محمد عبدالله الشهري"
-          },
-          {
-            "text": "مكان الحفل: قاعة الياسمين",
-            "source": "user",
-            "quote": "الحفل في قاعة الياسمين"
-          },
-          {
             "text": "اسم العروس سارة وليس نورة",
             "source": "user",
             "quote": "اسم العروس سارة مو نورة"
@@ -693,18 +639,6 @@
       },
       {
         "item": "add:1",
-        "verdict": "trust",
-        "why": "verbatim",
-        "cat": "decision-correct"
-      },
-      {
-        "item": "add:2",
-        "verdict": "trust",
-        "why": "verbatim",
-        "cat": "decision-correct"
-      },
-      {
-        "item": "add:3",
         "verdict": "trust",
         "why": "user's correction",
         "cat": "decision-negative-correct"
@@ -1123,6 +1057,11 @@
             "text": "Split auth into auth/session.ts, auth/tokens.ts and auth/guards.ts, with no behavior changes in the first PR",
             "source": "assistant-approved",
             "quote": "ok go with it"
+          },
+          {
+            "text": "Add unit tests for every new auth file",
+            "source": "assistant-approved",
+            "quote": "ok go with it"
           }
         ],
         "revoke": []
@@ -1138,6 +1077,12 @@
         "verdict": "trust",
         "why": "clean approval",
         "cat": "approval-clean"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "tests were never proposed; approval doesn't cover it",
+        "cat": "approval-bad"
       }
     ]
   },
@@ -1565,6 +1510,11 @@
             "text": "ترتيب التشطيب: السباكة والكهرباء، ثم المحارة، ثم الأرضيات، ثم الدهان",
             "source": "assistant-approved",
             "quote": "ماشي، امشي على الترتيب ده"
+          },
+          {
+            "text": "البدء بالدهان قبل الأرضيات",
+            "source": "assistant-approved",
+            "quote": "امشي على الترتيب ده"
           }
         ],
         "revoke": []
@@ -1580,6 +1530,12 @@
         "verdict": "trust",
         "why": "clean approval",
         "cat": "approval-clean"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "contradicts the approved order (paint last)",
+        "cat": "approval-bad"
       }
     ]
   },
@@ -1611,6 +1567,11 @@
             "text": "اسم التطبيق: قرشي (الدومين qirshi.app)",
             "source": "assistant-approved",
             "quote": "خلص اعتمدو"
+          },
+          {
+            "text": "اسم التطبيق قرشي اختاره المستخدم",
+            "source": "user",
+            "quote": "شو رأيك بـ«قرشي»؟"
           }
         ],
         "revoke": []
@@ -1626,6 +1587,12 @@
         "verdict": "trust",
         "why": "clean approval of the name",
         "cat": "approval-clean"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "quote is the assistant's question, attributed to user",
+        "cat": "assistant-quote"
       }
     ]
   },
@@ -1734,7 +1701,12 @@
         ]
       },
       "constraints": {
-        "add": [],
+        "add": [
+          {
+            "text": "عدم إضافة أي أثاث جديد للكافيه",
+            "quote": "المساحة ما تكفي"
+          }
+        ],
         "remove": []
       }
     },
@@ -1744,6 +1716,12 @@
         "verdict": "trust",
         "why": "explicit cancellation",
         "cat": "revoke-valid"
+      },
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "invented standing rule from a one-off remark",
+        "cat": "constraint-add-invalid"
       }
     ]
   },
@@ -1841,13 +1819,7 @@
     },
     "draft": {
       "decisions": {
-        "add": [
-          {
-            "text": "إضافة persist middleware لحفظ السلة بعد إغلاق التطبيق",
-            "source": "user",
-            "quote": "ضيف كمان persist middleware"
-          }
-        ],
+        "add": [],
         "revoke": [
           {
             "id": "d1",
@@ -1861,12 +1833,6 @@
       }
     },
     "expect": [
-      {
-        "item": "add:0",
-        "verdict": "trust",
-        "why": "user's request",
-        "cat": "decision-correct"
-      },
       {
         "item": "revoke:0",
         "verdict": "hold",
@@ -1906,13 +1872,7 @@
     },
     "draft": {
       "decisions": {
-        "add": [
-          {
-            "text": "Remove the old Travis config; CI runs on GitHub Actions",
-            "source": "user",
-            "quote": "drop the old Travis config, we're on GitHub Actions now"
-          }
-        ],
+        "add": [],
         "revoke": [
           {
             "id": "d1",
@@ -1926,12 +1886,6 @@
       }
     },
     "expect": [
-      {
-        "item": "add:0",
-        "verdict": "trust",
-        "why": "user's request",
-        "cat": "decision-correct"
-      },
       {
         "item": "revoke:0",
         "verdict": "hold",
@@ -2142,11 +2096,6 @@
             "source": "user",
             "quote": "We'll use Chart.js for the graphs",
             "replaces": "d1"
-          },
-          {
-            "text": "Revenue line is green with a tooltip showing the exact amount",
-            "source": "user",
-            "quote": "Make the revenue line green and add a tooltip with the exact amount"
           }
         ],
         "revoke": []
@@ -2162,12 +2111,6 @@
         "verdict": "hold",
         "why": "replacement quotes the old decision; no change asked",
         "cat": "replace-invalid"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "user's words",
-        "cat": "decision-correct"
       }
     ]
   },
@@ -2363,6 +2306,10 @@
           {
             "text": "الرد دائماً بالعربية الفصحى حتى لو كتب المستخدم بالعامية",
             "quote": "ردودك دايماً تكون بالعربي الفصحى لو سمحت"
+          },
+          {
+            "text": "الرد بالعامية الخليجية",
+            "quote": "حتى لو كتبت لك بالعامية"
           }
         ],
         "remove": []
@@ -2374,6 +2321,12 @@
         "verdict": "trust",
         "why": "user's standing request",
         "cat": "constraint-add-valid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "hold",
+        "why": "opposite of the request (فصحى)",
+        "cat": "constraint-add-invalid"
       }
     ]
   },
@@ -2404,6 +2357,10 @@
           {
             "text": "Keep every answer under 200 words",
             "quote": "keep every answer under 200 words"
+          },
+          {
+            "text": "Format every answer as bullet points only",
+            "quote": "I read these on my phone"
           }
         ],
         "remove": []
@@ -2415,6 +2372,12 @@
         "verdict": "trust",
         "why": "user's standing request",
         "cat": "constraint-add-valid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "hold",
+        "why": "user never asked for bullets",
+        "cat": "constraint-add-invalid"
       }
     ]
   },
@@ -2624,7 +2587,8 @@
     "memory": {
       "decisions": [],
       "constraints": [
-        "Keep every answer under 200 words"
+        "Keep every answer under 200 words",
+        "Use British spelling"
       ]
     },
     "draft": {
@@ -2638,6 +2602,10 @@
           {
             "text": "Keep every answer under 200 words",
             "quote": "you can drop the word limit now"
+          },
+          {
+            "text": "Use British spelling",
+            "quote": "I want the full detail on the migration plan"
           }
         ]
       }
@@ -2648,6 +2616,12 @@
         "verdict": "trust",
         "why": "explicit drop",
         "cat": "constraint-remove-valid"
+      },
+      {
+        "item": "cremove:1",
+        "verdict": "hold",
+        "why": "spelling rule was never dropped",
+        "cat": "constraint-remove-invalid"
       }
     ]
   },
@@ -2781,11 +2755,6 @@
             "text": "الدخل الشهري 12000 ريال",
             "source": "user",
             "quote": "دخلي ١٢ ألف ريال"
-          },
-          {
-            "text": "الإيجار 4500 ريال شهرياً",
-            "source": "user",
-            "quote": "الإيجار وحده ٤٥٠٠"
           }
         ],
         "revoke": []
@@ -2806,12 +2775,6 @@
         "item": "add:1",
         "verdict": "trust",
         "why": "١٢ ألف = 12000",
-        "cat": "digits-normalized"
-      },
-      {
-        "item": "add:2",
-        "verdict": "trust",
-        "why": "same number",
         "cat": "digits-normalized"
       }
     ]
@@ -2907,11 +2870,6 @@
             "quote": "ما ابي احد يكسر البلاط اللي في الصاله"
           },
           {
-            "text": "المقاول أبو فهد يبدأ العمل 1 رجب",
-            "source": "user",
-            "quote": "المقاول اسمه ابو فهد ويبدا من ١ رجب"
-          },
-          {
             "text": "البدء بالحمام وحماية بلاط الصالة بألواح خشب أثناء العمل",
             "source": "assistant-approved",
             "quote": "تمام كذا"
@@ -2951,12 +2909,6 @@
       },
       {
         "item": "add:4",
-        "verdict": "trust",
-        "why": "same name and date",
-        "cat": "decision-correct"
-      },
-      {
-        "item": "add:5",
         "verdict": "trust",
         "why": "clean approval right after proposal",
         "cat": "approval-clean"
@@ -3066,11 +3018,6 @@
             "text": "مدة الكورس 8 أسابيع بواقع درسين أسبوعياً، ومدة الدرس ساعة ونصف",
             "source": "user",
             "quote": "بدي الكورس يكون ٨ أسابيع، درسين بالأسبوع، وكل درس ساعة ونص"
-          },
-          {
-            "text": "الدروس مباشرة على Zoom مع رفع التسجيل بعدها",
-            "source": "user",
-            "quote": "لايف عالزوم، وبنرفع التسجيل بعدها"
           }
         ],
         "revoke": []
@@ -3086,12 +3033,6 @@
         "verdict": "trust",
         "why": "same numbers, reworded",
         "cat": "digits-normalized"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "paraphrase (Zoom = الزوم)",
-        "cat": "paraphrase"
       }
     ]
   },
@@ -3126,7 +3067,13 @@
     },
     "draft": {
       "decisions": {
-        "add": [],
+        "add": [
+          {
+            "text": "تمديد مدة الدرس إلى ساعتين",
+            "source": "user",
+            "quote": "الوقت ما عم يكفي للشرح أصلاً"
+          }
+        ],
         "revoke": [
           {
             "id": "d1",
@@ -3140,6 +3087,12 @@
       }
     },
     "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user never decided to extend lessons",
+        "cat": "unsupported-inference"
+      },
       {
         "item": "revoke:0",
         "verdict": "trust",
@@ -3185,6 +3138,11 @@
             "source": "user",
             "quote": "ما عاد نبي Firebase، خلنا ننتقل لـ Supabase",
             "replaces": "d1"
+          },
+          {
+            "text": "إلغاء تسجيل الدخول بحساب جوجل",
+            "source": "user",
+            "quote": "ما عاد نبي Firebase"
           }
         ],
         "revoke": []
@@ -3200,6 +3158,12 @@
         "verdict": "trust",
         "why": "explicit later switch",
         "cat": "replace-valid"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "user dropped Firebase, not Google sign-in",
+        "cat": "unsupported-inference"
       }
     ]
   },
@@ -3227,11 +3191,6 @@
             "text": "عدم نشر بيانات المستخدم الشخصية أو رقمه في الاستبيان",
             "source": "user",
             "quote": "لا تنشر بياناتي الشخصية ولا رقمي في الاستبيان"
-          },
-          {
-            "text": "وضع إيميل الكافيه فقط للتواصل في الاستبيان",
-            "source": "user",
-            "quote": "حط إيميل الكافيه بس"
           }
         ],
         "revoke": []
@@ -3247,12 +3206,6 @@
         "verdict": "trust",
         "why": "negative kept as negative",
         "cat": "decision-negative-correct"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "user's words",
-        "cat": "decision-correct"
       }
     ]
   },
@@ -3333,6 +3286,11 @@
             "text": "دعوة الفرح بدون صور للعروسين، نص وزخرفة فقط",
             "source": "user",
             "quote": "مش عايز الدعوة يبقى فيها صور للعرسان"
+          },
+          {
+            "text": "الدعوة بزخرفة إسلامية خفيفة ولون ذهبي",
+            "source": "assistant-approved",
+            "quote": "خليها نص وزخرفة بس"
           }
         ],
         "revoke": []
@@ -3348,6 +3306,12 @@
         "verdict": "trust",
         "why": "negative kept",
         "cat": "decision-negative-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "quote precedes the proposal; no approval after it",
+        "cat": "approval-bad"
       }
     ]
   },
@@ -3417,11 +3381,6 @@
             "text": "ادخار 20% من الراتب شهرياً",
             "source": "user",
             "quote": "قررت أن أدخر ١٥٪ من الراتب كل شهر"
-          },
-          {
-            "text": "سداد بطاقة الائتمان قبل نهاية السنة",
-            "source": "user",
-            "quote": "وأن أسدد بطاقة الائتمان قبل نهاية السنة"
           }
         ],
         "revoke": []
@@ -3437,12 +3396,6 @@
         "verdict": "hold",
         "why": "15% became 20%",
         "cat": "number-changed"
-      },
-      {
-        "item": "add:1",
-        "verdict": "trust",
-        "why": "verbatim",
-        "cat": "decision-correct"
       }
     ]
   },
@@ -3527,6 +3480,11 @@
             "text": "حل بطء endpoint الطلبات بـ select_related وإضافة index على created_at",
             "source": "assistant-approved",
             "quote": "اوكي تمام، طبقه"
+          },
+          {
+            "text": "إضافة caching بـ Redis لنتائج endpoint الطلبات",
+            "source": "assistant-approved",
+            "quote": "اوكي تمام، طبقه"
           }
         ],
         "revoke": []
@@ -3542,6 +3500,12 @@
         "verdict": "trust",
         "why": "clean approval",
         "cat": "approval-clean"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "Redis caching was never proposed",
+        "cat": "approval-bad"
       }
     ]
   },
@@ -3881,6 +3845,11 @@
             "source": "user",
             "quote": "starter gets 3 seats instead of 5",
             "replaces": "d1"
+          },
+          {
+            "text": "Team plan: 30 seats",
+            "source": "user",
+            "quote": "team plan gets 25"
           }
         ],
         "revoke": []
@@ -3896,6 +3865,12 @@
         "verdict": "trust",
         "why": "explicit later change",
         "cat": "replace-valid"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "25 became 30",
+        "cat": "number-changed"
       }
     ]
   },
@@ -3977,6 +3952,10 @@
           {
             "text": "كتابة الاسم الكامل «أفق الابتكار للاستشارات» دون اختصار",
             "quote": "ويجب أن يُكتب كاملاً في كل المستندات دون اختصار"
+          },
+          {
+            "text": "يجوز اختصار الاسم إلى «أفق» في المستندات",
+            "quote": "كاملاً في كل المستندات"
           }
         ],
         "remove": []
@@ -3988,6 +3967,12 @@
         "verdict": "trust",
         "why": "user's standing requirement",
         "cat": "constraint-add-valid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "hold",
+        "why": "user forbade abbreviation",
+        "cat": "constraint-add-invalid"
       }
     ]
   },
@@ -4123,6 +4108,11 @@
             "text": "هوية محل الحلويات: وردي فاتح #F8C8DC وبني شوكولاتة #5D3A1A وخط Tajawal",
             "source": "assistant-approved",
             "quote": "خلاص كده تمام"
+          },
+          {
+            "text": "خط الهوية للعربي: Cairo",
+            "source": "assistant-approved",
+            "quote": "خلاص كده تمام"
           }
         ],
         "revoke": []
@@ -4138,6 +4128,12 @@
         "verdict": "trust",
         "why": "clean approval",
         "cat": "approval-clean"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "proposed font was Tajawal, not Cairo",
+        "cat": "swapped-detail"
       }
     ]
   },
@@ -4276,7 +4272,13 @@
     },
     "draft": {
       "decisions": {
-        "add": [],
+        "add": [
+          {
+            "text": "الفصل الثالث مخصص للدراسات المقارنة",
+            "source": "user",
+            "quote": "سأجعله الفصل الثالث"
+          }
+        ],
         "revoke": [
           {
             "id": "d1",
@@ -4290,6 +4292,12 @@
       }
     },
     "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "assistant's words, and the chapter was later cancelled",
+        "cat": "assistant-quote"
+      },
       {
         "item": "revoke:0",
         "verdict": "trust",
@@ -4385,7 +4393,12 @@
         "revoke": []
       },
       "constraints": {
-        "add": [],
+        "add": [
+          {
+            "text": "عدم تقديم أي خصومات على الاشتراكات",
+            "quote": "ومافي free trial"
+          }
+        ],
         "remove": []
       }
     },
@@ -4401,6 +4414,12 @@
         "verdict": "hold",
         "why": "user said no free trial",
         "cat": "meaning-flip"
+      },
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "no-trial is not a no-discounts rule",
+        "cat": "constraint-add-invalid"
       }
     ]
   }

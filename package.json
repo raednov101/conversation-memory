@@ -14,6 +14,8 @@
     "format:check": "prettier --check \"core/**/*.js\" \"plugin/scripts/**/*.js\" \"plugin/hooks/*.ts\" \"extension/src/**/*.js\" \"tests/**/*.js\" \"scripts/*.js\""
   },
   "devDependencies": {
+    "acorn": "^8.12.1",
+    "acorn-walk": "^8.3.4",
     "eslint": "9.13.0",
     "prettier": "^3.3.3"
   }
