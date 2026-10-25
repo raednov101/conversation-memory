@@ -1,5 +1,6 @@
 // node --test tests/   — reading a conversation from the sites' own data (pure parsing; no network)
 "use strict";
+process.env.CONV_MEMORY_LANG = process.env.CONV_MEMORY_LANG || "ar"; // the tests read the Arabic interface
 const test = require("node:test");
 const assert = require("node:assert/strict");
 globalThis.self = globalThis;

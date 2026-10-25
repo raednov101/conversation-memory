@@ -1,5 +1,6 @@
 // node --test tests/   — what the indicator shows for a given state (pure; no browser)
 "use strict";
+process.env.CONV_MEMORY_LANG = process.env.CONV_MEMORY_LANG || "ar"; // the tests read the Arabic interface
 const test = require("node:test");
 const assert = require("node:assert/strict");
 globalThis.self = globalThis; globalThis.MemoryCore = require("../src/memory-core.js");

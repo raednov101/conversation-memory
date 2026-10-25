@@ -1,5 +1,6 @@
 // node --test tests/linking.test.js   — runs without a browser
 "use strict";
+process.env.CONV_MEMORY_LANG = process.env.CONV_MEMORY_LANG || "ar"; // the tests read the Arabic interface
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const L = require("../src/linking.js");

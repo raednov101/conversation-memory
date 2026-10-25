@@ -1,5 +1,6 @@
 // node --test tests/plugin/        (Node 18+)
 "use strict";
+process.env.CONV_MEMORY_LANG = process.env.CONV_MEMORY_LANG || "ar"; // the tests read the Arabic interface
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const C = require("../../plugin/core/memory-core.js");

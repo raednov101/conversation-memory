@@ -1,5 +1,6 @@
 // node --test tests/plugin/      — drives scripts/hook.js exactly as Claude Code does (JSON on stdin), in temp folders and a temp HOME.
 "use strict";
+process.env.CONV_MEMORY_LANG = process.env.CONV_MEMORY_LANG || "ar"; // the tests read the Arabic interface
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { spawnSync, spawn } = require("node:child_process");

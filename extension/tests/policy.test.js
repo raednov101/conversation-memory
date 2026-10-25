@@ -1,5 +1,6 @@
 // node --test tests/   — the page's pure decisions, without a browser
 "use strict";
+process.env.CONV_MEMORY_LANG = process.env.CONV_MEMORY_LANG || "ar"; // the tests read the Arabic interface
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const POL = require("../src/page/policy.js");
