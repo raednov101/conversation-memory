@@ -14,17 +14,29 @@ function safeFile(p, max) {
   if (max && s.size > max) return { bad: `أكبر من الحد (${Math.round(max / 1024)} ك.ب)` };
   return { stat: s };
 }
-function readSafe(p, max) { const f = safeFile(p, max); if (f.missing) return { text: null }; if (f.bad) return { bad: f.bad }; return { text: fs.readFileSync(p, "utf8"), stat: f.stat }; }
+function readSafe(p, max) {
+  const f = safeFile(p, max);
+  if (f.missing) return { text: null };
+  if (f.bad) return { bad: f.bad };
+  return { text: fs.readFileSync(p, "utf8"), stat: f.stat };
+}
 function writeAtomic(file, data) {
   const s = lst(file);
   if (s && (s.isSymbolicLink() || !s.isFile() || s.nlink > 1)) throw new Error("unsafe target " + path.basename(file));
   const tmp = `${file}.${process.pid}.${nonce(3)}.tmp`;
   fs.writeFileSync(tmp, data, { flag: "wx", mode: 0o600 });
   for (let i = 0; ; i++) {
-    try { fs.renameSync(tmp, file); return; }
-    catch (e) {
-      if (i < 5 && ["EPERM", "EBUSY", "EACCES"].includes(e.code)) { sleep(25); continue; } // Windows: file briefly open elsewhere
-      try { fs.unlinkSync(tmp); } catch {}
+    try {
+      fs.renameSync(tmp, file);
+      return;
+    } catch (e) {
+      if (i < 5 && ["EPERM", "EBUSY", "EACCES"].includes(e.code)) {
+        sleep(25);
+        continue;
+      } // Windows: file briefly open elsewhere
+      try {
+        fs.unlinkSync(tmp);
+      } catch {}
       throw e;
     }
   }
@@ -38,14 +50,44 @@ function writeAtomic(file, data) {
 // had a window where a third process could slip in, leaving two holders).
 function breakStale(file, seen) {
   const m = file + ".break";
-  try { fs.closeSync(fs.openSync(m, "wx", 0o600)); }
-  catch (e) { if (e.code === "EEXIST") { const s = lst(m); if (s && s.isFile() && Date.now() - s.mtimeMs > 2000) { try { fs.unlinkSync(m); } catch {} } } return; }   // a breaker killed mid-way
-  try { let now = null; try { now = fs.readFileSync(file, "utf8"); } catch {} if (now === seen) fs.unlinkSync(file); }
-  catch {}
-  finally { try { fs.unlinkSync(m); } catch {} }
+  try {
+    fs.closeSync(fs.openSync(m, "wx", 0o600));
+  } catch (e) {
+    if (e.code === "EEXIST") {
+      const s = lst(m);
+      if (s && s.isFile() && Date.now() - s.mtimeMs > 2000) {
+        try {
+          fs.unlinkSync(m);
+        } catch {}
+      }
+    }
+    return;
+  } // a breaker killed mid-way
+  try {
+    let now = null;
+    try {
+      now = fs.readFileSync(file, "utf8");
+    } catch {}
+    if (now === seen) fs.unlinkSync(file);
+  } catch {
+  } finally {
+    try {
+      fs.unlinkSync(m);
+    } catch {}
+  }
 }
-function writeVerified(file, data) { writeAtomic(file, data); if (fs.readFileSync(file, "utf8") !== data) throw new Error("read-back mismatch " + path.basename(file)); }
-const unlinkSafe = (p) => { const s = lst(p); if (s && s.isFile() && !s.isSymbolicLink()) { try { fs.unlinkSync(p); } catch {} } };
+function writeVerified(file, data) {
+  writeAtomic(file, data);
+  if (fs.readFileSync(file, "utf8") !== data) throw new Error("read-back mismatch " + path.basename(file));
+}
+const unlinkSafe = (p) => {
+  const s = lst(p);
+  if (s && s.isFile() && !s.isSymbolicLink()) {
+    try {
+      fs.unlinkSync(p);
+    } catch {}
+  }
+};
 // a directory we own: not a link, (optionally) owned by us; created if missing
 function safeDir(d, mode = 0o700, owner = false) {
   const s0 = lst(d);

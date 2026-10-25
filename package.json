@@ -9,9 +9,12 @@
     "sync-core": "node scripts/check-core.js --write",
     "e2e": "python3 extension/tests/e2e.py",
     "integration": "bash tests/plugin/integration.sh",
-    "package": "node scripts/package.js"
+    "package": "node scripts/package.js",
+    "format": "prettier --write \"core/**/*.js\" \"plugin/scripts/**/*.js\" \"plugin/hooks/*.ts\" \"extension/src/**/*.js\" \"tests/**/*.js\" \"scripts/*.js\" && node scripts/check-core.js --write",
+    "format:check": "prettier --check \"core/**/*.js\" \"plugin/scripts/**/*.js\" \"plugin/hooks/*.ts\" \"extension/src/**/*.js\" \"tests/**/*.js\" \"scripts/*.js\""
   },
   "devDependencies": {
-    "eslint": "9.13.0"
+    "eslint": "9.13.0",
+    "prettier": "^3.3.3"
   }
 }

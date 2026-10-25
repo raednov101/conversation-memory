@@ -6,21 +6,31 @@
 
   async function typeInto(c, value) {
     c.focus();
-    if (c.value !== undefined) {   // plain textarea (React-controlled: use the native setter)
+    if (c.value !== undefined) {
+      // plain textarea (React-controlled: use the native setter)
       Object.getOwnPropertyDescriptor(Object.getPrototypeOf(c), "value").set.call(c, value);
       c.dispatchEvent(new Event("input", { bubbles: true }));
       return text(c).length > 0;
     }
     document.execCommand("selectAll", false);
     document.execCommand("insertText", false, value);
-    if (!text(c)) {                 // fallback: a synthetic paste, which both editors accept
-      const dt = new DataTransfer(); dt.setData("text/plain", value);
+    if (!text(c)) {
+      // fallback: a synthetic paste, which both editors accept
+      const dt = new DataTransfer();
+      dt.setData("text/plain", value);
       c.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     }
     return text(c).length > 0;
   }
   async function send(adapter, c) {
-    for (let i = 0; i < 30; i++) { const b = adapter.sendButton(); if (b && !b.disabled) { b.click(); return true; } await sleep(100); }
+    for (let i = 0; i < 30; i++) {
+      const b = adapter.sendButton();
+      if (b && !b.disabled) {
+        b.click();
+        return true;
+      }
+      await sleep(100);
+    }
     c.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
     return true;
   }

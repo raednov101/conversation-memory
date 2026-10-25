@@ -8,7 +8,10 @@
   else (root.CM = root.CM || {}).policy = api;
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
-  const CONFIRM_MS = 2500, REWIND_WINDOW_MS = 1800000, MAX_REWINDS = 3, MAX_ATTEMPTS = 3;
+  const CONFIRM_MS = 2500,
+    REWIND_WINDOW_MS = 1800000,
+    MAX_REWINDS = 3,
+    MAX_ATTEMPTS = 3;
 
   // st: { summarizedUpTo, hashes[], rhashes[], suspect, rewinds[] }; uh/rh: current fingerprints (your text / your text + replies)
   // → { action: "none" | "watch" | "rewind" | "capped", k?, kind?, suspect? }  (never mutates st)

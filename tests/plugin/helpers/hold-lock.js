@@ -5,5 +5,8 @@ const s = require("../../../plugin/scripts/lib/store");
 const until = Date.now() + Number(process.argv[2] || 17000);
 if (!s.holdWriteLock(3000)) process.exit(2);
 const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-while (Date.now() < until) { nap(2000); s.touchWriteLock(); }
+while (Date.now() < until) {
+  nap(2000);
+  s.touchWriteLock();
+}
 s.releaseWriteLock();

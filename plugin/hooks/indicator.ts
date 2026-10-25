@@ -5,11 +5,24 @@
 // It only reads the small status file the command hooks write; it never writes anything.
 import type { EngineInterface, Register } from "claude-code";
 
-type Status = { v: number; every: number; mode?: string; since: number; pending: number; stuck: number; lastSave: string; lastCapture?: string; cost?: number; error: string; updated: number };
+type Status = {
+  v: number;
+  every: number;
+  mode?: string;
+  since: number;
+  pending: number;
+  stuck: number;
+  lastSave: string;
+  lastCapture?: string;
+  cost?: number;
+  error: string;
+  updated: number;
+};
 
 export function format(s: Status): string {
   // auto: «3/5»; manual: «3 · يدوي»; session (the default): «3 · نهاية الجلسة» (summarized before compaction and at exit)
-  const prog = s.mode === "auto" ? `${Math.min(s.since, s.every)}/${s.every}` : `${s.since} · ${s.mode === "manual" ? "يدوي" : "نهاية الجلسة"}`;
+  const prog =
+    s.mode === "auto" ? `${Math.min(s.since, s.every)}/${s.every}` : `${s.since} · ${s.mode === "manual" ? "يدوي" : "نهاية الجلسة"}`;
   if (s.stuck > 0) return `🧠 ⚠️ ${prog} · تعثّر الحفظ`;
   if (s.pending > 0) return `🧠 ⏳ ${prog} · يحفظ`;
   const cap = s.lastCapture || "";
@@ -22,7 +35,10 @@ async function show($: EngineInterface): Promise<void> {
   try {
     const home = (await $.env.get("HOME")) || (await $.env.get("USERPROFILE"));
     if (!home) return;
-    const id = String(await $.session.id()).replace(/[^A-Za-z0-9-]/g, "").slice(0, 80) || "default";
+    const id =
+      String(await $.session.id())
+        .replace(/[^A-Za-z0-9-]/g, "")
+        .slice(0, 80) || "default";
     const text = await $.fs.read(`${home}/.conversation-memory/status/${id}.json`);
     const s = JSON.parse(String(text)) as Status;
     if (s && s.v === 1) $.ui.status(format(s));

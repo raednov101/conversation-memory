@@ -1,0 +1,8 @@
+dist/
+downloads/
+node_modules/
+plugin/core/
+extension/src/memory-core.js
+*.html
+*.md
+*.json

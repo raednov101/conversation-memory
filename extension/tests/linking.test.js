@@ -31,6 +31,6 @@ test("content.js links a chat in exactly two places: this rule, and your click o
   const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "src", "content.js"), "utf8");
   const sets = (src.match(/linked\s*[:=]\s*[^,;}]+/g) || []).filter((x) => !/[:=]\s*false\s*$/.test(x));
   assert.deepEqual(sets.map((x) => x.replace(/\s+/g, " ")), ["linked = d.link", "linked: true"], sets.join(" | "));
-  assert.match(src, /a === "link" \? \{ linked: true/, "the only literal true is the link button");
+  assert.match(src, /a === "link"\s*\?\s*\{\s*linked: true/, "the only literal true is the link button");
   assert.doesNotMatch(src, /typedOnNew|"input", \(e\) =>/, "typing is not used as proof");
 });

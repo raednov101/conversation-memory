@@ -7,7 +7,16 @@ const big = "ن".repeat(3000);
 for (let i = 0; ; i++) {
   writeMemory((m) => {
     const out = JSON.parse(JSON.stringify(m));
-    out.log.push({ id: `loop-${process.pid}-${i}`, platform: "claude-code", chat: "", range: String(i), date: "", raised: [big], decided: [], changed: [] });
+    out.log.push({
+      id: `loop-${process.pid}-${i}`,
+      platform: "claude-code",
+      chat: "",
+      range: String(i),
+      date: "",
+      raised: [big],
+      decided: [],
+      changed: [],
+    });
     out.log = out.log.slice(-40);
     return C.normalizeMemory(out);
   });

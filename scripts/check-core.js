@@ -12,8 +12,12 @@ const want = fs.readFileSync(source);
 let bad = 0;
 for (const f of copies) {
   const same = fs.existsSync(f) && Buffer.compare(fs.readFileSync(f), want) === 0;
-  if (!same && process.argv.includes("--write")) { fs.writeFileSync(f, want); console.log("updated", path.relative(root, f)); }
-  else if (!same) { bad++; console.error("DIFFERS", path.relative(root, f)); }
-  else console.log("same   ", path.relative(root, f));
+  if (!same && process.argv.includes("--write")) {
+    fs.writeFileSync(f, want);
+    console.log("updated", path.relative(root, f));
+  } else if (!same) {
+    bad++;
+    console.error("DIFFERS", path.relative(root, f));
+  } else console.log("same   ", path.relative(root, f));
 }
 process.exit(bad ? 1 : 0);

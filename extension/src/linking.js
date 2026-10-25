@@ -8,13 +8,25 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
   const WINDOW_MS = 120000;
-  const norm = (t) => String(t == null ? "" : t).replace(/\s+/g, " ").trim();
+  const norm = (t) =>
+    String(t == null ? "" : t)
+      .replace(/\s+/g, " ")
+      .trim();
   // the message you sent from a new-chat page (null if the composer was empty)
-  const proofFromSend = (composerText, now) => { const text = norm(composerText); return text ? { text, at: now } : null; };
+  const proofFromSend = (composerText, now) => {
+    const text = norm(composerText);
+    return text ? { text, at: now } : null;
+  };
   // { link, consume }: link this chat? consume the proof?
   function decide({ proof, now, autoLink, userMessages }) {
-    const ok = autoLink !== false && !!proof && now - proof.at >= 0 && now - proof.at < WINDOW_MS &&
-      Array.isArray(userMessages) && userMessages.length === 1 && norm(userMessages[0]) === proof.text;
+    const ok =
+      autoLink !== false &&
+      !!proof &&
+      now - proof.at >= 0 &&
+      now - proof.at < WINDOW_MS &&
+      Array.isArray(userMessages) &&
+      userMessages.length === 1 &&
+      norm(userMessages[0]) === proof.text;
     return { link: ok, consume: ok };
   }
   return { WINDOW_MS, norm, proofFromSend, decide };

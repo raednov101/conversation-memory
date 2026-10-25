@@ -1,0 +1,4407 @@
+[
+  {
+    "id": "gulf-cafe-name",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي اسم للكافيه يكون قصير وسهل، عندي كم فكرة: بُن، رُكن، مَدار"
+      },
+      {
+        "role": "assistant",
+        "text": "كلها حلوة. «مدار» مميز ويعطي إحساس بالحركة، و«ركن» دافئ وقريب. أيهم تميل له أكثر؟"
+      },
+      {
+        "role": "user",
+        "text": "خلنا على مدار، زين وسهل ينحفظ"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "اسم الكافيه: مدار",
+            "source": "user",
+            "quote": "خلنا على مدار"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "user picked the name explicitly",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "egy-hurghada-hotel",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايز أحجز فندق في الغردقة أسبوع في نوفمبر، الميزانية حوالي ١٥ ألف جنيه"
+      },
+      {
+        "role": "assistant",
+        "text": "عندي ثلاث ترشيحات: ستيجنبرجر، سنريز، والبارون. البارون الأرخص فيهم وعلى البحر مباشرة."
+      },
+      {
+        "role": "user",
+        "text": "خلاص كده، البارون. احجزلي من ١٠ لـ ١٧ نوفمبر"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الفندق: البارون في الغردقة",
+            "source": "user",
+            "quote": "خلاص كده، البارون"
+          },
+          {
+            "text": "الإقامة من 10 إلى 17 نوفمبر",
+            "source": "user",
+            "quote": "احجزلي من ١٠ لـ ١٧ نوفمبر"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "user chose البارون",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "same dates, Arabic vs Latin digits",
+        "cat": "digits-normalized"
+      }
+    ]
+  },
+  {
+    "id": "lev-wedding-card-colors",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي كرت العرس يكون لونه أخضر زيتي مع دهبي، وما بدي أبيض أبداً لأنو كل الكروت هالسنة بيض"
+      },
+      {
+        "role": "assistant",
+        "text": "اختيار حلو ومميز. الأخضر الزيتي مع الذهبي بيعطي طابع كلاسيكي فخم. بدك الخط عربي ولا إنجليزي؟"
+      },
+      {
+        "role": "user",
+        "text": "عربي، خط ثلث إذا بتقدر"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "لون كرت العرس: أخضر زيتي مع ذهبي",
+            "source": "user",
+            "quote": "بدي كرت العرس يكون لونه أخضر زيتي مع دهبي"
+          },
+          {
+            "text": "عدم استخدام اللون الأبيض في كرت العرس",
+            "source": "user",
+            "quote": "ما بدي أبيض أبداً"
+          },
+          {
+            "text": "خط الكرت عربي بخط الثلث",
+            "source": "user",
+            "quote": "عربي، خط ثلث"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "colors match user's words",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "negative kept as negative",
+        "cat": "decision-negative-correct"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "paraphrase of user's choice",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "en-db-choice",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Quick architecture note before we start: we'll use PostgreSQL for the main database, and Redis only for caching, not as a queue."
+      },
+      {
+        "role": "assistant",
+        "text": "Got it. For the background job queue, do you want me to propose something?"
+      },
+      {
+        "role": "user",
+        "text": "Later. Let's get the schema done first."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Main database: PostgreSQL",
+            "source": "user",
+            "quote": "we'll use PostgreSQL for the main database"
+          },
+          {
+            "text": "Redis is used only for caching and must not be used as a job queue",
+            "source": "user",
+            "quote": "Redis only for caching, not as a queue"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "verbatim user decision",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "longer wording, same meaning",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "en-analytics-mongo-swap",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "For the analytics service, let's stick with PostgreSQL. Someone suggested MongoDB in the standup but the team already knows Postgres well."
+      },
+      {
+        "role": "assistant",
+        "text": "Makes sense; sticking with what the team knows reduces risk. I'll set up the analytics schema in PostgreSQL."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Analytics service database: MongoDB",
+            "source": "user",
+            "quote": "let's stick with PostgreSQL"
+          },
+          {
+            "text": "Analytics service stays on PostgreSQL because the team knows it",
+            "source": "user",
+            "quote": "For the analytics service, let's stick with PostgreSQL"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user chose PostgreSQL, not MongoDB",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "matches user's choice",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "msa-thesis-company-name",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أنا أكتب رسالة ماجستير عن إدارة سلاسل الإمداد، ودراسة الحالة على شركة توزيع في جدة. لا أريد أن يُذكر اسم الشركة في الرسالة، استخدم «الشركة أ» بدلاً منه."
+      },
+      {
+        "role": "assistant",
+        "text": "مفهوم، سأشير إليها بـ«الشركة أ» في كل الفصول. هل تريد إخفاء اسم المدينة أيضاً؟"
+      },
+      {
+        "role": "user",
+        "text": "لا، المدينة عادي تبقى."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "عدم ذكر اسم الشركة في الرسالة والإشارة إليها بـ«الشركة أ»",
+            "source": "user",
+            "quote": "لا أريد أن يُذكر اسم الشركة في الرسالة"
+          },
+          {
+            "text": "إبقاء اسم المدينة (جدة) ظاهراً في الرسالة",
+            "source": "user",
+            "quote": "المدينة عادي تبقى"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "negative decision stated correctly",
+        "cat": "decision-negative-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user said the city can stay",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "msa-thesis-participants-partial",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "في الفصل الرابع عندي جداول المقابلات. لا أريد نشر بيانات المشاركين في الملحق، يكفي الأكواد P1 إلى P12."
+      },
+      {
+        "role": "assistant",
+        "text": "حسناً، سأضع في الملحق الأكواد فقط مع الدور الوظيفي العام لكل مشارك."
+      },
+      {
+        "role": "user",
+        "text": "ممتاز"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "نشر بيانات المشاركين في الملحق",
+            "source": "user",
+            "quote": "نشر بيانات المشاركين في الملحق"
+          },
+          {
+            "text": "الاكتفاء بالأكواد P1 إلى P12 بدل بيانات المشاركين",
+            "source": "user",
+            "quote": "يكفي الأكواد P1 إلى P12"
+          },
+          {
+            "text": "إضافة الدور الوظيفي العام لكل مشارك بجانب الكود في الملحق",
+            "source": "assistant-approved",
+            "quote": "ممتاز"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "quote cuts off «لا أريد»; meaning flipped",
+        "cat": "meaning-flip"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's own words",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "clean approval right after the proposal",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "gulf-menu-prices-flip",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بالنسبة للمنيو، لا تحط أسعار في المنيو الخارجي اللي على الباب، الأسعار بس داخل الكافيه على الكاونتر"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، المنيو الخارجي يكون صور ووصف بدون أسعار، والأسعار على لوحة الكاونتر."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "وضع الأسعار في المنيو الخارجي على الباب",
+            "source": "user",
+            "quote": "تحط أسعار في المنيو الخارجي"
+          },
+          {
+            "text": "الأسعار تُعرض داخل الكافيه على الكاونتر فقط",
+            "source": "user",
+            "quote": "الأسعار بس داخل الكافيه على الكاونتر"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "negation «لا» dropped",
+        "cat": "meaning-flip"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "same meaning",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "gulf-free-delivery-negation-added",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أبي التوصيل يكون مجاني للطلبات فوق ١٠٠ ريال، وتحتها رسوم ١٥ ريال"
+      },
+      {
+        "role": "assistant",
+        "text": "واضح. أحدّث صفحة الدفع بهالشروط."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "عدم تقديم توصيل مجاني",
+            "source": "user",
+            "quote": "أبي التوصيل يكون مجاني للطلبات فوق ١٠٠ ريال"
+          },
+          {
+            "text": "رسوم توصيل 15 ريالاً للطلبات الأقل من 100 ريال",
+            "source": "user",
+            "quote": "وتحتها رسوم ١٥ ريال"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "negation added; user wants free delivery over 100",
+        "cat": "meaning-flip"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "numbers match the message",
+        "cat": "digits-normalized"
+      }
+    ]
+  },
+  {
+    "id": "mixed-onboarding-font-opposite",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خلي الـ font size كبير شوي في شاشات الـ onboarding، أغلب المستخدمين كبار في السن"
+      },
+      {
+        "role": "assistant",
+        "text": "Got it. سأرفع حجم الخط إلى 20pt في شاشات التعريف وأزيد التباين بين النص والخلفية."
+      },
+      {
+        "role": "user",
+        "text": "حلو"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حجم الخط صغير في شاشات التعريف",
+            "source": "user",
+            "quote": "خلي الـ font size كبير شوي في شاشات الـ onboarding"
+          },
+          {
+            "text": "رفع الخط إلى 20pt وزيادة التباين في شاشات التعريف",
+            "source": "assistant-approved",
+            "quote": "حلو"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "opposite value (كبير → صغير)",
+        "cat": "meaning-flip"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "approval right after the proposal",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "gulf-brand-color-swap",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي لون الهوية الأساسي أزرق غامق، والثانوي رملي فاتح. الأحمر لا، يذكرنا بمطاعم الوجبات السريعة"
+      },
+      {
+        "role": "assistant",
+        "text": "اختيار موفق لكافيه هادي. أقترح درجة #1F3A5F للأزرق و#E8DCC4 للرملي."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "اللون الأساسي للهوية: الأحمر الغامق",
+            "source": "user",
+            "quote": "نبي لون الهوية الأساسي أزرق غامق"
+          },
+          {
+            "text": "اللون الثانوي للهوية: رملي فاتح",
+            "source": "user",
+            "quote": "والثانوي رملي فاتح"
+          },
+          {
+            "text": "عدم استخدام الأحمر في الهوية",
+            "source": "user",
+            "quote": "الأحمر لا، يذكرنا بمطاعم الوجبات السريعة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user said أزرق, not أحمر",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "matches user",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "gulf-wedding-bride-name-swap",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أبي نص دعوة زواج، اسم العريس محمد عبدالله الشهري والعروس سارة، الحفل في قاعة الياسمين"
+      },
+      {
+        "role": "assistant",
+        "text": "يسعدني. هذه مسودة: «بكل الحب ندعوكم لحضور حفل زواج ابننا محمد عبدالله الشهري على كريمتهم نورة...»"
+      },
+      {
+        "role": "user",
+        "text": "زين بس اسم العروس سارة مو نورة، انتبه"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "اسم العروس: نورة",
+            "source": "user",
+            "quote": "والعروس سارة"
+          },
+          {
+            "text": "اسم العريس: محمد عبدالله الشهري",
+            "source": "user",
+            "quote": "اسم العريس محمد عبدالله الشهري"
+          },
+          {
+            "text": "مكان الحفل: قاعة الياسمين",
+            "source": "user",
+            "quote": "الحفل في قاعة الياسمين"
+          },
+          {
+            "text": "اسم العروس سارة وليس نورة",
+            "source": "user",
+            "quote": "اسم العروس سارة مو نورة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "name swapped to the assistant's mistake",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "verbatim",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "verbatim",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:3",
+        "verdict": "trust",
+        "why": "user's correction",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "egy-istanbul-date-swap",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايزين نسافر إسطنبول أنا ومراتي، السفر يوم ١٢ ديسمبر والرجوع ١٩"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، فيه رحلة مصر للطيران الساعة ١٠ الصبح يوم ١٢، ورحلة رجوع يوم ١٩ الساعة ٤ العصر."
+      },
+      {
+        "role": "user",
+        "text": "ماشي احجز الاتنين"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "السفر إلى إسطنبول يوم 21 ديسمبر",
+            "source": "user",
+            "quote": "السفر يوم ١٢ ديسمبر"
+          },
+          {
+            "text": "حجز رحلة مصر للطيران 10 صباحاً يوم 12 ديسمبر والعودة يوم 19 الساعة 4 عصراً",
+            "source": "assistant-approved",
+            "quote": "ماشي احجز الاتنين"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "date changed 12 → 21",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "clean approval of both flights",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "mixed-rn-not-flutter",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "للتطبيق هنستخدم React Native مش Flutter، الفريق كله JavaScript"
+      },
+      {
+        "role": "assistant",
+        "text": "قرار منطقي. هبدأ بـ Expo عشان أسرع في الإعداد، ولا تفضل bare workflow؟"
+      },
+      {
+        "role": "user",
+        "text": "Expo تمام"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "إطار التطبيق: Flutter",
+            "source": "user",
+            "quote": "هنستخدم React Native مش Flutter"
+          },
+          {
+            "text": "استخدام Expo لإعداد مشروع React Native",
+            "source": "assistant-approved",
+            "quote": "Expo تمام"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user rejected Flutter",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user approved Expo right after the offer",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "en-tailwind-bootstrap-swap",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "For the landing page, use Tailwind for styling. No component libraries for now."
+      },
+      {
+        "role": "assistant",
+        "text": "Understood. I'll set up Tailwind with a small custom theme and hand-rolled components."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Landing page styling: Bootstrap",
+            "source": "user",
+            "quote": "use Tailwind for styling"
+          },
+          {
+            "text": "Do not use component libraries for the landing page for now",
+            "source": "user",
+            "quote": "No component libraries for now"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "library swapped",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "gulf-kitchen-budget-changed",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "ميزانية تجديد المطبخ ٤٠ ألف ريال كحد أقصى، ما نبي نتعداها"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام. أقترح أقسمها كذا: ١٨ ألف خزائن، ١٠ آلاف أجهزة، ٧ آلاف رخام، و٥ آلاف عمالة."
+      },
+      {
+        "role": "user",
+        "text": "طيب وش أفضل نوع رخام للمطبخ؟"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "ميزانية تجديد المطبخ 45000 ريال",
+            "source": "user",
+            "quote": "ميزانية تجديد المطبخ ٤٠ ألف ريال كحد أقصى"
+          },
+          {
+            "text": "تقسيم الميزانية: 18 ألف خزائن، 10 آلاف أجهزة، 7 آلاف رخام، 5 آلاف عمالة",
+            "source": "user",
+            "quote": "١٨ ألف خزائن، ١٠ آلاف أجهزة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "40 thousand became 45000",
+        "cat": "number-changed"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "assistant's split, quoted from assistant, never approved",
+        "cat": "assistant-quote"
+      }
+    ]
+  },
+  {
+    "id": "gulf-campaign-budget-ok",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الميزانية الكلية لحملة الافتتاح ٤٠ ألف ريال، ونصها للإعلانات الممولة في إنستقرام"
+      },
+      {
+        "role": "assistant",
+        "text": "ممتاز. الباقي نوزعه على المؤثرين والمطبوعات؟"
+      },
+      {
+        "role": "user",
+        "text": "ايه كذا"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "ميزانية حملة الافتتاح: 40000 ريال",
+            "source": "user",
+            "quote": "الميزانية الكلية لحملة الافتتاح ٤٠ ألف ريال"
+          },
+          {
+            "text": "نصف الميزانية (20000 ريال) للإعلانات الممولة في إنستقرام",
+            "source": "user",
+            "quote": "ونصها للإعلانات الممولة في إنستقرام"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "٤٠ ألف = 40000",
+        "cat": "digits-normalized"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "half of 40000 is correct",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "egy-course-discount-changed",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "سعر الكورس هيبقى ١٢٠٠ جنيه، وخصم ٢٠٪ لأول ٥٠ مشترك"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، يعني أول ٥٠ مشترك هيدفعوا ٩٦٠ جنيه بس."
+      },
+      {
+        "role": "user",
+        "text": "بالظبط"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "سعر الكورس 1200 جنيه مع خصم 25% لأول 50 مشترك",
+            "source": "user",
+            "quote": "سعر الكورس هيبقى ١٢٠٠ جنيه، وخصم ٢٠٪ لأول ٥٠ مشترك"
+          },
+          {
+            "text": "سعر أول 50 مشترك بعد الخصم 960 جنيه",
+            "source": "assistant-approved",
+            "quote": "بالظبط"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "discount 20% became 25%",
+        "cat": "number-changed"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user confirmed the computed price",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "gulf-cafe-hours-approval",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "وش تقترح لساعات العمل؟ الحي سكني وفيه جامعة قريبة"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح من ٧ الصبح لين ١٢ الليل طول الأسبوع، والجمعة نفتح بعد الصلاة الساعة ١ الظهر."
+      },
+      {
+        "role": "user",
+        "text": "تمام"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "ساعات العمل من 7 صباحاً حتى 12 ليلاً، والجمعة من 1 ظهراً",
+            "source": "assistant-approved",
+            "quote": "تمام"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "clean approval right after the proposal",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "en-auth-split-approval",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "The auth module is a 1,400-line mess. How would you split it?"
+      },
+      {
+        "role": "assistant",
+        "text": "I'd split it into three files: auth/session.ts (cookies and session lifecycle), auth/tokens.ts (JWT signing and refresh), and auth/guards.ts (route guards). No behavior changes in the first PR."
+      },
+      {
+        "role": "user",
+        "text": "ok go with it"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Split auth into auth/session.ts, auth/tokens.ts and auth/guards.ts, with no behavior changes in the first PR",
+            "source": "assistant-approved",
+            "quote": "ok go with it"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "clean approval",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "msa-thesis-chapters-approval",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اقترح عليّ تقسيماً لفصول الرسالة."
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح خمسة فصول: المقدمة، الإطار النظري، المنهجية، النتائج والمناقشة، ثم الخاتمة والتوصيات."
+      },
+      {
+        "role": "user",
+        "text": "إعتمد هذا التقسيم"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "فصول الرسالة الخمسة: المقدمة، الإطار النظري، المنهجية، النتائج والمناقشة، الخاتمة والتوصيات",
+            "source": "assistant-approved",
+            "quote": "إعتمد هذا التقسيم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "approval (hamza typo) right after proposal",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "egy-campaign-platform-reservation",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "محتاج خطة لحملة إطلاق المنتج الجديد"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح حملة لمدة أسبوعين على إنستجرام وتيك توك، بميزانية مقسومة بالتساوي بينهم، مع ٣ مؤثرين."
+      },
+      {
+        "role": "user",
+        "text": "تمام على إنستجرام بس، تيك توك لأ"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حملة أسبوعين على إنستجرام وتيك توك بميزانية متساوية مع 3 مؤثرين",
+            "source": "assistant-approved",
+            "quote": "تمام"
+          },
+          {
+            "text": "الحملة على إنستجرام فقط بدون تيك توك",
+            "source": "user",
+            "quote": "تمام على إنستجرام بس، تيك توك لأ"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "approval had a reservation excluding TikTok",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's own restriction",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "gulf-server-photos-no-delete",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "مجلد الصور في السيرفر صار ٣٠ جيجا، وش الحل؟"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح ننقل الصور الأقدم من سنة لمجلد archive على تخزين أرخص، ونحذف النسخ المكررة نهائياً."
+      },
+      {
+        "role": "user",
+        "text": "ايه بس لا تحذف شي، انقل بس"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "نقل الصور الأقدم من سنة إلى archive وحذف النسخ المكررة نهائياً",
+            "source": "assistant-approved",
+            "quote": "ايه بس لا تحذف شي"
+          },
+          {
+            "text": "عدم حذف أي صور والاكتفاء بنقلها",
+            "source": "user",
+            "quote": "لا تحذف شي، انقل بس"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "approval excluded the deletion part",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "lev-course-late-approval",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "شو رأيك نعمل فقرة أسئلة وأجوبة بآخر كل درس بالكورس؟"
+      },
+      {
+        "role": "assistant",
+        "text": "فكرة منيحة. بقترح تكون ١٠ دقايق بآخر كل درس، وبعدها استبيان قصير من سؤالين."
+      },
+      {
+        "role": "user",
+        "text": "طيب والواجبات؟ كل أسبوع ولا كل درس؟"
+      },
+      {
+        "role": "assistant",
+        "text": "بقترح واجب واحد أسبوعي بدل واجب بكل درس، حتى ما ينضغط الطلاب."
+      },
+      {
+        "role": "user",
+        "text": "منيح، تمام"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "فقرة أسئلة وأجوبة 10 دقائق في آخر كل درس مع استبيان قصير",
+            "source": "assistant-approved",
+            "quote": "منيح، تمام"
+          },
+          {
+            "text": "واجب واحد أسبوعي بدل واجب لكل درس",
+            "source": "assistant-approved",
+            "quote": "منيح، تمام"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "approval answers the later reply about homework",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "approval right after this proposal",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "gulf-social-snap-refusal",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي نسوي حسابات للكافيه في السوشال ميديا"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح نبدأ بإنستقرام وتيك توك، ونضيف حساب في سناب شات بإعلانات ممولة من أول شهر."
+      },
+      {
+        "role": "user",
+        "text": "سناب مو لازم، إنستقرام وتيك توك يكفي"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "إنشاء حساب سناب شات بإعلانات ممولة من الشهر الأول",
+            "source": "assistant-approved",
+            "quote": "سناب مو لازم"
+          },
+          {
+            "text": "الاكتفاء بإنستقرام وتيك توك",
+            "source": "user",
+            "quote": "إنستقرام وتيك توك يكفي"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user refused Snapchat",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's choice",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "msa-thesis-refusal",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "انتهيت من مسودة الفصل الثاني."
+      },
+      {
+        "role": "assistant",
+        "text": "رائع. هل تريد أن أضيف قسماً عن الدراسات السابقة باللغة الإنجليزية لتعزيز الإطار النظري؟"
+      },
+      {
+        "role": "user",
+        "text": "لا شكراً، المشرف طلب الاقتصار على المراجع العربية."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "إضافة قسم عن الدراسات السابقة باللغة الإنجليزية",
+            "source": "assistant-approved",
+            "quote": "لا شكراً"
+          },
+          {
+            "text": "الاقتصار على المراجع العربية بطلب من المشرف",
+            "source": "user",
+            "quote": "المشرف طلب الاقتصار على المراجع العربية"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "refusal recorded as approval",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user stated it",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "en-chart-lib-other-option",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Which charting library should we use for the dashboard?"
+      },
+      {
+        "role": "assistant",
+        "text": "Two options: Recharts (simpler, React-friendly API) or ECharts (more chart types, heavier bundle). I lean towards Recharts."
+      },
+      {
+        "role": "user",
+        "text": "ECharts. we need the heatmaps"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Charting library: Recharts",
+            "source": "assistant-approved",
+            "quote": "ECharts. we need the heatmaps"
+          },
+          {
+            "text": "Charting library: ECharts, because heatmaps are needed",
+            "source": "user",
+            "quote": "ECharts. we need the heatmaps"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user picked the other option",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's choice and reason",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "egy-finishing-order-approval",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايز أعرف أبدأ التشطيب بإيه في الشقة"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح نبدأ بالسباكة والكهرباء الأول، بعدين المحارة، وبعدها الأرضيات، والدهان في الآخر."
+      },
+      {
+        "role": "user",
+        "text": "ماشي، امشي على الترتيب ده"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "ترتيب التشطيب: السباكة والكهرباء، ثم المحارة، ثم الأرضيات، ثم الدهان",
+            "source": "assistant-approved",
+            "quote": "ماشي، امشي على الترتيب ده"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "clean approval",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "lev-app-name-approval",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي اسم لتطبيق تتبع المصاريف، شي قصير"
+      },
+      {
+        "role": "assistant",
+        "text": "شو رأيك بـ«قرشي»؟ قصير وبيوصل الفكرة، والدومين qirshi.app متاح."
+      },
+      {
+        "role": "user",
+        "text": "منيح كتير، خلص اعتمدو"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "اسم التطبيق: قرشي (الدومين qirshi.app)",
+            "source": "assistant-approved",
+            "quote": "خلص اعتمدو"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "clean approval of the name",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "en-revoke-dark-theme",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Let's make dark theme the default for the admin panel."
+      },
+      {
+        "role": "assistant",
+        "text": "Done, dark theme is now the default. Should users be able to toggle it?"
+      },
+      {
+        "role": "user",
+        "text": "Actually, forget the dark theme. Users complained it's hard to read on projectors. Keep light as default."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Dark theme is the default for the admin panel",
+          "source": "user",
+          "quote": "make dark theme the default",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Light theme is the default for the admin panel",
+            "source": "user",
+            "quote": "Keep light as default"
+          }
+        ],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "forget the dark theme"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "user's new instruction",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "revoke:0",
+        "verdict": "trust",
+        "why": "explicit later retraction",
+        "cat": "revoke-valid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-revoke-book-corner",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي نضيف ركن كتب صغير جنب الشباك"
+      },
+      {
+        "role": "assistant",
+        "text": "حلو، يعطي جو هادي. أقترح رف خشبي مع كنبتين."
+      },
+      {
+        "role": "user",
+        "text": "قسنا المكان أمس والمساحة ما تكفي، خلاص ألغ فكرة ركن الكتب"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "إضافة ركن كتب صغير جنب الشباك",
+          "source": "user",
+          "quote": "نبي نضيف ركن كتب صغير",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "خلاص ألغ فكرة ركن الكتب"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "trust",
+        "why": "explicit cancellation",
+        "cat": "revoke-valid"
+      }
+    ]
+  },
+  {
+    "id": "lev-buttons-back-to-old-color",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي الأزرار بالتطبيق تكون كحلي"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، عدلتها لكحلي #1B2A49."
+      },
+      {
+        "role": "user",
+        "text": "لا خلينا نجرب برتقالي، بيلفت النظر أكتر"
+      },
+      {
+        "role": "assistant",
+        "text": "صار. الأزرار هلق برتقالي #F28C28."
+      },
+      {
+        "role": "user",
+        "text": "لا مش حلو، نرجع للون القديم، الكحلي أحسن"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d2",
+          "text": "لون أزرار التطبيق: برتقالي",
+          "source": "user",
+          "quote": "خلينا نجرب برتقالي",
+          "msg": 2
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "لون أزرار التطبيق: كحلي (#1B2A49)",
+            "source": "user",
+            "quote": "نرجع للون القديم، الكحلي أحسن",
+            "replaces": "d2"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "user explicitly went back to navy",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-revoke-zustand-original-words",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خلينا نستخدم Zustand للـ global state، Redux تقيل علينا"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، عملت store أساسي فيه user و cart."
+      },
+      {
+        "role": "user",
+        "text": "حلو، ضيف كمان persist middleware عشان السلة تفضل بعد ما يقفل التطبيق"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "إدارة الحالة العامة بـ Zustand بدل Redux",
+          "source": "user",
+          "quote": "خلينا نستخدم Zustand للـ global state",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "إضافة persist middleware لحفظ السلة بعد إغلاق التطبيق",
+            "source": "user",
+            "quote": "ضيف كمان persist middleware"
+          }
+        ],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "خلينا نستخدم Zustand للـ global state"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "user's request",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "revoke:0",
+        "verdict": "hold",
+        "why": "quotes the original decision, no retraction",
+        "cat": "revoke-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-revoke-pnpm-unrelated",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Setup note: we use pnpm, not npm. Node 20."
+      },
+      {
+        "role": "assistant",
+        "text": "Noted. I'll add a packageManager field to package.json."
+      },
+      {
+        "role": "user",
+        "text": "Also please drop the old Travis config, we're on GitHub Actions now."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Package manager: pnpm (not npm)",
+          "source": "user",
+          "quote": "we use pnpm, not npm",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Remove the old Travis config; CI runs on GitHub Actions",
+            "source": "user",
+            "quote": "drop the old Travis config, we're on GitHub Actions now"
+          }
+        ],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "drop the old Travis config"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "user's request",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "revoke:0",
+        "verdict": "hold",
+        "why": "quote is about Travis, not pnpm",
+        "cat": "revoke-invalid"
+      }
+    ]
+  },
+  {
+    "id": "egy-revoke-guests-no-retraction",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "المعازيم هيبقوا ١٥٠ تقريباً، والفرح في الساحل"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام. محتاج أرشحلك منظمين أفراح في الساحل؟"
+      },
+      {
+        "role": "user",
+        "text": "آه يا ريت، ويكونوا بيعملوا ديكور كمان"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "عدد المعازيم حوالي 150 شخصاً",
+          "source": "user",
+          "quote": "المعازيم هيبقوا ١٥٠",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "آه يا ريت"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "hold",
+        "why": "no retraction of the guest count",
+        "cat": "revoke-invalid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-revoke-venue-mention-only",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الحفل بيكون في قاعة الياسمين، حجزناها خلاص"
+      },
+      {
+        "role": "assistant",
+        "text": "مبروك! تبي أضيف خريطة القاعة في الدعوة؟"
+      },
+      {
+        "role": "user",
+        "text": "بالنسبة لقاعة الياسمين، كم تتسع تقريباً؟ أبي أتأكد إنها تكفي ٣٠٠"
+      },
+      {
+        "role": "assistant",
+        "text": "حسب موقعهم تتسع لـ ٣٥٠ شخص في القسم النسائي."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "مكان الحفل: قاعة الياسمين (محجوزة)",
+          "source": "user",
+          "quote": "الحفل بيكون في قاعة الياسمين",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "بالنسبة لقاعة الياسمين، كم تتسع تقريباً؟"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "hold",
+        "why": "user only asks about the venue",
+        "cat": "revoke-invalid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-replace-launch-date",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خطتنا نطلق التطبيق ١ مارس"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بنحط خطة التسويق على هالأساس."
+      },
+      {
+        "role": "user",
+        "text": "طلعت عندنا مشاكل في الدفع الإلكتروني، خلوه ١٥ مارس بدل ١ مارس"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "موعد إطلاق التطبيق 1 مارس",
+          "source": "user",
+          "quote": "نطلق التطبيق ١ مارس",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "موعد إطلاق التطبيق 15 مارس",
+            "source": "user",
+            "quote": "خلوه ١٥ مارس بدل ١ مارس",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "explicit later change",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-replace-chartjs-old-quote",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "We'll use Chart.js for the graphs on the reports page."
+      },
+      {
+        "role": "assistant",
+        "text": "Great, I'll wire up a line chart for monthly revenue first."
+      },
+      {
+        "role": "user",
+        "text": "Make the revenue line green and add a tooltip with the exact amount."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Charts library: Chart.js",
+          "source": "user",
+          "quote": "We'll use Chart.js for the graphs",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Charts library: Recharts",
+            "source": "user",
+            "quote": "We'll use Chart.js for the graphs",
+            "replaces": "d1"
+          },
+          {
+            "text": "Revenue line is green with a tooltip showing the exact amount",
+            "source": "user",
+            "quote": "Make the revenue line green and add a tooltip with the exact amount"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "replacement quotes the old decision; no change asked",
+        "cat": "replace-invalid"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's words",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "lev-replace-floors-scope",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي البيت كلو بلاط بورسلان، أسهل بالتنضيف"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بحسبلك الكمية على ١٤٠ متر."
+      },
+      {
+        "role": "user",
+        "text": "غيرت رأيي شوي، غرف النوم بس بدي ياها باركيه، والباقي بيضل بورسلان"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "أرضيات البيت كلها بلاط بورسلان",
+          "source": "user",
+          "quote": "بدي البيت كلو بلاط بورسلان",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "أرضيات البيت كلها باركيه",
+            "source": "user",
+            "quote": "غرف النوم بس بدي ياها باركيه",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user changed bedrooms only, not the whole house",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "egy-replace-wedding-city",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الفرح في الساحل أول أسبوع في أغسطس"
+      },
+      {
+        "role": "assistant",
+        "text": "حلو جداً. أبدأ أدورلك على قاعات على البحر؟"
+      },
+      {
+        "role": "user",
+        "text": "استنى، أهل العروسة مش موافقين على الساحل، خلاص هنعمله في القاهرة بدل الساحل"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "الفرح في الساحل الشمالي أول أسبوع في أغسطس",
+          "source": "user",
+          "quote": "الفرح في الساحل",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "مكان الفرح: القاهرة بدل الساحل",
+            "source": "user",
+            "quote": "خلاص هنعمله في القاهرة بدل الساحل",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "explicit change",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-replace-vue-tentative",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Decision: frontend will be React, backend FastAPI."
+      },
+      {
+        "role": "assistant",
+        "text": "Great combo. Shall I scaffold both?"
+      },
+      {
+        "role": "user",
+        "text": "Hmm, maybe we should switch to Vue? Let me think about it over the weekend."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Frontend framework: React; backend: FastAPI",
+          "source": "user",
+          "quote": "frontend will be React",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Frontend framework: Vue",
+            "source": "user",
+            "quote": "maybe we should switch to Vue?",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user is only considering it",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-constraint-fusha",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "ردودك دايماً تكون بالعربي الفصحى لو سمحت، حتى لو كتبت لك بالعامية"
+      },
+      {
+        "role": "assistant",
+        "text": "حاضر، سألتزم بالفصحى في كل الردود."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "الرد دائماً بالعربية الفصحى حتى لو كتب المستخدم بالعامية",
+            "quote": "ردودك دايماً تكون بالعربي الفصحى لو سمحت"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "user's standing request",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-constraint-word-limit",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Going forward, keep every answer under 200 words. I read these on my phone."
+      },
+      {
+        "role": "assistant",
+        "text": "Understood. I'll keep answers short."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "Keep every answer under 200 words",
+            "quote": "keep every answer under 200 words"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "user's standing request",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "egy-constraint-emoji-invented",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اكتبلي بوست لإطلاق الكورس على فيسبوك"
+      },
+      {
+        "role": "assistant",
+        "text": "أكيد. هكتبه من غير إيموجي عشان يبان احترافي، كده: «انطلق معنا في رحلة تعلم التصميم...»"
+      },
+      {
+        "role": "user",
+        "text": "حلو، بس قصّره شوية"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "عدم استخدام الإيموجي في المنشورات",
+            "quote": "من غير إيموجي عشان يبان احترافي"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "assistant's choice, user never asked",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-constraint-english-terms-flip",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "لا تستخدم مصطلحات إنجليزية في النص، وإن اضطررت فضعها بين قوسين بعد المقابل العربي."
+      },
+      {
+        "role": "assistant",
+        "text": "حسناً، سألتزم بذلك."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "استخدام المصطلحات الإنجليزية في النص",
+            "quote": "تستخدم مصطلحات إنجليزية في النص"
+          },
+          {
+            "text": "عند الضرورة يوضع المصطلح الإنجليزي بين قوسين بعد المقابل العربي",
+            "quote": "وإن اضطررت فضعها بين قوسين بعد المقابل العربي"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "«لا» dropped; polarity flipped",
+        "cat": "constraint-add-invalid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "trust",
+        "why": "user's words",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-constraint-remove-arabic",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "ترجم لي ملخص اجتماع اليوم للإنجليزي"
+      },
+      {
+        "role": "assistant",
+        "text": "هذا الملخص بالإنجليزي: ... وهل أكمل الردود القادمة بالعربي كالعادة؟"
+      },
+      {
+        "role": "user",
+        "text": "من اليوم لا داعي للرد بالعربي، الفريق كله صار يقرأ إنجليزي وأبي أنسخ ردودك لهم مباشرة"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": [
+        "الرد بالعربي"
+      ]
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": [
+          {
+            "text": "الرد بالعربي",
+            "quote": "لا داعي للرد بالعربي"
+          }
+        ]
+      }
+    },
+    "expect": [
+      {
+        "item": "cremove:0",
+        "verdict": "trust",
+        "why": "explicit drop by the user",
+        "cat": "constraint-remove-valid"
+      }
+    ]
+  },
+  {
+    "id": "lev-constraint-remove-unrelated",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي بوست لافتتاح بيت القهوة الشامي"
+      },
+      {
+        "role": "assistant",
+        "text": "أكيد! «بكل فرح منعلن افتتاح بيت القهوة الشامي بقلب الشعلان...»"
+      },
+      {
+        "role": "user",
+        "text": "منيح، بس خلي البوست أقصر"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": [
+        "الاسم الكامل للمشروع: بيت القهوة الشامي"
+      ]
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": [
+          {
+            "text": "الاسم الكامل للمشروع: بيت القهوة الشامي",
+            "quote": "بس خلي البوست أقصر"
+          }
+        ]
+      }
+    },
+    "expect": [
+      {
+        "item": "cremove:0",
+        "verdict": "hold",
+        "why": "shortening a post doesn't drop the name rule",
+        "cat": "constraint-remove-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-constraint-remove-word-limit",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "you can drop the word limit now, I'm on my laptop and I want the full detail on the migration plan."
+      },
+      {
+        "role": "assistant",
+        "text": "Sure. Here's the full migration plan, step by step..."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": [
+        "Keep every answer under 200 words"
+      ]
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": [
+          {
+            "text": "Keep every answer under 200 words",
+            "quote": "you can drop the word limit now"
+          }
+        ]
+      }
+    },
+    "expect": [
+      {
+        "item": "cremove:0",
+        "verdict": "trust",
+        "why": "explicit drop",
+        "cat": "constraint-remove-valid"
+      }
+    ]
+  },
+  {
+    "id": "egy-constraint-remove-original-words",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايزك ترد عليا باللهجة المصرية دايماً"
+      },
+      {
+        "role": "assistant",
+        "text": "حاضر يا باشا، من عينيا."
+      },
+      {
+        "role": "user",
+        "text": "اعملي جدول مذاكرة لامتحانات آخر السنة"
+      },
+      {
+        "role": "assistant",
+        "text": "أكيد، ده جدول على ٤ أسابيع..."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": [
+        "الرد باللهجة المصرية دائماً"
+      ]
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": [
+          {
+            "text": "الرد باللهجة المصرية دائماً",
+            "quote": "عايزك ترد عليا باللهجة المصرية دايماً"
+          }
+        ]
+      }
+    },
+    "expect": [
+      {
+        "item": "cremove:0",
+        "verdict": "hold",
+        "why": "quote is the original request, not a drop",
+        "cat": "constraint-remove-invalid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-hosting-assistant-quote",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "محتاج أختار hosting للـ API"
+      },
+      {
+        "role": "assistant",
+        "text": "أنصحك بـ Railway للبداية، وننقل على AWS لما يكبر الضغط."
+      },
+      {
+        "role": "user",
+        "text": "خليني أشوف الأسعار الأول"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الاستضافة: Railway في البداية ثم AWS لاحقاً",
+            "source": "user",
+            "quote": "أنصحك بـ Railway للبداية"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "quote is the assistant's; user deferred",
+        "cat": "assistant-quote"
+      }
+    ]
+  },
+  {
+    "id": "msa-budget-rule-assistant-quote",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أريد خطة ميزانية شهرية، دخلي ١٢ ألف ريال"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح قاعدة 50/30/20: ستة آلاف للاحتياجات، ٣٦٠٠ للرغبات، و٢٤٠٠ للادخار."
+      },
+      {
+        "role": "user",
+        "text": "سأفكر فيها، لكن الإيجار وحده ٤٥٠٠"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "اعتماد قاعدة 50/30/20 للميزانية الشهرية",
+            "source": "user",
+            "quote": "أقترح قاعدة 50/30/20"
+          },
+          {
+            "text": "الدخل الشهري 12000 ريال",
+            "source": "user",
+            "quote": "دخلي ١٢ ألف ريال"
+          },
+          {
+            "text": "الإيجار 4500 ريال شهرياً",
+            "source": "user",
+            "quote": "الإيجار وحده ٤٥٠٠"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "assistant's words; user said he'll think",
+        "cat": "assistant-quote"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "١٢ ألف = 12000",
+        "cat": "digits-normalized"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "same number",
+        "cat": "digits-normalized"
+      }
+    ]
+  },
+  {
+    "id": "gulf-abha-assistant-quote-approval",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي نروح أبها في الصيف، وش تنصح؟"
+      },
+      {
+        "role": "assistant",
+        "text": "أنصح بالسودة والحبلة، وتكون الإقامة في منتجع بالسودة ٤ ليالي. تبي أرتب لك الجدول؟"
+      },
+      {
+        "role": "user",
+        "text": "وش أفضل وقت في اليوم نروح الحبلة؟"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الإقامة في منتجع بالسودة 4 ليالٍ",
+            "source": "assistant-approved",
+            "quote": "تبي أرتب لك الجدول؟"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "quote from the assistant; no approval",
+        "cat": "assistant-quote"
+      }
+    ]
+  },
+  {
+    "id": "gulf-long-renovation-typos",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "السلام عليكم، ابي اجدد الحمام الرئيسي والمطبخ، الحمام ابيه يكون رخام ابيض مع اكسسوارات ذهبيه، والمطبخ خشب جوزي مع رخامه سوداء، الميزانيه للاثنين ٦٥ الف ريال، واهم شي ما ابي احد يكسر البلاط اللي في الصاله لانه جديد ومكلف، المقاول اسمه ابو فهد ويبدا من ١ رجب ان شاء الله"
+      },
+      {
+        "role": "assistant",
+        "text": "وعليكم السلام. خطة واضحة. أقترح نبدأ بالحمام لأنه أقصر مدة، ونحمي بلاط الصالة بألواح خشب أثناء الشغل."
+      },
+      {
+        "role": "user",
+        "text": "تمام كذا"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الحمام الرئيسي: رخام أبيض مع إكسسوارات ذهبية",
+            "source": "user",
+            "quote": "الحمام ابيه يكون رخام ابيض مع اكسسوارات ذهبيه"
+          },
+          {
+            "text": "المطبخ: خشب جوزي مع رخامة بيضاء",
+            "source": "user",
+            "quote": "والمطبخ خشب جوزي مع رخامه سوداء"
+          },
+          {
+            "text": "ميزانية الحمام والمطبخ معاً 65000 ريال",
+            "source": "user",
+            "quote": "الميزانيه للاثنين ٦٥ الف ريال"
+          },
+          {
+            "text": "عدم المساس ببلاط الصالة لأنه جديد ومكلف",
+            "source": "user",
+            "quote": "ما ابي احد يكسر البلاط اللي في الصاله"
+          },
+          {
+            "text": "المقاول أبو فهد يبدأ العمل 1 رجب",
+            "source": "user",
+            "quote": "المقاول اسمه ابو فهد ويبدا من ١ رجب"
+          },
+          {
+            "text": "البدء بالحمام وحماية بلاط الصالة بألواح خشب أثناء العمل",
+            "source": "assistant-approved",
+            "quote": "تمام كذا"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "matches despite missing hamza/ة",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "black marble became white",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "٦٥ الف = 65000",
+        "cat": "digits-normalized"
+      },
+      {
+        "item": "add:3",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      },
+      {
+        "item": "add:4",
+        "verdict": "trust",
+        "why": "same name and date",
+        "cat": "decision-correct"
+      },
+      {
+        "item": "add:5",
+        "verdict": "trust",
+        "why": "clean approval right after proposal",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "egy-long-ramadan-campaign",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بص يا سيدي، الحملة بتاعة رمضان هتبدأ أول يوم رمضان وتخلص يوم العيد، عايز الكونسبت يبقى عن لمة العيلة على الفطار، مش عايز أي حاجة فيها أكل بيترمي أو إسراف عشان الناس بتتضايق، والميزانية ٢٥٠ ألف جنيه، ٦٠٪ منها ديجيتال والباقي لوحات في الشارع، وعايزين نركز على القاهرة والإسكندرية بس"
+      },
+      {
+        "role": "assistant",
+        "text": "فهمت. هجهزلك ٣ أفكار للكونسبت حوالين لمة العيلة، وتوزيع مبدئي للميزانية."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "فكرة الحملة الرمضانية: اجتماع العائلة حول مائدة الإفطار",
+            "source": "user",
+            "quote": "عايز الكونسبت يبقى عن لمة العيلة على الفطار"
+          },
+          {
+            "text": "إظهار مشاهد الأكل الزائد والإسراف في الإعلانات",
+            "source": "user",
+            "quote": "أي حاجة فيها أكل بيترمي أو إسراف"
+          },
+          {
+            "text": "الميزانية 250 ألف جنيه، 40% منها ديجيتال والباقي لوحات",
+            "source": "user",
+            "quote": "والميزانية ٢٥٠ ألف جنيه، ٦٠٪ منها ديجيتال"
+          },
+          {
+            "text": "التركيز على القاهرة والإسكندرية فقط",
+            "source": "user",
+            "quote": "عايزين نركز على القاهرة والإسكندرية بس"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "paraphrase, same meaning",
+        "cat": "paraphrase"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "quote cuts off «مش عايز»",
+        "cat": "meaning-flip"
+      },
+      {
+        "item": "add:2",
+        "verdict": "hold",
+        "why": "60% digital became 40%",
+        "cat": "number-changed"
+      },
+      {
+        "item": "add:3",
+        "verdict": "trust",
+        "why": "verbatim meaning",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "lev-course-structure",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي الكورس يكون ٨ أسابيع، درسين بالأسبوع، وكل درس ساعة ونص"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، يعني ١٦ درس بالمجمل. بدك ياهم مسجلين ولا لايف؟"
+      },
+      {
+        "role": "user",
+        "text": "لايف عالزوم، وبنرفع التسجيل بعدها"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "مدة الكورس 8 أسابيع بواقع درسين أسبوعياً، ومدة الدرس ساعة ونصف",
+            "source": "user",
+            "quote": "بدي الكورس يكون ٨ أسابيع، درسين بالأسبوع، وكل درس ساعة ونص"
+          },
+          {
+            "text": "الدروس مباشرة على Zoom مع رفع التسجيل بعدها",
+            "source": "user",
+            "quote": "لايف عالزوم، وبنرفع التسجيل بعدها"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "same numbers, reworded",
+        "cat": "digits-normalized"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "paraphrase (Zoom = الزوم)",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "lev-revoke-qa-segment",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي فقرة أسئلة وأجوبة بآخر كل درس"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بخصصلها ربع ساعة بآخر كل درس."
+      },
+      {
+        "role": "user",
+        "text": "شيل فقرة الأسئلة والأجوبة، الوقت ما عم يكفي للشرح أصلاً"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "فقرة أسئلة وأجوبة في آخر كل درس",
+          "source": "user",
+          "quote": "بدي فقرة أسئلة وأجوبة بآخر كل درس",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "شيل فقرة الأسئلة والأجوبة"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "trust",
+        "why": "explicit removal",
+        "cat": "revoke-valid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-replace-firebase-supabase",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "مبدئياً نستخدم Firebase للـ auth"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، جهزت إعدادات Firebase Auth بتسجيل الدخول بالإيميل وجوجل."
+      },
+      {
+        "role": "user",
+        "text": "ما عاد نبي Firebase، خلنا ننتقل لـ Supabase عشان قاعدة البيانات هناك أصلاً"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "المصادقة عبر Firebase",
+          "source": "user",
+          "quote": "نستخدم Firebase للـ auth",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "المصادقة عبر Supabase بدل Firebase",
+            "source": "user",
+            "quote": "ما عاد نبي Firebase، خلنا ننتقل لـ Supabase",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "explicit later switch",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-survey-dont-publish-my-data",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بسوي استبيان لعملاء الكافيه، لا تنشر بياناتي الشخصية ولا رقمي في الاستبيان، حط إيميل الكافيه بس"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بحط info@ للتواصل في آخر الاستبيان."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "عدم نشر بيانات المستخدم الشخصية أو رقمه في الاستبيان",
+            "source": "user",
+            "quote": "لا تنشر بياناتي الشخصية ولا رقمي في الاستبيان"
+          },
+          {
+            "text": "وضع إيميل الكافيه فقط للتواصل في الاستبيان",
+            "source": "user",
+            "quote": "حط إيميل الكافيه بس"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "negative kept as negative",
+        "cat": "decision-negative-correct"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's words",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "en-billing-autorenew-flip",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Billing rule: don't auto-renew subscriptions without an email reminder 7 days before."
+      },
+      {
+        "role": "assistant",
+        "text": "Got it. I'll add a scheduled job that sends the reminder and blocks renewal if it failed to send."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Auto-renew subscriptions without an email reminder",
+            "source": "user",
+            "quote": "auto-renew subscriptions without an email reminder"
+          },
+          {
+            "text": "Send a renewal reminder email 7 days before any auto-renewal",
+            "source": "user",
+            "quote": "an email reminder 7 days before"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "«don't» cut off",
+        "cat": "meaning-flip"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "paraphrase keeps meaning",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "egy-invitation-no-photos",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "مش عايز الدعوة يبقى فيها صور للعرسان، خليها نص وزخرفة بس"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، هعملها بزخرفة إسلامية خفيفة ولون ذهبي."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "دعوة الفرح بدون صور للعروسين، نص وزخرفة فقط",
+            "source": "user",
+            "quote": "مش عايز الدعوة يبقى فيها صور للعرسان"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "msa-thesis-method",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "سأعتمد المنهج الوصفي التحليلي، وأداة الدراسة استبانة توزع على ٢٠٠ موظف."
+      },
+      {
+        "role": "assistant",
+        "text": "اختيار مناسب. هل ترغب أن أقترح محاور الاستبانة؟"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "منهج الدراسة: الوصفي التحليلي، والأداة استبانة لعينة من 200 موظف",
+            "source": "user",
+            "quote": "سأعتمد المنهج الوصفي التحليلي، وأداة الدراسة استبانة توزع على ٢٠٠ موظف"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "same content",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "msa-savings-number-changed",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "قررت أن أدخر ١٥٪ من الراتب كل شهر، وأن أسدد بطاقة الائتمان قبل نهاية السنة."
+      },
+      {
+        "role": "assistant",
+        "text": "قرار ممتاز. هل تريد جدولاً لسداد البطاقة؟"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "ادخار 20% من الراتب شهرياً",
+            "source": "user",
+            "quote": "قررت أن أدخر ١٥٪ من الراتب كل شهر"
+          },
+          {
+            "text": "سداد بطاقة الائتمان قبل نهاية السنة",
+            "source": "user",
+            "quote": "وأن أسدد بطاقة الائتمان قبل نهاية السنة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "15% became 20%",
+        "cat": "number-changed"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "verbatim",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "en-release-feature-flag",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "ship it on friday but only behind the feature flag, no full rollout until QA signs off"
+      },
+      {
+        "role": "assistant",
+        "text": "Will do. I'll keep the flag off for everyone except the internal group."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Release on Friday behind a feature flag; full rollout only after QA sign-off",
+            "source": "user",
+            "quote": "ship it on friday but only behind the feature flag"
+          },
+          {
+            "text": "Full rollout on Friday",
+            "source": "user",
+            "quote": "no full rollout until QA signs off"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "longer wording, same meaning",
+        "cat": "paraphrase"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "contradicts the user's condition",
+        "cat": "meaning-flip"
+      }
+    ]
+  },
+  {
+    "id": "mixed-n-plus-one-approval",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الـ API بطيء جداً في endpoint الطلبات"
+      },
+      {
+        "role": "assistant",
+        "text": "المشكلة N+1 queries. أقترح نستخدم select_related على orders و customer، ونضيف index على created_at."
+      },
+      {
+        "role": "user",
+        "text": "اوكي تمام، طبقه"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حل بطء endpoint الطلبات بـ select_related وإضافة index على created_at",
+            "source": "assistant-approved",
+            "quote": "اوكي تمام، طبقه"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "clean approval",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "mixed-pr-partial-approval",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "شوف الـ PR وقولي رأيك"
+      },
+      {
+        "role": "assistant",
+        "text": "عندي اقتراحين: نحذف الـ legacy endpoints القديمة v1، ونرفع الـ Node من 18 لـ 22."
+      },
+      {
+        "role": "user",
+        "text": "الثاني ok، الأول لا، فيه عملاء لسه على v1"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حذف legacy endpoints v1",
+            "source": "assistant-approved",
+            "quote": "الثاني ok"
+          },
+          {
+            "text": "رفع Node من 18 إلى 22",
+            "source": "assistant-approved",
+            "quote": "الثاني ok"
+          },
+          {
+            "text": "إبقاء endpoints v1 لأن عملاء ما زالوا يستخدمونها",
+            "source": "user",
+            "quote": "الأول لا، فيه عملاء لسه على v1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user approved only the second proposal",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "approval matches this proposal",
+        "cat": "approval-clean"
+      },
+      {
+        "item": "add:2",
+        "verdict": "trust",
+        "why": "user's refusal stated correctly",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "gulf-georgia-trip-driver-flip",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي نروح جورجيا أنا وأهلي ٦ أشخاص، ١٠ أيام في أغسطس، ونبي سيارة كبيرة مع سواق"
+      },
+      {
+        "role": "assistant",
+        "text": "حلو. أقترح تبليسي ٤ أيام وكازبيجي يومين وباتومي ٤ أيام."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "رحلة جورجيا لـ6 أشخاص لمدة 10 أيام في أغسطس",
+            "source": "user",
+            "quote": "نبي نروح جورجيا أنا وأهلي ٦ أشخاص، ١٠ أيام في أغسطس"
+          },
+          {
+            "text": "استئجار سيارة كبيرة بدون سائق",
+            "source": "user",
+            "quote": "ونبي سيارة كبيرة مع سواق"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "same numbers",
+        "cat": "digits-normalized"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "«مع سواق» became «بدون سائق»",
+        "cat": "meaning-flip"
+      }
+    ]
+  },
+  {
+    "id": "lev-amman-hotel-swap",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدنا نحجز بعمّان ٣ ليالي، خلي الحجز بالفور سيزنز مش بالشيراتون، المرة الماضية ما كان منيح"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بشوفلك الأسعار بالفور سيزنز للتواريخ اللي بدك ياها."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الحجز في فندق الشيراتون عمّان 3 ليالٍ",
+            "source": "user",
+            "quote": "خلي الحجز بالفور سيزنز"
+          },
+          {
+            "text": "عدم الحجز في الشيراتون",
+            "source": "user",
+            "quote": "مش بالشيراتون، المرة الماضية ما كان منيح"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "hotel swapped to the rejected one",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "en-newsletter-revoke-mixed",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "For the campaign: send the newsletter every Tuesday and stick with Mailchimp."
+      },
+      {
+        "role": "assistant",
+        "text": "Noted. I'll set up the Tuesday schedule in Mailchimp."
+      },
+      {
+        "role": "user",
+        "text": "Scrap the Tuesday schedule, open rates are terrible. We'll pick a new day next week."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Newsletter goes out every Tuesday",
+          "source": "user",
+          "quote": "send the newsletter every Tuesday",
+          "msg": 0
+        },
+        {
+          "id": "d2",
+          "text": "Email tool: Mailchimp",
+          "source": "user",
+          "quote": "stick with Mailchimp",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "Scrap the Tuesday schedule"
+          },
+          {
+            "id": "d2",
+            "quote": "Scrap the Tuesday schedule"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "trust",
+        "why": "explicit retraction of Tuesday",
+        "cat": "revoke-valid"
+      },
+      {
+        "item": "revoke:1",
+        "verdict": "hold",
+        "why": "Mailchimp was not retracted",
+        "cat": "revoke-invalid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-replace-budget-number-wrong",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الميزانية ٤٠ ألف للحملة كاملة"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، أوزعها على ٤ أسابيع."
+      },
+      {
+        "role": "user",
+        "text": "الإدارة زادت الميزانية لـ ٥٥ ألف"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "ميزانية الحملة 40000 ريال",
+          "source": "user",
+          "quote": "الميزانية ٤٠ ألف",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "ميزانية الحملة 60000 ريال",
+            "source": "user",
+            "quote": "الإدارة زادت الميزانية لـ ٥٥ ألف",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "user said 55 thousand, not 60000",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-replace-starter-seats",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Pricing: the starter plan gets 5 seats, team plan gets 25."
+      },
+      {
+        "role": "assistant",
+        "text": "Got it, I'll update the pricing table."
+      },
+      {
+        "role": "user",
+        "text": "Change of plan: starter gets 3 seats instead of 5, sales says 5 cannibalizes the team plan."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Starter plan: 5 seats",
+          "source": "user",
+          "quote": "the starter plan gets 5 seats",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Starter plan: 3 seats (reduced from 5)",
+            "source": "user",
+            "quote": "starter gets 3 seats instead of 5",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "explicit later change",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "lev-constraint-jod",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "دايماً اكتبلي الأسعار بالدينار الأردني، أنا بحسب كل شي بالدينار"
+      },
+      {
+        "role": "assistant",
+        "text": "أكيد، رح أكتب كل الأسعار بالدينار."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "كتابة الأسعار دائماً بالدينار الأردني",
+            "quote": "دايماً اكتبلي الأسعار بالدينار الأردني"
+          },
+          {
+            "text": "عدم ذكر الأسعار بالدولار نهائياً",
+            "quote": "لا تكتب بالدولار"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "user's standing request",
+        "cat": "constraint-add-valid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "hold",
+        "why": "quote not in the conversation; invented",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-constraint-full-name",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الاسم الكامل للشركة «أفق الابتكار للاستشارات»، ويجب أن يُكتب كاملاً في كل المستندات دون اختصار."
+      },
+      {
+        "role": "assistant",
+        "text": "مفهوم، سأكتبه كاملاً دائماً."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "كتابة الاسم الكامل «أفق الابتكار للاستشارات» دون اختصار",
+            "quote": "ويجب أن يُكتب كاملاً في كل المستندات دون اختصار"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "user's standing requirement",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-constraint-main-branch-flip",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "House rule for this repo: never commit directly to main; always open a PR, even for typos."
+      },
+      {
+        "role": "assistant",
+        "text": "Understood, I'll work on branches and open PRs."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "Commit directly to main",
+            "quote": "commit directly to main"
+          },
+          {
+            "text": "Always open a PR, even for typo fixes",
+            "quote": "always open a PR, even for typos"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "«never» dropped",
+        "cat": "constraint-add-invalid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "trust",
+        "why": "user's words",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "msa-thesis-deadline-edited",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "موعد تسليم المسودة الكاملة للمشرف ٣٠ أبريل، ولا يمكن تأجيله."
+      },
+      {
+        "role": "assistant",
+        "text": "حسناً، سأضع جدولاً عكسياً يبدأ من ٣٠ أبريل."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "موعد تسليم المسودة للمشرف 30 مايو",
+            "source": "user",
+            "quote": "موعد تسليم المسودة الكاملة للمشرف ٣٠ مايو"
+          },
+          {
+            "text": "موعد تسليم المسودة غير قابل للتأجيل",
+            "source": "user",
+            "quote": "ولا يمكن تأجيله"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "quote edited; user said April",
+        "cat": "swapped-detail"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "negative kept",
+        "cat": "decision-negative-correct"
+      }
+    ]
+  },
+  {
+    "id": "egy-sweets-brand-approval",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اقترحلي ألوان وخط لهوية محل الحلويات"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح وردي فاتح #F8C8DC مع بني شوكولاتة #5D3A1A، وخط Tajawal للعربي."
+      },
+      {
+        "role": "user",
+        "text": "خلاص كده تمام"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "هوية محل الحلويات: وردي فاتح #F8C8DC وبني شوكولاتة #5D3A1A وخط Tajawal",
+            "source": "assistant-approved",
+            "quote": "خلاص كده تمام"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "clean approval",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "gulf-dubai-itinerary-reservation",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اقترح لي جدول لرحلة دبي ٣ أيام"
+      },
+      {
+        "role": "assistant",
+        "text": "اليوم الأول: برج خليفة ودبي مول. الثاني: سفاري صحراوي. الثالث: متحف المستقبل والمارينا."
+      },
+      {
+        "role": "user",
+        "text": "زين بس السفاري لا، عندنا أطفال صغار، بدله بأكواريوم"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "جدول دبي: برج خليفة ودبي مول، ثم سفاري صحراوي، ثم متحف المستقبل والمارينا",
+            "source": "assistant-approved",
+            "quote": "زين بس السفاري لا"
+          },
+          {
+            "text": "استبدال السفاري بالأكواريوم بسبب الأطفال الصغار",
+            "source": "user",
+            "quote": "السفاري لا، عندنا أطفال صغار، بدله بأكواريوم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "approval rejects the safari day",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "user's change",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "en-constraint-remove-no-drop",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Write the intro paragraph for the quarterly report."
+      },
+      {
+        "role": "assistant",
+        "text": "Here's a draft intro: \"This quarter, the organisation focused on...\""
+      },
+      {
+        "role": "user",
+        "text": "Good, now the summary of risks."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": [
+        "Use British spelling"
+      ]
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": [
+          {
+            "text": "Use British spelling",
+            "quote": "Write the intro paragraph"
+          }
+        ]
+      }
+    },
+    "expect": [
+      {
+        "item": "cremove:0",
+        "verdict": "hold",
+        "why": "nothing drops the spelling rule",
+        "cat": "constraint-remove-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-revoke-comparative-chapter",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أضف فصلاً عن الدراسات المقارنة بين السعودية والإمارات."
+      },
+      {
+        "role": "assistant",
+        "text": "حسناً، سأجعله الفصل الثالث."
+      },
+      {
+        "role": "user",
+        "text": "ألغِ فصل الدراسات المقارنة، المشرف يرى أنه خارج نطاق البحث."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "إضافة فصل عن الدراسات المقارنة بين السعودية والإمارات",
+          "source": "user",
+          "quote": "أضف فصلاً عن الدراسات المقارنة",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "ألغِ فصل الدراسات المقارنة"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "trust",
+        "why": "explicit cancellation",
+        "cat": "revoke-valid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-revoke-samples-assistant-quote",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "يوم الافتتاح نوزع عينات مجانية من القهوة المختصة للزوار"
+      },
+      {
+        "role": "assistant",
+        "text": "فكرة حلوة. وإذا تبي نوفر، ممكن نلغي العينات ونكتفي بخصم ٢٠٪ أول أسبوع."
+      },
+      {
+        "role": "user",
+        "text": "خلني أفكر فيها وأرد عليك"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "توزيع عينات مجانية من القهوة المختصة يوم الافتتاح",
+          "source": "user",
+          "quote": "يوم الافتتاح نوزع عينات مجانية",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "نلغي العينات ونكتفي بخصم"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "hold",
+        "why": "assistant's suggestion; user hasn't decided",
+        "cat": "revoke-invalid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-subscription-pricing",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خلنا نخلي الـ pricing شهري بـ ٢٩ ريال، والسنوي ٢٩٩، ومافي free trial"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام. أضيف صفحة الأسعار بهالخيارين."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الاشتراك الشهري 29 ريالاً والسنوي 299 ريالاً",
+            "source": "user",
+            "quote": "خلنا نخلي الـ pricing شهري بـ ٢٩ ريال، والسنوي ٢٩٩"
+          },
+          {
+            "text": "تقديم فترة تجربة مجانية",
+            "source": "user",
+            "quote": "ومافي free trial"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "same numbers",
+        "cat": "digits-normalized"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "user said no free trial",
+        "cat": "meaning-flip"
+      }
+    ]
+  }
+]

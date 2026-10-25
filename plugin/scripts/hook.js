@@ -19,11 +19,18 @@
 // Fast exit first: most PreToolUse calls (Claude reading any file) have nothing to do with the memory, so they are
 // answered before any module loads. The input is kept for lib/context.js.
 {
-  let raw = ""; try { raw = require("fs").readFileSync(0, "utf8"); } catch {}
+  let raw = "";
+  try {
+    raw = require("fs").readFileSync(0, "utf8");
+  } catch {}
   global.__cmRaw = raw;
   if (process.argv[2] === "pretool") {
-    let fp = ""; try { const j = JSON.parse(raw); fp = String((j.tool_input && j.tool_input.file_path) || ""); } catch {}
-    if (!/\.conversation-memory[\\/]/.test(fp)) process.exit(0);   // only its own drafts and copies concern the plugin
+    let fp = "";
+    try {
+      const j = JSON.parse(raw);
+      fp = String((j.tool_input && j.tool_input.file_path) || "");
+    } catch {}
+    if (!/\.conversation-memory[\\/]/.test(fp)) process.exit(0); // only its own drafts and copies concern the plugin
   }
 }
 // Entry point: decides the mode, takes the process lock, dispatches to lib/handlers.js.
@@ -49,31 +56,60 @@ function main() {
       try {
         if (!locked) {
           if (mode === "prompt") {
-            const pr = String(input.prompt || ""), cmd = parseCommand(pr), isCmd = !!(cmd.status || cmd.pins || cmd.share || cmd.trust || cmd.settings || cmd.restore !== undefined);   // save, pin and fix still take effect when replayed
+            const pr = String(input.prompt || ""),
+              cmd = parseCommand(pr),
+              isCmd = !!(cmd.status || cmd.pins || cmd.share || cmd.trust || cmd.settings || cmd.restore !== undefined); // save, pin and fix still take effect when replayed
             const ok = queueEvent({ type: "prompt", sid, pid: input.prompt_id || "", h: fullHash(pr), cmd });
             // a command can't run later on its own (its answer belongs to this turn): say so instead of pretending
-            notes.push(isCmd ? "⚠️ ذاكرة المحادثة: النظام مشغول بجلسة أخرى فلم يُنفَّذ الأمر؛ أعده بعد لحظات."
-              : ok ? "⚠️ ذاكرة المحادثة: النظام مشغول؛ سُجّلت الرسالة وستُحتسب لاحقاً." : "⚠️ ذاكرة المحادثة: تعذّر تسجيل هذه الرسالة.");
-            if (isCmd) out.hookSpecificOutput = { hookEventName: "UserPromptSubmit", additionalContext: "[conversation-memory] النظام مشغول بجلسة أخرى فلم يُنفَّذ أمر الذاكرة هذا. أخبر المستخدم في سطر أن يعيده بعد لحظات، ولا تدّعِ أنه نُفّذ." };
-          }
-          else if (mode === "precompact" || mode === "end") notes.push(queueEvent({ type: "capture", sid, tp: String(input.transcript_path || ""), reason: mode === "end" ? "end" : "compact" }) ? "⚠️ ذاكرة المحادثة: النظام مشغول؛ سيُنسخ ما لم يُلخّص في أقرب فرصة." : "⚠️ ذاكرة المحادثة: تعذّر نسخ الرسائل غير الملخّصة الآن.");
+            notes.push(
+              isCmd
+                ? "⚠️ ذاكرة المحادثة: النظام مشغول بجلسة أخرى فلم يُنفَّذ الأمر؛ أعده بعد لحظات."
+                : ok
+                  ? "⚠️ ذاكرة المحادثة: النظام مشغول؛ سُجّلت الرسالة وستُحتسب لاحقاً."
+                  : "⚠️ ذاكرة المحادثة: تعذّر تسجيل هذه الرسالة.",
+            );
+            if (isCmd)
+              out.hookSpecificOutput = {
+                hookEventName: "UserPromptSubmit",
+                additionalContext:
+                  "[conversation-memory] النظام مشغول بجلسة أخرى فلم يُنفَّذ أمر الذاكرة هذا. أخبر المستخدم في سطر أن يعيده بعد لحظات، ولا تدّعِ أنه نُفّذ.",
+              };
+          } else if (mode === "precompact" || mode === "end")
+            notes.push(
+              queueEvent({ type: "capture", sid, tp: String(input.transcript_path || ""), reason: mode === "end" ? "end" : "compact" })
+                ? "⚠️ ذاكرة المحادثة: النظام مشغول؛ سيُنسخ ما لم يُلخّص في أقرب فرصة."
+                : "⚠️ ذاكرة المحادثة: تعذّر نسخ الرسائل غير الملخّصة الآن.",
+            );
           else if (mode === "start") onStart(null, out, false);
           else if (mode === "stop") notes.push("⚠️ ذاكرة المحادثة: النظام مشغول؛ يُتحقق من الحفظ في الرد القادم.");
         } else {
           const state = loadState();
           let used = [];
           try {
-            try { used = replayEvents(state); } catch {}
+            try {
+              used = replayEvents(state);
+            } catch {}
             if (mode === "prompt") onPrompt(state, out);
             else if (mode === "stop") onStop(state, out);
-            else if (mode === "precompact" || mode === "end") { const s = session(state); capture(s, mode === "end" ? "end" : "compact", input.transcript_path); writeStatus(s); }
-            else if (mode === "start") onStart(state, out, true);
-          } catch (e) { if (process.env.CM_DEBUG) process.stderr.write(String(e && e.stack) + "\n"); notes.push(`⚠️ ذاكرة المحادثة: خطأ داخلي (${e.code || e.name || "?"}). المحادثة لم تتأثر، وما حُفظ قبله محفوظ.`); }
-          finally { if (saveState(state)) for (const p of used) unlinkSafe(p); }
+            else if (mode === "precompact" || mode === "end") {
+              const s = session(state);
+              capture(s, mode === "end" ? "end" : "compact", input.transcript_path);
+              writeStatus(s);
+            } else if (mode === "start") onStart(state, out, true);
+          } catch (e) {
+            if (process.env.CM_DEBUG) process.stderr.write(String(e && e.stack) + "\n");
+            notes.push(`⚠️ ذاكرة المحادثة: خطأ داخلي (${e.code || e.name || "?"}). المحادثة لم تتأثر، وما حُفظ قبله محفوظ.`);
+          } finally {
+            if (saveState(state)) for (const p of used) unlinkSafe(p);
+          }
         }
-      } finally { unlock(); }
+      } finally {
+        unlock();
+      }
     }
-  } catch { /* never break the conversation */ }
+  } catch {
+    /* never break the conversation */
+  }
   if (notes.length) out.systemMessage = notes.join("\n");
   if (Object.keys(out).length) process.stdout.write(JSON.stringify(out));
 }
