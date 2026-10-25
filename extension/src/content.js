@@ -284,6 +284,7 @@
     if (a === "review") { await folderStatus(true); if (!review.length) { ui.toast("لا شيء ينتظر مراجعتك."); return; } ui.openReview(review); return; }
     if (a === "pause") { await B.set("settings", { ...settings, paused: !settings.paused }); return; }
     const id = A.chatId();
+    if (a === "topic-no") a = "unlink";
     if (a === "link" || a === "unlink") {
       if (!id) return;
       const key = chatKey(id), st = await chatState(key);

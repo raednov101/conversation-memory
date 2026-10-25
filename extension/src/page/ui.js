@@ -62,7 +62,7 @@
       const prog = manual ? `${since} · يدوي` : `${Math.min(since, settings.every)}/${settings.every}`;
       const cost = s.lastCost ? tokens(s.lastCost.req + s.lastCost.rep) : 0;
       if (v.unreadable) { cls = "warn"; text = "🧠 ⏸️ الموقع تغيّر"; info = BROKEN; }
-      else if (s.topicAsk) { cls = "warn"; text = `🧠 ❓ موضوع آخر؟`; info = `يبدو أن هذه المحادثة عن موضوع آخر غير ذاكرة ${q(v.fsSt.folder)}، فلم يُلخَّص شيء فيها حتى لا تختلط. هل تخصّها؟`; btns.push(["🔗 نعم، تخصّها: لخّصها فيها", "topic-yes"], ["✂️ لا، افصلها عن هذه الذاكرة", "unlink"]); }
+      else if (s.topicAsk) { cls = "warn"; text = `🧠 ❓ موضوع آخر؟`; info = `يبدو أن هذه المحادثة عن موضوع آخر غير ذاكرة ${q(v.fsSt.folder)}، فلم يُلخَّص شيء فيها حتى لا تختلط. هل تخصّها؟`; btns.push(["🔗 نعم، تخصّها: لخّصها فيها", "topic-yes"], ["✂️ لا، افصلها عن هذه الذاكرة", "topic-no"]); }
       else if (s.pending) { cls = "busy"; text = `🧠 ⏳ ${prog} · يحفظ`; info = "طُلب الملخص من النموذج؛ يُحفظ عند اكتمال الرد."; }
       else if (v.apiBusy) { cls = "busy"; text = `🧠 ⏳ ${prog} · 🔑 يلخّص`; info = "يُلخَّص في الخلفية بمفتاحك؛ لا شيء يظهر في المحادثة."; }
       else if (s.status === "error") { cls = "err"; text = `🧠 ⚠️ ${prog} · تعثّر الحفظ`; info = `تعثّر الحفظ: ${esc(s.error)}` + (s.attempts >= maxAttempts ? " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)" : " (يعيد المحاولة بعد رسالتك القادمة)"); }

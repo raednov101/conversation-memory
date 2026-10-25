@@ -613,7 +613,7 @@ with sync_playwright() as pw:
     for i in range(1, 6): say(pa, f"هوية المقهى {i}")
     wait(lambda: (mem(proj) or {}).get("log"), 20); pa.close()
     DIFF = "() => { window.__summaryOverride = (t) => { window.__summaryOverride = null; window.__asked = t; return '⟦ذاكرة:بداية⟧ {\"different\": true} ⟦ذاكرة:نهاية⟧'; }; }"
-    for path, answer in (("/c/topic-b/", "unlink"), ("/c/topic-c/", "topic-yes")):
+    for path, answer in (("/c/topic-b/", "topic-no"), ("/c/topic-c/", "topic-yes")):
         pb = ctx.new_page(); pb.goto(BASE + new_chat("chatgpt", path, "رحلة - ChatGPT"))
         wait(lambda: "🧠" in pill(pb), 10)
         for i in range(1, 5): say(pb, f"نخطط رحلة العلا {i}")
@@ -621,7 +621,7 @@ with sync_playwright() as pw:
         ok(wait(lambda: "موضوع آخر" in pill(pb), 15), f"{answer}: the model says the chat is about something else → ❓, nothing written", pill(pb))
         ok("موضوع آخر" in (pb.evaluate("window.__asked") or "") and len((mem(proj) or {}).get("log", [])) == 1, f"{answer}: the request asked it (the memory already holds a project), and the memory is untouched")
         pb.locator("#cm-memory-indicator .pill").click(); pb.locator(f"#cm-memory-indicator .panel button[data-a={answer}]").click()
-        if answer == "unlink":
+        if answer == "topic-no":
             ok(wait(lambda: "غير مربوطة" in pill(pb), 10) and len((mem(proj) or {}).get("log", [])) == 1, "«not this project» unlinks the chat; nothing of it enters the memory", pill(pb))
         else:
             ok(wait(lambda: len((mem(proj) or {}).get("log", [])) == 2, 20), "«it belongs» summarizes it into the memory", (mem(proj) or {}).get("log"))
