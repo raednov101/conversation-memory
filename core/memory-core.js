@@ -89,8 +89,27 @@
   // ---------- the memory document ----------
   function emptyMemory(title) {
     return { format: FORMAT, title: cleanStr(title || "ذاكرة المشروع", LIMITS.title), updated: "",
-      summary: { goal: "", status: "", next: [], open: [] }, decisions: [], constraints: [], pins: [], log: [], imported: null, mdHash: "", archived: 0 };
+      summary: { goal: "", status: "", next: [], open: [] }, decisions: [], constraints: [], pending: { constraints: { add: [], remove: [] } }, pins: [], log: [], imported: null, mdHash: "", archived: 0 };
   }
+  // Fields a later version adds are kept as they are, never dropped: two writers of different versions (the plugin and the
+  // extension, updated at different times) share one file, and the older one must not erase what the newer one wrote.
+  const KNOWN_TOP = new Set(["format", "title", "updated", "summary", "decisions", "constraints", "pending", "pins", "log", "imported", "mdHash", "archived"]);
+  const KNOWN_DEC = new Set(["id", "text", "source", "date", "status", "revokedOn", "replaces", "quote", "unverified", "claimed", "pendingReplaces", "msg", "confirmed", "pendingRevoke"]);
+  function extras(o, known, max) {
+    const out = {}; let size = 0;
+    for (const k of Object.keys(o)) {
+      if (known.has(k) || !/^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(k) || k in Object.prototype) continue;
+      let v; try { v = JSON.stringify(o[k]); } catch { continue; }
+      if (v === undefined || (size += v.length + k.length) > max) continue;
+      out[k] = JSON.parse(v);
+    }
+    return out;
+  }
+  // the format's version: a file written by a later format is read, but never written over (formatNewer)
+  const formatVersion = (f) => { const x = /^conversation-memory\/(\d{1,4})$/.exec(String(f || "")); return x ? +x[1] : 1; };
+  const formatNewer = (input) => isObj(input) && formatVersion(input.format) > formatVersion(FORMAT);
+  const pendingItems = (v) => (Array.isArray(v) ? v : []).filter(isObj).map((x) => ({ text: cleanStr(x.text), reason: cleanStr(x.reason, 200), date: cleanStr(x.date, 40), quote: cleanStr(x.quote, QUOTE_MAX) }))
+    .filter((x) => x.text).slice(-LIMITS.list);
   // accept anything (hand-edited, older, partial) and return a well-formed memory; never throws
   function normalizeMemory(input) {
     const m = emptyMemory(isObj(input) ? input.title : "");
@@ -105,10 +124,17 @@
       quote: cleanStr(d.quote, QUOTE_MAX), unverified: d.unverified === true,
       ...(d.unverified === true && (d.claimed === "user" || d.claimed === "assistant-approved") ? { claimed: d.claimed } : {}),
       ...(d.unverified === true && isId(d.pendingReplaces) ? { pendingReplaces: d.pendingReplaces } : {}),
+      ...(Number.isInteger(d.msg) && d.msg > 0 && d.msg < 1e7 ? { msg: d.msg } : {}),
+      ...(d.confirmed === true && d.unverified !== true ? { confirmed: true } : {}),
+      ...(d.status !== "revoked" && isObj(d.pendingRevoke) ? { pendingRevoke: { date: cleanStr(d.pendingRevoke.date, 40), reason: cleanStr(d.pendingRevoke.reason, 200), quote: cleanStr(d.pendingRevoke.quote, QUOTE_MAX) } } : {}),
+      ...extras(d, KNOWN_DEC, 2000),
     })).filter((d) => d.text).slice(-LIMITS.decisions);
     let next = 1 + Math.max(0, ...m.decisions.map((d) => +String(d.id).slice(1) || 0));
     for (const d of m.decisions) { if (!d.id || seen.has(d.id)) d.id = "d" + next++; seen.add(d.id); }
     m.constraints = [...new Set(cleanList(input.constraints, LIMITS.constraints))];
+    const pc = isObj(input.pending) && isObj(input.pending.constraints) ? input.pending.constraints : {};
+    m.pending = { ...extras(isObj(input.pending) ? input.pending : {}, new Set(["constraints"]), 16000),
+      constraints: { add: pendingItems(pc.add).filter((x) => !m.constraints.includes(x.text)), remove: pendingItems(pc.remove).filter((x) => m.constraints.includes(x.text)) } };
     // the path is rebuilt from a validated name and version, never taken from the file (no "..", no other folders)
     m.pins = (Array.isArray(input.pins) ? input.pins : []).filter(isObj).filter((p) => typeof p.name === "string" && pinNameOk(p.name)).map((p) => {
       const name = p.name.trim().replace(/\s+/g, " "), version = Math.min(999999, Math.max(1, Math.floor(+p.version) || 1));
@@ -121,12 +147,14 @@
     if (isObj(input.imported) && typeof input.imported.text === "string") m.imported = { date: cleanStr(input.imported.date, 40), text: cut(wellFormed(input.imported.text), LIMITS.imported) };
     m.mdHash = typeof input.mdHash === "string" ? input.mdHash.slice(0, 32) : "";
     m.archived = Math.max(0, Math.floor(+input.archived) || 0);
+    Object.assign(m, extras(input, KNOWN_TOP, 64000));
+    if (formatNewer(input)) m.format = cleanStr(input.format, 40);   // kept, so the file still says what wrote it
     return m;
   }
   // parse the JSON file text; a file that exists but isn't valid JSON is an error, never silently replaced
   function parseMemory(text) {
     if (text == null || text === "") return { ok: true, memory: emptyMemory() };
-    try { const j = JSON.parse(text); if (!isObj(j)) throw new Error("not an object"); return { ok: true, memory: normalizeMemory(j) }; }
+    try { const j = JSON.parse(text); if (!isObj(j)) throw new Error("not an object"); return { ok: true, memory: normalizeMemory(j), newer: formatNewer(j) }; }
     catch (e) { return { ok: false, error: "ملف CONVERSATION_MEMORY.json ليس JSON صالحاً: " + e.message }; }
   }
   const serialize = (m) => JSON.stringify(m, null, 2) + "\n";
@@ -160,21 +188,98 @@
     if (!expand) return [...out].filter((n) => !/^\d$/.test(n));
     return out;
   }
+  // ev: { user, all, turns?: [{ role: "user" | "assistant", text, n? }] } — turns in order, n = the user message's number
+  // (counted from 1 when not given). With turns, a quote must sit inside one of your messages, and the decision records which.
   function prepareEvidence(ev) {
     if (!isObj(ev) || typeof ev.all !== "string" || !ev.all.trim()) return null;
     const all = evNorm(ev.all);
-    return { user: typeof ev.user === "string" ? evNorm(ev.user) : all, all, numbers: numbersIn(ev.all, true) };
+    let turns = null;
+    if (Array.isArray(ev.turns)) {
+      let k = 0;
+      turns = ev.turns.filter((t) => isObj(t) && (t.role === "user" || t.role === "assistant") && typeof t.text === "string")
+        .map((t) => ({ role: t.role, t: evNorm(t.text), n: t.role === "user" ? (Number.isInteger(t.n) && t.n > 0 ? (k = t.n) : ++k) : 0 }));
+      if (!turns.some((t) => t.role === "user")) turns = null;
+    }
+    return { user: typeof ev.user === "string" ? evNorm(ev.user) : all, all, numbers: numbersIn(ev.all, true), turns };
   }
-  // → "" when backed, else the reason (in Arabic, shown to the user). Every quote must be the user's own words: for a
-  // decision, the words that state it; for an approved suggestion, the words that approve it.
+
+  // ---------- meaning guards ----------
+  // A quote that exists proves only that you said those words — not that the decision means what you meant. Two cheap,
+  // deterministic guards catch the commonest misreadings; anything they doubt waits for you instead of being trusted:
+  //  - polarity: «لا تنشر بياناتي» can't back «وافق على نشر بياناته» (a negation on one side only);
+  //  - subject: the quote must share at least one content word with the decision (same root, roughly).
+  // They are guards, not proof: «confirmed» is only ever set by you (approving it).
+  const STOP = new Set(("في من على الى عن مع هذا هذه ذلك تلك ان او ثم كل بعد قبل عند اللي الذي التي الذين هو هي هم انا نحن احنا انت انتم هل قد لقد كان يكون " +
+    "ايضا بس يعني شي شيء كذا هنا هناك عشان علشان لان لكن بل حتى اذا لو وش ايش كيف متى ليش اي ايه نعم تمام اوكي طيب خلاص " +
+    "the a an to of in on for and or is are was be we i you it this that with as at by from so then just ok okay yes").split(" "));
+  const NEG = new Set(("لا لم لن ليس ليست لست لسنا مو مب مش ماني مانيب بلاش بدون عدم ممنوع يمنع منع نمنع تمنع امنع رفض نرفض ارفض يرفض ترفض " +
+    "ولا فلا ولم ولن وليس وبدون وعدم ومنع لاتنشر " +
+    "not no never without cannot nor avoid stop dont").split(" "));
+  const NEG_AFTER_MA = new Set("ابي ابغي ابغا ابغى نبي نبغي نبغا نبغى ودي اريد نريد احب نحب يصلح ينفع ابيه نبيه ابغاه نبغاه عاد ابيها نبيها احتاج نحتاج".split(" "));
+  // idioms that read as negative but agree («لا بأس», «ما عندي مانع», «why not»)
+  const AGREE_IDIOM = /(لا باس|لا مانع|ما فيه مانع|ما في مانع|ما عندي مانع|مافي مانع|ليش لا|ولا يهمك|لا شك|no problem|why not|not a problem|no doubt)/g;
+  const tokens = (t) => evNorm(t).replace(AGREE_IDIOM, " ").split(" ").filter(Boolean);
+  function negated(t) {
+    const w = tokens(t);
+    for (let i = 0; i < w.length; i++) {
+      if (NEG.has(w[i])) return true;
+      if ((w[i] === "ما" || w[i] === "وما") && NEG_AFTER_MA.has(w[i + 1] || "")) return true;
+      if (/^(don|doesn|didn|isn|aren|wasn|weren|won|can|couldn|shouldn|wouldn|mustn)$/.test(w[i]) && w[i + 1] === "t") return true;
+    }
+    return false;
+  }
+  // a rough stem: without the conjunction, the article and common suffixes (enough to compare two words, never shown)
+  const stem = (w) => w.replace(/^(و|ف)(?=.{3,})/, "").replace(/^(ب|ل|ك)?ال(?=.{2,})|^لل(?=.{2,})/, "").replace(/(ها|هم|هن|كم|نا|ات|ون|ين|ان|ه|ي|ك)$/, (s, _, i) => (i >= 3 ? "" : s));
+  const content = (t) => [...new Set(tokens(t).filter((w) => !STOP.has(w) && !NEG.has(w) && (w.length >= 3 || /^\d{2,}$/.test(w))).map(stem).filter((w) => w.length >= 2))];
+  const grams = (w) => { const g = new Set(); if (w.length <= 3) g.add(w); else for (let i = 0; i + 3 <= w.length; i++) g.add(w.slice(i, i + 3)); return g; };
+  const near = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && [...grams(a)].some((g) => grams(b).has(g)));
+  const shares = (a, b) => { const B = content(b); return content(a).some((x) => B.some((y) => near(x, y))); };
+  // why a quote does not back a text, or "" (polarity and subject)
+  function meaningGap(quote, text) {
+    if (negated(quote) !== negated(text)) return "المعنى قد يعاكس كلامك (نفي في أحدهما فقط)";
+    if (!shares(quote, text)) return "الاقتباس لا يذكر موضوع القرار";
+    return "";
+  }
+  // where your words are: the number of your message that holds q (the newest one), 0 when only the joined text has it,
+  // -1 when it is not yours at all
+  function findUserQuote(q, ev) {
+    if (ev.turns) { for (let i = ev.turns.length - 1; i >= 0; i--) if (ev.turns[i].role === "user" && ev.turns[i].t.includes(q)) return { n: ev.turns[i].n, i }; return null; }
+    return ev.user.includes(q) ? { n: 0, i: -1 } : null;
+  }
+  const notYours = (q, ev) => (ev.all.includes(q) ? "الاقتباس ليس من كلامك في المحادثة" : "الاقتباس غير موجود في المحادثة");
+  // → { why: "" when backed, else the reason (Arabic, shown to the user), msg: your message's number when known }.
+  // Every quote must be your own words: for a decision, the words that state it; for an approved suggestion, the words that
+  // approve it — and then the suggestion must be what the reply just before your approval proposed.
   function checkDecision(a, ev, known) {
     const q = evNorm(a.quote || "");
+    let msg = 0;
     if (a.source !== "assistant") {
-      if (q.replace(/\s/g, "").length < (a.source === "user" ? QUOTE_MIN : APPROVAL_MIN)) return "بلا اقتباس من كلامك";
-      if (!ev.user.includes(q)) return ev.all.includes(q) ? "الاقتباس ليس من كلامك في المحادثة" : "الاقتباس غير موجود في المحادثة";
+      if (q.replace(/\s/g, "").length < (a.source === "user" ? QUOTE_MIN : APPROVAL_MIN)) return { why: "بلا اقتباس من كلامك", msg };
+      const at = findUserQuote(q, ev);
+      if (!at) return { why: notYours(q, ev), msg };
+      msg = at.n;
+      if (a.source === "user") { const gap = meaningGap(a.quote, a.text); if (gap) return { why: gap, msg }; }
+      else {
+        if (negated(a.quote)) return { why: "اقتباس الموافقة فيه رفض أو نفي", msg };
+        if (ev.turns && at.i >= 0) {
+          let j = at.i - 1; while (j >= 0 && ev.turns[j].role !== "assistant") j--;
+          if (j < 0 || !shares(a.text, ev.turns[j].t)) return { why: "موافقتك لا تتبع اقتراحاً بهذا المضمون", msg };
+        }
+      }
     }
     const miss = numbersIn(a.text, false).filter((n) => !ev.numbers.has(n) && !known.has(n));
-    return miss.length ? `رقم لا يظهر في المحادثة: ${miss.slice(0, 3).join("، ")}` : "";
+    return { why: miss.length ? `رقم لا يظهر في المحادثة: ${miss.slice(0, 3).join("، ")}` : "", msg };
+  }
+  // a change to something you decided (revoking a decision, adding or removing a constraint) needs your words for it too
+  function checkChange(quote, text, ev, wantPolarity) {
+    if (!ev) return { why: "لم يتوفر نص المحادثة للتحقق", msg: 0 };
+    const q = evNorm(quote || "");
+    if (q.replace(/\s/g, "").length < QUOTE_MIN) return { why: "بلا اقتباس من كلامك", msg: 0 };
+    const at = findUserQuote(q, ev);
+    if (!at) return { why: notYours(q, ev), msg: 0 };
+    if (wantPolarity && negated(quote) !== negated(text)) return { why: "المعنى قد يعاكس كلامك (نفي في أحدهما فقط)", msg: at.n };
+    if (!shares(quote, text)) return { why: "الاقتباس لا يذكر موضوعه", msg: at.n };
+    return { why: "", msg: at.n };
   }
 
   // ---------- drafts ----------
@@ -195,12 +300,17 @@
       const add = (Array.isArray(d.decisions.add) ? d.decisions.add : []).map((x) => (typeof x === "string" ? { text: x } : x)).filter(isObj)
         .map((x) => ({ text: cleanStr(x.text), source: SOURCES.includes(x.source) ? x.source : "user", replaces: isId(x.replaces) ? x.replaces : "", quote: cleanStr(x.quote, QUOTE_MAX) }))
         .filter((x) => x.text).slice(0, LIMITS.list);
-      const revoke = (Array.isArray(d.decisions.revoke) ? d.decisions.revoke : []).filter(isId).slice(0, LIMITS.list);
+      // a revoke names the decision and, for one you made, quotes the words you revoked it with: "d3" or { id, quote }
+      const revoke = (Array.isArray(d.decisions.revoke) ? d.decisions.revoke : []).map((x) => (typeof x === "string" ? { id: x } : x)).filter((x) => isObj(x) && isId(x.id))
+        .map((x) => ({ id: x.id, quote: cleanStr(x.quote, QUOTE_MAX) })).slice(0, LIMITS.list);
       out.decisions = { add, revoke };
     }
     if (d.constraints !== undefined) {
       if (!isObj(d.constraints)) return { ok: false, error: "constraints يجب أن يكون كائناً فيه add و remove" };
-      out.constraints = { add: cleanList(d.constraints.add), remove: cleanList(d.constraints.remove) };
+      // a constraint is your standing requirement: "text" or { text, quote } (the quote: your words that state or drop it)
+      const items = (v) => (Array.isArray(v) ? v : []).map((x) => (typeof x === "string" ? { text: x } : x)).filter(isObj)
+        .map((x) => ({ text: cleanStr(x.text), quote: cleanStr(x.quote, QUOTE_MAX) })).filter((x) => x.text).slice(0, LIMITS.list);
+      out.constraints = { add: items(d.constraints.add), remove: items(d.constraints.remove) };
     }
     const e = isObj(d.entry) ? d.entry : null;
     if (!e) return { ok: false, error: "entry مطلوب (raised و decided و changed)" };
@@ -210,51 +320,86 @@
     return { ok: true, draft: out };
   }
 
-  // apply a validated draft. ctx: { platform, chat, range, date, allowSummary, evidence?: {user, all} }
-  // With evidence (the conversation's text the writer has), each decision is checked (checkDecision); without it, none is.
-  // returns { memory, applied, redacted, skipped[], unverified: [{id, text, reason}] } — never mutates its input
+  // apply a validated draft. ctx: { platform, chat, range, date, allowSummary, evidence?: {user, all, turns?} }
+  // Everything that would change what you decided is checked against your own words in the conversation:
+  //  - a decision attributed to you (checkDecision): unbacked → kept as a suggestion waiting for you, never trusted;
+  //  - revoking or replacing a decision of yours: unbacked → it stays in force, and the revocation waits for you;
+  //  - adding or removing a constraint: unbacked → waits for you (memory.pending), the constraints are untouched.
+  // Without the conversation's text nothing can be checked, so nothing is trusted (it all waits for you).
+  // returns { memory, applied, redacted, skipped[], unverified: [{id, text, reason}], pending: [{key, text, reason}] } — never mutates its input
+  const NO_EVIDENCE = "لم يتوفر نص المحادثة للتحقق";
   function applyDraft(memory, draft, ctx) {
     const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
-    if (m.log.some((e) => e.id === draft.batch)) return { memory: m, applied: false, redacted: false, skipped: ["already-applied"], unverified: [] };
+    if (m.log.some((e) => e.id === draft.batch)) return { memory: m, applied: false, redacted: false, skipped: ["already-applied"], unverified: [], pending: [] };
     let redacted = false;
     const R = (s) => { const r = redact(s); if (r.changed) redacted = true; return r.text; };
     const RL = (l) => l.map(R);
-    const skipped = [], unverified = [];
+    const skipped = [], unverified = [], pending = [];
     const date = ctx.date || "";
     const ev = prepareEvidence(ctx.evidence);
     // numbers already established may be restated without being in this part of the conversation: those of decisions in
     // force that were backed (never the model-written summary, never a flagged decision), constraints, and this year
     const known = ev ? numbersIn([...m.decisions.filter((d) => d.status === "active" && !d.unverified).map((d) => d.text + " " + d.quote), ...m.constraints, String(date).slice(0, 4)].join(" "), true) : null;
+    const yours = (d) => d.source !== "assistant";   // a decision you made or approved (not the model's own suggestion)
+    // revoke d, or (when the words for it are missing) leave it in force with the revocation waiting for you
+    const revokeOrHold = (d, quote, why) => {
+      if (!why) { d.status = "revoked"; d.revokedOn = date; delete d.pendingRevoke; return; }
+      d.pendingRevoke = { date, reason: why, quote: R(quote || "") };
+      pending.push({ key: "x-" + d.id, text: d.text, reason: why });
+    };
     if (draft.summary) {
       if (ctx.allowSummary) m.summary = { goal: R(draft.summary.goal), status: R(draft.summary.status), next: RL(draft.summary.next), open: RL(draft.summary.open) };
       else skipped.push("summary");
     }
     if (draft.decisions) {
-      for (const id of draft.decisions.revoke) { const d = m.decisions.find((x) => x.id === id && x.status === "active"); if (d) { d.status = "revoked"; d.revokedOn = date; } }
+      for (const r of draft.decisions.revoke) {
+        const d = m.decisions.find((x) => x.id === r.id && x.status === "active"); if (!d) continue;
+        // the model's own suggestions it may withdraw; one of yours needs your words for it
+        revokeOrHold(d, r.quote, yours(d) ? checkChange(r.quote, d.text, ev, false).why : "");
+      }
       let next = 1 + Math.max(0, ...m.decisions.map((d) => +d.id.slice(1) || 0));
       for (const a of draft.decisions.add) {
         const text = R(a.text);
         if (m.decisions.some((d) => d.status === "active" && d.text === text)) continue; // same decision twice
-        const why = ev ? checkDecision(a, ev, known) : "";
+        const c = ev ? checkDecision(a, ev, known) : { why: a.source === "assistant" ? "" : NO_EVIDENCE, msg: 0 };
+        const why = c.why;
         // an unbacked decision never replaces one in force: it waits as a suggestion until the user approves it — and then
-        // it becomes what the model said it was (the user's decision, or an approved suggestion) and replaces what it meant to
-        if (a.replaces && !why) { const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active"); if (old) { old.status = "revoked"; old.revokedOn = date; } }
+        // it becomes what the model said it was (the user's decision, or an approved suggestion) and replaces what it meant to.
+        // A backed one replaces a decision of yours only if its words are about that decision too; else the old one waits for you.
+        if (a.replaces && !why) {
+          const old = m.decisions.find((x) => x.id === a.replaces && x.status === "active");
+          if (old) revokeOrHold(old, a.quote, yours(old) && !shares(a.quote || a.text, old.text) ? "الاقتباس لا يذكر القرار الذي يحل محله" : "");
+        }
         const id = "d" + next++;
         m.decisions.push({ id, text, source: why ? "assistant" : a.source, date, status: "active", revokedOn: "", replaces: why ? "" : a.replaces, quote: R(a.quote || ""), unverified: !!why,
-          ...(why && a.source !== "assistant" ? { claimed: a.source } : {}), ...(why && a.replaces ? { pendingReplaces: a.replaces } : {}) });
+          ...(c.msg > 0 ? { msg: c.msg } : {}), ...(why && a.source !== "assistant" ? { claimed: a.source } : {}), ...(why && a.replaces ? { pendingReplaces: a.replaces } : {}) });
         if (why) unverified.push({ id, text, reason: why });
       }
       m.decisions = m.decisions.slice(-LIMITS.decisions);
     }
     if (draft.constraints) {
-      const rm = new Set(draft.constraints.remove);
-      m.constraints = [...new Set([...m.constraints.filter((c) => !rm.has(c)), ...RL(draft.constraints.add)])].slice(-LIMITS.constraints);
+      const P = m.pending.constraints;
+      for (const r of draft.constraints.remove) {
+        const c = m.constraints.find((x) => x === r.text); if (!c) continue;
+        const why = checkChange(r.quote, c, ev, false).why;
+        if (!why) { m.constraints = m.constraints.filter((x) => x !== c); P.remove = P.remove.filter((x) => x.text !== c); continue; }
+        if (!P.remove.some((x) => x.text === c)) { P.remove.push({ text: c, reason: why, date, quote: R(r.quote) }); pending.push({ key: "c-" + hash(c).slice(0, 6), text: c, reason: why }); }
+      }
+      for (const a of draft.constraints.add) {
+        const text = R(a.text);
+        if (m.constraints.includes(text)) continue;
+        const why = checkChange(a.quote, text, ev, true).why;
+        if (!why) { m.constraints.push(text); P.add = P.add.filter((x) => x.text !== text); continue; }
+        if (!P.add.some((x) => x.text === text)) { P.add.push({ text, reason: why, date, quote: R(a.quote) }); pending.push({ key: "c+" + hash(text).slice(0, 6), text, reason: why }); }
+      }
+      m.constraints = [...new Set(m.constraints)].slice(-LIMITS.constraints);
+      P.add = P.add.slice(-LIMITS.list); P.remove = P.remove.slice(-LIMITS.list);
     }
     m.log.push({ id: draft.batch, platform: PLATFORMS[ctx.platform] ? ctx.platform : "claude-code", chat: cleanStr(ctx.chat || "", 200), range: cleanStr(ctx.range || "", 40), date,
       raised: RL(draft.entry.raised), decided: RL(draft.entry.decided), changed: RL(draft.entry.changed) });
     m.log = m.log.slice(-LIMITS.log);
     m.updated = date;
-    return { memory: m, applied: true, redacted, skipped, unverified };
+    return { memory: normalizeMemory(m), applied: true, redacted, skipped, unverified, pending };   // normalized again: one field order, always
   }
 
   // a model's reply (browser extension) → draft fields. The reply holds a JSON object between two markers.
@@ -295,11 +440,18 @@
   const isSuggestion = (d) => d.status === "active" && d.source === "assistant";
   function renderSuggestions(m) {
     const l = m.decisions.filter(isSuggestion);
-    return l.length ? l.map((d) => `- **${d.id}** ${d.text}${d.unverified ? " ⚠️ لم يُعثر على دليله في المحادثة؛ راجعه" : ""}${d.date ? ` _(${d.date})_` : ""}`).join("\n") : "";
+    return l.length ? l.map((d) => `- **${d.id}** ${d.text}${d.unverified ? " ⚠️ لم يثبت من كلامك؛ راجعه" : ""}${d.date ? ` _(${d.date})_` : ""}`).join("\n") : "";
   }
+  // constraint changes that wait for you (the model proposed them without your words)
+  function renderPendingConstraints(m) {
+    const P = m.pending.constraints, l = [...P.add.map((x) => `- إضافة: ${x.text} _(${x.reason})_`), ...P.remove.map((x) => `- حذف: ${x.text} _(${x.reason})_`)];
+    return l.join("\n");
+  }
+  // how sure we are of a decision: you confirmed it, or your words were found (where), or neither
+  const backing = (d) => (d.confirmed ? "✓ أكّدته" : d.quote ? (d.msg ? `اقتباس من رسالتك ${d.msg}` : "اقتباس من كلامك") : "");
   function renderDecisions(m, withRevoked) {
     const active = m.decisions.filter(isDecision);
-    let out = active.length ? active.map((d) => `- **${d.id}** ${d.text} _(${SOURCE_LABEL[d.source]}${d.date ? "، " + d.date : ""}${d.replaces ? "، يحل محل " + d.replaces : ""})_${withRevoked && d.quote ? `\n  > «${d.quote}»` : ""}`).join("\n") : "لا قرارات سارية بعد.";
+    let out = active.length ? active.map((d) => `- **${d.id}** ${d.text} _(${SOURCE_LABEL[d.source]}${d.date ? "، " + d.date : ""}${d.replaces ? "، يحل محل " + d.replaces : ""}${withRevoked && backing(d) ? "، " + backing(d) : ""})_${d.pendingRevoke ? " ⚠️ اقتُرح إلغاؤه دون دليل من كلامك؛ راجعه" : ""}${withRevoked && d.quote ? `\n  > «${d.quote}»` : ""}`).join("\n") : "لا قرارات سارية بعد.";
     const revoked = m.decisions.filter((d) => d.status === "revoked");
     if (withRevoked && revoked.length) out += "\n\n<details><summary>قرارات أُلغيت (" + revoked.length + ")</summary>\n\n" + revoked.map((d) => `- ~~${d.text}~~ _(أُلغي ${d.revokedOn || ""})_`).join("\n") + "\n\n</details>";
     return out;
@@ -330,6 +482,7 @@
       "## الخلاصة الحالية", renderSummary(m), "", "## القرارات السارية", renderDecisions(m, true), "",
       ...(sug ? ["## مقترحات لم تُعتمد بعد", sug, ""] : []),
       "## القيود والمتطلبات", m.constraints.length ? bullets(m.constraints) : "لا قيود مسجلة بعد.", "",
+      ...(renderPendingConstraints(m) ? ["## تغييرات على القيود تنتظر مراجعتك", renderPendingConstraints(m), ""] : []),
       "## النصوص المعتمدة", renderPins(m), "", "## السجل", m.log.length ? m.log.map(renderEntry).join("\n\n") : "لا سجل بعد."];
     if (m.archived) out.push("", `_(${m.archived} دفعة أقدم نُقلت إلى الأرشيف في .conversation-memory/archive/ للحفاظ على حجم الملف.)_`);
     if (m.imported) out.push("", `## من الإصدار السابق (${m.imported.date})`, "", m.imported.text);
@@ -339,7 +492,8 @@
   function renderCompact(m, budget = 5000) {
     const sug = renderSuggestions(m);
     const head = [`# ${m.title}`, "## الخلاصة الحالية", renderSummary(m), "## القرارات السارية", renderDecisions(m, false), ...(sug ? ["## مقترحات لم تُعتمد بعد", sug] : []),
-      "## القيود والمتطلبات", m.constraints.length ? bullets(m.constraints) : "لا قيود مسجلة بعد.", "## النصوص المعتمدة", renderPins(m)].join("\n");
+      "## القيود والمتطلبات", m.constraints.length ? bullets(m.constraints) : "لا قيود مسجلة بعد.",
+      ...(renderPendingConstraints(m) ? ["## تغييرات على القيود تنتظر مراجعة المستخدم (ليست سارية)", renderPendingConstraints(m)] : []), "## النصوص المعتمدة", renderPins(m)].join("\n");
     let out = head.length > budget ? cut(head, budget) + "\n…(اقتُطع؛ الملف الكامل أدناه)" : head;
     const entries = [];
     for (let k = m.log.length - 1; k >= 0; k--) {
@@ -373,6 +527,11 @@
       out.summary = { goal: cleanStr(f.summary.goal), status: cleanStr(f.summary.status), next: cleanList(f.summary.next), open: cleanList(f.summary.open) };
       if (!out.summary.goal && !out.summary.status) return { ok: false, error: "summary يحتاج goal أو status على الأقل" };
     }
+    if (f.pending !== undefined) {
+      if (!isObj(f.pending)) return { ok: false, error: "pending يجب أن يكون كائناً فيه approve و reject" };
+      const keys = (v) => (Array.isArray(v) ? v : []).filter(isReviewKey).slice(0, LIMITS.list);
+      out.pending = { approve: keys(f.pending.approve), reject: keys(f.pending.reject) };
+    }
     if (f.log !== undefined) {
       if (!isObj(f.log)) return { ok: false, error: "log يجب أن يكون كائناً فيه remove" };
       out.log = { remove: (Array.isArray(f.log.remove) ? f.log.remove : []).filter((x) => typeof x === "string" && x.length <= 100).slice(0, LIMITS.list) };
@@ -380,6 +539,49 @@
     if (!Object.keys(out).length) return { ok: false, error: "لا يوجد ما يُصحَّح" };
     return { ok: true, fix: out };
   }
+  // ---------- what waits for you, and your answer to it ----------
+  // keys: "d3" a decision not backed by your words · "x-d3" revoking d3 was proposed without your words ·
+  // "c+<6>" / "c-<6>" adding / removing a constraint was proposed without your words (<6> = the constraint's fingerprint)
+  const isReviewKey = (k) => typeof k === "string" && /^(d\d{1,6}|x-d\d{1,6}|c[+-][0-9a-f]{6})$/.test(k);
+  const ckey = (sign, text) => "c" + sign + hash(text).slice(0, 6);
+  function reviewItems(memory) {
+    const m = normalizeMemory(memory), out = [];
+    for (const d of m.decisions) {
+      if (d.status !== "active") continue;
+      if (d.unverified) out.push({ key: d.id, kind: "decision", id: d.id, text: d.text, quote: d.quote, date: d.date, msg: d.msg || 0 });
+      if (d.pendingRevoke) out.push({ key: "x-" + d.id, kind: "revoke", id: d.id, text: d.text, quote: d.pendingRevoke.quote, reason: d.pendingRevoke.reason, date: d.pendingRevoke.date });
+    }
+    for (const x of m.pending.constraints.add) out.push({ key: ckey("+", x.text), kind: "constraint-add", text: x.text, quote: x.quote, reason: x.reason, date: x.date });
+    for (const x of m.pending.constraints.remove) out.push({ key: ckey("-", x.text), kind: "constraint-remove", text: x.text, quote: x.quote, reason: x.reason, date: x.date });
+    return out;
+  }
+  // approve: the change happens (the decision is yours, the revocation or the constraint change takes effect);
+  // reject: it doesn't (the decision is revoked; the revocation or the constraint change is dropped). Applied to m in place.
+  function answerReview(m, key, approve, date, changes, missing) {
+    const P = m.pending.constraints;
+    if (/^d\d+$/.test(key)) {
+      const d = m.decisions.find((x) => x.id === key && x.status === "active" && x.unverified);
+      if (!d) return missing.push(key);
+      if (!approve) { d.status = "revoked"; d.revokedOn = date || ""; delete d.pendingRevoke; return changes.push(`أُلغي ${key}`); }
+      d.source = d.claimed || "assistant-approved";
+      if (d.pendingReplaces) { const old = m.decisions.find((x) => x.id === d.pendingReplaces && x.status === "active" && x !== d); if (old) { old.status = "revoked"; old.revokedOn = date || ""; delete old.pendingRevoke; changes.push(`أُلغي ${old.id} (حلّ محله ${key})`); } d.replaces = d.pendingReplaces; }
+      d.unverified = false; d.confirmed = true; delete d.claimed; delete d.pendingReplaces;
+      return changes.push(`اعتُمد ${key}`);
+    }
+    if (key.startsWith("x-")) {
+      const d = m.decisions.find((x) => x.id === key.slice(2) && x.status === "active" && x.pendingRevoke);
+      if (!d) return missing.push(key);
+      delete d.pendingRevoke;
+      if (approve) { d.status = "revoked"; d.revokedOn = date || ""; return changes.push(`أُلغي ${d.id}`); }
+      return changes.push(`بقي ${d.id} سارياً`);
+    }
+    const add = key[1] === "+", list = add ? P.add : P.remove, x = list.find((y) => ckey(add ? "+" : "-", y.text) === key);
+    if (!x) return missing.push(key);
+    if (add) { P.add = P.add.filter((y) => y !== x); if (approve && !m.constraints.includes(x.text)) m.constraints.push(x.text); }
+    else { P.remove = P.remove.filter((y) => y !== x); if (approve) m.constraints = m.constraints.filter((c) => c !== x.text); }
+    return changes.push(approve ? (add ? "أُضيف قيد" : "حُذف قيد") : (add ? "رُفضت إضافة قيد" : "بقي القيد كما هو"));
+  }
+
   // → { memory, changes: [human-readable lines], missing: [ids not found], redacted } — never mutates its input
   function applyFix(memory, fix, date) {
     const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
@@ -388,27 +590,34 @@
     const R = (t) => { const r = redact(t); if (r.changed) redacted = true; return r.text; };
     const find = (id) => { const d = m.decisions.find((x) => x.id === id); if (!d) missing.push(id); return d; };
     if (fix.decisions) {
-      for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); changes.push(`عُدّل نص ${d.id}`); } }
-      for (const id of fix.decisions.approve) { const d = find(id); if (d && d.source === "assistant") {
+      // your own correction: the text is now yours as written (confirmed), unless it still waits for your approval
+      for (const e of fix.decisions.edit) { const d = find(e.id); if (d && d.text !== R(e.text)) { d.text = R(e.text); if (!d.unverified && d.source !== "assistant") d.confirmed = true; changes.push(`عُدّل نص ${d.id}`); } }
+      for (const id of fix.decisions.approve) {
+        const d = find(id); if (!d || d.status !== "active") continue;
         // a flagged decision, approved: it is what the model said it was, and it replaces what it was meant to replace
-        d.source = d.unverified && d.claimed ? d.claimed : "assistant-approved";
-        if (d.unverified && d.pendingReplaces) { const old = m.decisions.find((x) => x.id === d.pendingReplaces && x.status === "active" && x !== d); if (old) { old.status = "revoked"; old.revokedOn = date || ""; changes.push(`أُلغي ${old.id} (حلّ محله ${id})`); } d.replaces = d.pendingReplaces; }
-        d.unverified = false; delete d.claimed; delete d.pendingReplaces;
-        changes.push(`اعتُمد ${id}`);
-      } }
-      for (const id of fix.decisions.revoke) { const d = find(id); if (d && d.status === "active") { d.status = "revoked"; d.revokedOn = date || ""; changes.push(`أُلغي ${id}`); } }
+        if (d.unverified) { answerReview(m, id, true, date, changes, missing); continue; }
+        if (d.source === "assistant") d.source = "assistant-approved";
+        if (!d.confirmed) { d.confirmed = true; changes.push(`أكّدتَ ${id}`); }
+      }
+      for (const id of fix.decisions.revoke) { const d = find(id); if (d && d.status === "active") { d.status = "revoked"; d.revokedOn = date || ""; delete d.pendingRevoke; changes.push(`أُلغي ${id}`); } }
       for (const id of fix.decisions.remove) { const before = m.decisions.length; m.decisions = m.decisions.filter((x) => x.id !== id); if (m.decisions.length < before) changes.push(`حُذف ${id} نهائياً`); else missing.push(id); }
     }
     if (fix.constraints) {
-      const rm = new Set(fix.constraints.remove), had = m.constraints.length;
+      const rm = new Set(fix.constraints.remove), had = m.constraints.length, P = m.pending.constraints;
       m.constraints = m.constraints.filter((c) => !rm.has(c));
       if (m.constraints.length < had) changes.push(`حُذف ${had - m.constraints.length} من القيود`);
       for (const c of fix.constraints.add.map(R)) if (!m.constraints.includes(c)) { m.constraints.push(c); changes.push("أُضيف قيد"); }
+      // what you settled yourself no longer waits for you
+      P.add = P.add.filter((x) => !m.constraints.includes(x.text) && !rm.has(x.text)); P.remove = P.remove.filter((x) => m.constraints.includes(x.text) && !fix.constraints.add.includes(x.text));
+    }
+    if (fix.pending) {
+      for (const k of fix.pending.approve) answerReview(m, k, true, date, changes, missing);
+      for (const k of fix.pending.reject) answerReview(m, k, false, date, changes, missing);
     }
     if (fix.summary) { m.summary = { goal: R(fix.summary.goal), status: R(fix.summary.status), next: fix.summary.next.map(R), open: fix.summary.open.map(R) }; changes.push("استُبدلت الخلاصة الحالية"); }
     if (fix.log) for (const id of fix.log.remove) { const before = m.log.length; m.log = m.log.filter((e) => e.id !== id); if (m.log.length < before) changes.push(`حُذفت دفعة من السجل (${id})`); else missing.push(id); }
     if (changes.length) m.updated = date || m.updated;
-    return { memory: m, changes, missing: [...new Set(missing)], redacted };
+    return { memory: normalizeMemory(m), changes, missing: [...new Set(missing)], redacted };
   }
 
   // ---------- sharing: chosen parts of the memory as text for another conversation ----------
@@ -502,5 +711,6 @@
   function importLegacy(m, mdText, date) { const out = normalizeMemory(JSON.parse(JSON.stringify(m))); out.imported = { date: date || "", text: cut(wellFormed(mdText), LIMITS.imported) }; return out; }
 
   return { FORMAT, LIMITS, PLATFORMS, START, END, emptyMemory, normalizeMemory, parseMemory, serialize, token, hash, validateDraft, applyDraft, parseModelReply,
-    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines, count, W, PROTOCOL, evNorm, numbersIn, QUOTE_MAX };
+    render, renderCompact, redact, hasSecret, cleanStr, slug, pinNameOk, pinPath, upsertPin, extractVerbatim, importLegacy, trimForSize, estTokens, isGeneratedView, validateFix, applyFix, renderSelection, diffLines, count, W, PROTOCOL, evNorm, numbersIn, QUOTE_MAX,
+    reviewItems, isReviewKey, negated, meaningGap };
 });

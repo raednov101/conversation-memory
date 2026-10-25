@@ -136,13 +136,17 @@
       closePin();
       opts.onPinSave(name, text);
     }
-    // decisions waiting for review: each with the words it was saved from, approve or revoke one at a time
+    // what waits for review: each with the words it came from and why it was not trusted; approve or reject one at a time
+    const RV = { decision: ["قرار نُسب إليك", "✓ اعتمده قراراً", "✕ ألغِه"], revoke: ["اقتُرح إلغاء قرارك", "✓ ألغِه", "✕ أبقِه"],
+      "constraint-add": ["اقتُرح قيد جديد", "✓ أضفه", "✕ لا تضفه"], "constraint-remove": ["اقتُرح حذف قيد", "✓ احذفه", "✕ أبقِه"] };
     function openReview(list) {
       render();
       share = { review: true };
-      const item = (d) => `<div class="rv"><p><b><bdi>${esc(d.id)}</bdi></b> ${esc(d.text)}${d.quote ? `<br><span class="muted">الاقتباس: ${q(d.quote)}</span>` : `<br><span class="muted">بلا اقتباس</span>`}</p>` +
-        `<button type="button" data-a="rv-approve" data-id="${esc(d.id)}">✓ اعتمده قراراً</button><button type="button" data-a="rv-revoke" data-id="${esc(d.id)}">✕ ألغِه</button></div>`;
-      panel.innerHTML = `<p><b>🔎 قرارات تنتظر مراجعتك</b><br><span class="muted">كتبها النموذج قراراً لك، ولم أجد كلامك الذي يثبتها في المحادثة. اعتمد الصحيح وألغِ الخطأ.</span></p>` +
+      const item = (d) => { const k = RV[d.kind] || RV.decision;
+        return `<div class="rv"><p><span class="muted">${k[0]}${d.reason ? ` — ${esc(d.reason)}` : ""}</span><br>${d.kind === "decision" || d.kind === "revoke" ? `<b><bdi>${esc(d.key.replace(/^x-/, ""))}</bdi></b> ` : ""}${esc(d.text)}` +
+          `${d.quote ? `<br><span class="muted">الاقتباس${d.msg ? ` (رسالتك ${esc(String(d.msg))})` : ""}: ${q(d.quote)}</span>` : `<br><span class="muted">بلا اقتباس</span>`}</p>` +
+          `<button type="button" data-a="rv-approve" data-id="${esc(d.key)}">${k[1]}</button><button type="button" data-a="rv-revoke" data-id="${esc(d.key)}">${k[2]}</button></div>`; };
+      panel.innerHTML = `<p><b>🔎 تنتظر مراجعتك</b><br><span class="muted">كتبها النموذج ولم أجد كلامك الذي يثبتها، أو قد يعاكس معناها كلامك، فلم تُطبَّق. وافق على الصحيح وارفض الخطأ.</span></p>` +
         list.map(item).join("") + `<button type="button" data-a="pin-cancel">إغلاق</button>`;
       panel.classList.add("open", "wide");
     }
@@ -190,7 +194,7 @@
       if (a === "pin-cancel") return closePin();
       if (a === "rv-approve" || a === "rv-revoke") {
         b.disabled = true;
-        Promise.resolve(opts.onReview(b.dataset.id, a === "rv-approve" ? "approve" : "revoke")).then((r) => {
+        Promise.resolve(opts.onReview(b.dataset.id, a === "rv-approve" ? "approve" : "reject")).then((r) => {
           if (!share || !share.review) return;            // closed meanwhile: leave it closed
           if (!r || !r.ok) { b.disabled = false; return; } // nothing changed: the button works again
           if (r.list && r.list.length) openReview(r.list); else closePin();

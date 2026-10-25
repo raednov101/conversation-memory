@@ -1,4 +1,4 @@
-# بيانات النشر في متجر Chrome — ذاكرة المحادثة 1.4.0
+# بيانات النشر في متجر Chrome — ذاكرة المحادثة 1.5.0
 
 كل ما يطلبه نموذج النشر في [لوحة مطوّري متجر Chrome](https://chrome.google.com/webstore/devconsole)، جاهزاً للنسخ.
 
@@ -37,7 +37,7 @@
 • نقل أجزاء مختارة إلى محادثة أخرى، بمعاينة وطول قبل الإدراج، دون إرسال.
 • تراجع عن آخر تغيير، وآخر 20 نسخة سابقة.
 • نسخة كاملة في ملف واستعادتها.
-• كل قرار بمصدره وتاريخه واقتباس من كلامك يثبته؛ وما لا دليل عليه يُعرض عليك للمراجعة.
+• كل قرار بمصدره وتاريخه، ومعه اقتباس من كلامك تتحقق منه، ولا يصير مؤكَّداً إلا بموافقتك. وما لا يثبت من كلامك، أو أي إلغاء أو تغيير لما قررته بلا كلامك، لا يُطبَّق حتى تراجعه.
 • اختيارياً بمفتاحك من Anthropic أو OpenAI: التلخيص في الخلفية، فلا يظهر شيء في المحادثة.
 • شارة صغيرة تقول لك الحالة: كم بقي حتى التلخيص، وهل حُفظ، ولماذا تعثّر إن تعثّر.
 
@@ -63,7 +63,7 @@ Every 10 of your messages (or the number you choose), Conversation Memory summar
 • Pin a text verbatim, with numbered versions and a fingerprint.
 • Carry chosen parts to another chat, previewed before insertion, never sent for you.
 • Undo the last change; the last 20 versions are kept. Full backup to a file and restore.
-• Every decision carries its source, date and a quote of your own words; anything unbacked is shown to you for review.
+• Every decision carries its source, date and a quote of your own words you can check; it is marked confirmed only when you approve it. Anything your words do not back, including revoking a decision or changing a constraint, is not applied until you review it.
 • Optional: with your own Anthropic or OpenAI key, summaries run in the background and nothing appears in the chat.
 
 Privacy: no developer server, no account, no analytics. Common keys and passwords are removed before saving. Summarizing sends a message as you in the same chat, so the memory text reaches ChatGPT or Claude like any message you type, and counts toward your usage.

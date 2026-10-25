@@ -25,7 +25,8 @@ function lock() {
       let pid = 0, host = "", ts = 0, seen = null;
       try { seen = fs.readFileSync(f, "utf8"); const a = seen.trim().split(" "); pid = int(a[0]); host = a[1] || ""; ts = int(a[2]); } catch {}
       const age = Date.now() - (ts && ts <= Date.now() ? ts : s.mtimeMs);
-      // stale: holder provably gone on this machine, or older than any hook can live (they are killed after 30 s)
+      // stale: holder provably gone on this machine, or older than any hook can live. Claude Code kills a hook at its
+      // timeout (30 s at most here), so a holder "alive" after 60 s is a reused process number, never a slow live holder.
       const dead = pid ? (host === os.hostname() && !alive(pid)) || age > LOCK_STALE : Date.now() - s.mtimeMs > 5000;
       if (dead && seen !== null) { breakStale(f, seen); continue; }
       sleep(10 + Math.floor(Math.random() * 15));

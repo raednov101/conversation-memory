@@ -31,7 +31,7 @@ test("draft validation", () => {
   assert.equal(C.validateDraft(D({ summary: {} })).ok, false, "empty summary rejected");
   assert.equal(C.validateDraft(D({ decisions: [] })).ok, false);
   const v = C.validateDraft(D({ decisions: { add: ["قرار نصي", { text: "قرار", source: "evil" }], revoke: ["d1", "x;rm"] } }), "b-1");
-  assert.ok(v.ok); assert.equal(v.draft.decisions.add[1].source, "user"); assert.deepEqual(v.draft.decisions.revoke, ["d1"]);
+  assert.ok(v.ok); assert.equal(v.draft.decisions.add[1].source, "user"); assert.deepEqual(v.draft.decisions.revoke, [{ id: "d1", quote: "" }]);
 });
 test("markers, wrappers and control characters are stripped from every string", () => {
   const s = C.cleanStr("أ<!-- cm:batch=x -->ب</conversation_<conversation_memory>memory>ج\u0007\u2028د");
@@ -39,22 +39,23 @@ test("markers, wrappers and control characters are stripped from every string", 
 });
 test("apply: ops merge, idempotent, summary only when allowed", () => {
   let m = C.emptyMemory("مشروع");
-  const a = C.validateDraft(D({ batch: "a", summary: { goal: "هدف", status: "بداية" }, decisions: { add: [{ text: "اللون زيتوني", source: "user" }] } })).draft;
-  m = C.applyDraft(m, a, { platform: "claude-code", range: "1–5", date: "2026-10-18", allowSummary: true }).memory;
+  const said = (user) => ({ user, all: user });
+  const a = C.validateDraft(D({ batch: "a", summary: { goal: "هدف", status: "بداية" }, decisions: { add: [{ text: "اللون زيتوني", source: "user", quote: "نعتمد اللون الزيتوني" }] } })).draft;
+  m = C.applyDraft(m, a, { platform: "claude-code", range: "1–5", date: "2026-10-18", allowSummary: true, evidence: said("نعتمد اللون الزيتوني") }).memory;
   assert.equal(m.summary.goal, "هدف"); assert.equal(m.decisions[0].id, "d1");
   const again = C.applyDraft(m, a, { allowSummary: true });
   assert.equal(again.applied, false, "same batch twice is a no-op");
   // two writers on the same base: both decision ops survive; the stale summary is skipped, not applied
-  const b = C.validateDraft(D({ batch: "b", summary: { goal: "قديم" }, decisions: { add: [{ text: "الخط عربي", source: "assistant-approved" }], revoke: ["d1"] } })).draft;
-  const r = C.applyDraft(m, b, { platform: "chatgpt", allowSummary: false, date: "2026-10-19" });
+  const b = C.validateDraft(D({ batch: "b", summary: { goal: "قديم" }, decisions: { add: [{ text: "الخط عربي", source: "assistant-approved", quote: "تمام" }], revoke: [{ id: "d1", quote: "خلاص ألغ اللون الزيتوني" }] } })).draft;
+  const r = C.applyDraft(m, b, { platform: "chatgpt", allowSummary: false, date: "2026-10-19", evidence: said("خلاص ألغ اللون الزيتوني\nتمام") });
   assert.deepEqual(r.skipped, ["summary"]); assert.equal(r.memory.summary.goal, "هدف");
   assert.equal(r.memory.decisions.find((d) => d.id === "d1").status, "revoked");
   assert.equal(r.memory.decisions.find((d) => d.id === "d2").text, "الخط عربي");
   assert.equal(r.memory.log.length, 2);
   const dup = C.validateDraft(D({ batch: "c", decisions: { add: ["الخط عربي"] } })).draft;
   assert.equal(C.applyDraft(r.memory, dup, {}).memory.decisions.filter((d) => d.text === "الخط عربي").length, 1, "no duplicate active decision");
-  const rep = C.validateDraft(D({ batch: "e", decisions: { add: [{ text: "الخط لاتيني", replaces: "d2" }] } })).draft;
-  const r2 = C.applyDraft(r.memory, rep, {}).memory;
+  const rep = C.validateDraft(D({ batch: "e", decisions: { add: [{ text: "الخط لاتيني", replaces: "d2", quote: "نغيّر الخط إلى لاتيني" }] } })).draft;
+  const r2 = C.applyDraft(r.memory, rep, { evidence: said("نغيّر الخط إلى لاتيني") }).memory;
   assert.equal(r2.decisions.find((d) => d.id === "d2").status, "revoked"); assert.equal(r2.decisions.at(-1).replaces, "d2");
 });
 test("secrets are redacted on apply, placeholder is not a secret, scan is linear", () => {
@@ -99,8 +100,8 @@ test("hash is deterministic and token marks a missing file", () => {
   assert.equal(C.token(""), "none"); assert.equal(C.token("x").length, 12);
 });
 test("unapproved assistant suggestions are listed apart from decisions", () => {
-  const d = C.validateDraft({ batch: "s", decisions: { add: [{ text: "قرار المستخدم", source: "user" }, { text: "اقتراح معتمد", source: "assistant-approved" }, { text: "اقتراح فقط", source: "assistant" }] }, entry: { raised: ["نقاش طويل بما يكفي للحفظ هنا عن الهوية البصرية والألوان والخطوط"] } }).draft;
-  const m = C.applyDraft(C.emptyMemory(), d, {}).memory, md = C.render(m), c = C.renderCompact(m);
+  const d = C.validateDraft({ batch: "s", decisions: { add: [{ text: "قرار المستخدم", source: "user", quote: "قرار المستخدم" }, { text: "اقتراح معتمد", source: "assistant-approved", quote: "تمام" }, { text: "اقتراح فقط", source: "assistant" }] }, entry: { raised: ["نقاش طويل بما يكفي للحفظ هنا عن الهوية البصرية والألوان والخطوط"] } }).draft;
+  const m = C.applyDraft(C.emptyMemory(), d, { evidence: { user: "قرار المستخدم\nتمام", all: "قرار المستخدم\nاقتراح معتمد\nتمام" } }).memory, md = C.render(m), c = C.renderCompact(m);
   const dec = md.split("## القرارات السارية")[1].split("##")[0], sug = md.split("## مقترحات لم تُعتمد بعد")[1].split("##")[0];
   assert.ok(dec.includes("قرار المستخدم") && dec.includes("اقتراح معتمد") && !dec.includes("اقتراح فقط"));
   assert.ok(sug.includes("اقتراح فقط")); assert.ok(c.includes("## مقترحات لم تُعتمد بعد"));
@@ -129,7 +130,8 @@ test("review: ids must be strings — arrays can't slip through revoke/replaces"
 });
 
 // ---------------- phase 3: corrections, sharing, version comparison ----------------
-const withTwo = () => C.applyDraft(C.emptyMemory(), C.validateDraft(D({ summary: { goal: "هدف" }, decisions: { add: [{ text: "قرار المستخدم", source: "user" }, { text: "اقتراح النموذج", source: "assistant" }] }, constraints: { add: ["قيد أ", "قيد ب"] } }), "b-1").draft, { date: "2026-10-19", allowSummary: true }).memory;
+const withTwo = () => C.applyDraft(C.emptyMemory(), C.validateDraft(D({ summary: { goal: "هدف" }, decisions: { add: [{ text: "قرار المستخدم", source: "user", quote: "قرار المستخدم" }, { text: "اقتراح النموذج", source: "assistant" }] },
+  constraints: { add: [{ text: "قيد أ", quote: "قيد أ" }, { text: "قيد ب", quote: "قيد ب" }] } }), "b-1").draft, { date: "2026-10-19", allowSummary: true, evidence: { user: "قرار المستخدم\nقيد أ\nقيد ب", all: "قرار المستخدم\nقيد أ\nقيد ب" } }).memory;
 test("fix: edit, approve a suggestion, revoke, remove, constraints, summary, log — and say what changed", () => {
   const m = withTwo();
   const v = C.validateFix({ decisions: { edit: [{ id: "d1", text: "قرار معدّل" }], approve: ["d2"], remove: ["d77"] }, constraints: { remove: ["قيد أ"], add: ["قيد ج"] }, summary: { goal: "هدف جديد" }, log: { remove: ["b-1"] } });
@@ -267,7 +269,7 @@ test("evidence: a decision is the user's only if their words back it; numbers mu
   assert.ok(r.memory.decisions.every((d) => d.source === "assistant" && d.unverified));
   // whole numbers, never substrings; the same amount written another way counts; a month's name is its number
   const ev2 = { user: "الميزانية 1500 ريال، والمدة 120 يوما، والسقف 10k، والافتتاح 15 نوفمبر، والدفعة ٤٠ ألف، وکتاب واحد", all: "" }; ev2.all = ev2.user;
-  const flagged = (text, quote = "الميزانية 1500 ريال") => C.applyDraft(m0, draft([{ text, source: "user", quote }]), { date: "2026-10-25", evidence: ev2 }).unverified.length > 0;
+  const flagged = (text, quote = ev2.user.slice(0, 80)) => C.applyDraft(m0, draft([{ text, source: "user", quote }]), { date: "2026-10-25", evidence: ev2 }).unverified.length > 0;
   assert.ok(flagged("الميزانية 500 ريال"), "500 is not in 1500"); assert.ok(flagged("المدة 20 يوما"), "20 is not in 120");
   assert.ok(flagged("السقف 25 ألفاً"), "the date's digits are no longer a free pass");
   assert.ok(!flagged("السقف 10,000"), "10k = 10,000"); assert.ok(!flagged("الدفعة 40,000 ريال"), "٤٠ ألف = 40,000"); assert.ok(!flagged("الدفعة 40 ألف"));
@@ -277,11 +279,11 @@ test("evidence: a decision is the user's only if their words back it; numbers mu
   const m7 = C.applyDraft(m0, draft([{ text: "سقف 7777", source: "user", quote: "الميزانية 1500 ريال" }]), { evidence: ev2 }).memory;
   assert.equal(C.applyDraft(m7, draft([{ text: "سقف الميزانية 7777", source: "user", quote: "الميزانية 1500 ريال" }]), { evidence: ev2 }).unverified.length, 1);
   // numbers already in the memory, ids, colour codes and today's year are not new facts
-  const m1 = C.applyDraft(m0, draft([{ text: "الافتتاح 15 نوفمبر", source: "user", quote: "نعتمد الأزرق الداكن" }]), {}).memory;
-  r = C.applyDraft(m1, draft([{ text: "يبقى الافتتاح 15 نوفمبر 2026 بلون #556B2F ويحل محل d12", source: "user", quote: "نعتمد الأزرق الداكن" }]), { date: "2026-10-25", evidence: ev });
+  const m1 = C.applyDraft(m0, draft([{ text: "الافتتاح 15 نوفمبر", source: "user", quote: "والافتتاح 15 نوفمبر" }]), { evidence: ev2 }).memory;
+  r = C.applyDraft(m1, draft([{ text: "يبقى الافتتاح 15 نوفمبر 2026 بلون #556B2F ويحل محل d12", source: "user", quote: "يبقى الافتتاح كما هو" }]), { date: "2026-10-25", evidence: { user: "يبقى الافتتاح كما هو", all: "يبقى الافتتاح كما هو" } });
   assert.deepEqual(r.unverified, []);
   // an unbacked decision never replaces one in force
-  const m2 = C.applyDraft(m0, draft([{ text: "اللون أخضر", source: "user", quote: "نعتمد الأزرق الداكن" }]), {}).memory;
+  const m2 = C.applyDraft(m0, draft([{ text: "اللون أخضر", source: "user", quote: "اللون أخضر" }]), { evidence: { user: "اللون أخضر", all: "اللون أخضر" } }).memory;
   r = C.applyDraft(m2, draft([{ text: "اللون أحمر", source: "user", quote: "قلت أحمر", replaces: "d1" }]), { evidence: ev });
   assert.equal(r.memory.decisions.find((d) => d.id === "d1").status, "active");
   // approving it: it becomes what the model said (the user's decision) and replaces what it meant to — never two in force
@@ -289,10 +291,112 @@ test("evidence: a decision is the user's only if their words back it; numbers mu
   assert.equal(f.decisions[1].unverified, false); assert.equal(f.decisions[1].source, "user"); assert.equal(f.decisions[1].replaces, "d1");
   assert.equal(f.decisions[0].status, "revoked", "the decision it replaces is revoked on approval");
   assert.equal(f.decisions[1].claimed, undefined); assert.equal(f.decisions[1].pendingReplaces, undefined);
-  assert.match(C.render(r.memory), /لم يُعثر على دليله/);
-  assert.match(C.render(m2), /> «نعتمد الأزرق الداكن»/);
-  // no evidence (a correction, an older writer): nothing is checked
-  assert.deepEqual(C.applyDraft(m0, draft([{ text: "بلا دليل 99", source: "user" }]), {}).unverified, []);
+  assert.match(C.render(r.memory), /لم يثبت من كلامك/);
+  assert.match(C.render(m2), /> «اللون أخضر»/);
+  // no evidence (the conversation's text unavailable): nothing can be checked, so nothing is trusted
+  const ne = C.applyDraft(m0, draft([{ text: "بلا دليل 99", source: "user" }, { text: "اقتراح للنموذج", source: "assistant" }]), {});
+  assert.deepEqual(ne.unverified.map((u) => u.reason), ["لم يتوفر نص المحادثة للتحقق"]); assert.equal(ne.memory.decisions[1].unverified, false, "the model's own suggestion stays a suggestion");
   // fields survive a round trip
   assert.equal(C.normalizeMemory(JSON.parse(C.serialize(r.memory))).decisions[1].unverified, true);
+});
+
+// ---------- 1.5: a quote that exists is not proof of meaning; every change to what you decided needs your words ----------
+const EVQ = (...msgs) => { const turns = msgs.map(([role, text]) => ({ role, text })); return { user: turns.filter((x) => x.role === "user").map((x) => x.text).join("\n"), all: msgs.map((x) => x[1]).join("\n"), turns }; };
+const DR = (o) => C.validateDraft({ batch: "v" + Math.random(), entry: { raised: ["نقاش طويل بما يكفي عن البيانات والهوية والقيود"] }, ...o }).draft;
+
+test("meaning: the reported case — «لا تنشر بياناتي» can't back its opposite, nor revoke the decision it backs", () => {
+  const ev = EVQ(["user", "لا تنشر بياناتي"], ["assistant", "حسناً"]);
+  const m0 = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "عدم نشر بيانات المستخدم", source: "user", quote: "لا تنشر بياناتي" }] } }), { date: "2026-10-25", evidence: ev });
+  assert.deepEqual(m0.unverified, []); assert.equal(m0.memory.decisions[0].msg, 1, "tied to your message");
+  const r = C.applyDraft(m0.memory, DR({ decisions: { add: [{ text: "وافق المستخدم على نشر بياناته", source: "user", quote: "لا تنشر بياناتي" }], revoke: ["d1"] } }), { date: "2026-10-26", evidence: ev });
+  assert.match(r.unverified[0].reason, /يعاكس/); assert.equal(r.memory.decisions[1].unverified, true);
+  const d1 = r.memory.decisions[0];
+  assert.equal(d1.status, "active", "your decision stays in force"); assert.ok(d1.pendingRevoke, "the revocation waits for you");
+  assert.deepEqual(r.pending.map((x) => x.key), ["x-d1"]);
+  assert.deepEqual(C.reviewItems(r.memory).map((x) => x.key).sort(), ["d2", "x-d1"]);
+  // your answers: keep d1, reject the misreading
+  const f = C.applyFix(r.memory, C.validateFix({ pending: { reject: ["x-d1", "d2"] } }).fix, "2026-10-26").memory;
+  assert.equal(f.decisions[0].status, "active"); assert.equal(f.decisions[0].pendingRevoke, undefined); assert.equal(f.decisions[1].status, "revoked");
+  assert.deepEqual(C.reviewItems(f), []);
+  // or approve the revocation
+  const g = C.applyFix(r.memory, C.validateFix({ pending: { approve: ["x-d1"] } }).fix, "2026-10-26").memory;
+  assert.equal(g.decisions[0].status, "revoked");
+});
+test("meaning: polarity — negation kept is backed, flipped is not; agreeing idioms are not negation", () => {
+  const ok = (text, quote, ev) => C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text, source: "user", quote }] } }), { evidence: ev || EVQ(["user", quote]) }).unverified.length === 0;
+  assert.ok(ok("لا نستخدم اللون الأحمر", "ما ابي اللون الأحمر"), "Gulf «ما ابي» is a negation, kept");
+  assert.ok(!ok("نستخدم اللون الأحمر", "ما ابي اللون الأحمر"), "flipped");
+  assert.ok(ok("اعتماد اللون الأزرق", "لا بأس نعتمد الأزرق"), "«لا بأس» agrees");
+  assert.ok(!ok("Publish the data", "don't publish my data"), "English negation");
+  assert.ok(ok("Do not publish the data", "don't publish my data"));
+  assert.ok(ok("منع نشر البيانات", "لا تنشر البيانات"), "a prohibition reads as a negation");
+});
+test("meaning: subject — the quote must be about the decision", () => {
+  const r = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "الميزانية 40 ألف ريال", source: "user", quote: "اسمه سكر وهيل" }] } }), { evidence: EVQ(["user", "اسمه سكر وهيل والميزانية 40 ألف"]) });
+  assert.match(r.unverified[0].reason, /موضوع/);
+  const s = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "اسم المقهى «سُكّر وهيل»", source: "user", quote: "اسمه «سُكّر وهيل»" }] } }), { evidence: EVQ(["user", "نبدأ هوية لمقهى اسمه «سُكّر وهيل»"]) });
+  assert.deepEqual(s.unverified, [], "same root, different form (اسمه / اسم)");
+});
+test("meaning: an approval must answer a reply that proposed it, and must not refuse", () => {
+  const ev = EVQ(["user", "اقترح خطاً"], ["assistant", "أقترح خط IBM Plex للعناوين"], ["user", "تمام"], ["assistant", "تم"], ["user", "لا"]);
+  const one = (text, quote) => C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text, source: "assistant-approved", quote }] } }), { evidence: ev });
+  assert.deepEqual(one("خط IBM Plex للعناوين", "تمام").unverified, []);
+  assert.equal(one("خط IBM Plex للعناوين", "تمام").memory.decisions[0].msg, 2);
+  assert.match(one("اللون الأحمر للشعار", "تمام").unverified[0].reason, /لا تتبع اقتراحاً/);
+  assert.match(one("خط IBM Plex للعناوين", "لا").unverified[0].reason, /رفض أو نفي/);
+});
+test("constraints: added or removed only with your words; otherwise they wait, the list untouched", () => {
+  const ev = EVQ(["user", "الرد بالعربي دائماً"]);
+  let r = C.applyDraft(C.emptyMemory(), DR({ constraints: { add: [{ text: "الرد بالعربي", quote: "الرد بالعربي دائماً" }, "الميزانية 9000"] } }), { evidence: ev });
+  assert.deepEqual(r.memory.constraints, ["الرد بالعربي"]); assert.deepEqual(r.memory.pending.constraints.add.map((x) => x.text), ["الميزانية 9000"]);
+  assert.match(C.render(r.memory), /تغييرات على القيود تنتظر مراجعتك/);
+  r = C.applyDraft(r.memory, DR({ constraints: { remove: ["الرد بالعربي"] } }), { evidence: ev });
+  assert.deepEqual(r.memory.constraints, ["الرد بالعربي"], "not removed without your words"); assert.equal(r.pending[0].key[1], "-");
+  const keys = C.reviewItems(r.memory).map((x) => x.key);
+  const f = C.applyFix(r.memory, C.validateFix({ pending: { approve: keys } }).fix, "x").memory;
+  assert.deepEqual(f.constraints, ["الميزانية 9000"]); assert.deepEqual(C.reviewItems(f), []);
+  const g = C.applyDraft(r.memory, DR({ constraints: { remove: [{ text: "الرد بالعربي", quote: "لا داعي للرد بالعربي" }] } }), { evidence: EVQ(["user", "لا داعي للرد بالعربي"]) }).memory;
+  assert.deepEqual(g.constraints, []); assert.deepEqual(g.pending.constraints.remove, [], "settled, no longer waiting");
+});
+test("replace: a backed decision replaces yours only if its words are about it", () => {
+  const ev = EVQ(["user", "اللون أخضر"], ["assistant", "تم"], ["user", "نغير الخط إلى لاتيني"]);
+  const m = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "اللون أخضر", source: "user", quote: "اللون أخضر" }] } }), { evidence: ev }).memory;
+  const r = C.applyDraft(m, DR({ decisions: { add: [{ text: "الخط لاتيني", source: "user", quote: "نغير الخط إلى لاتيني", replaces: "d1" }] } }), { evidence: ev }).memory;
+  assert.equal(r.decisions[0].status, "active"); assert.ok(r.decisions[0].pendingRevoke); assert.equal(r.decisions[1].unverified, false);
+});
+test("confirmed is set by you only: approving or correcting a decision; shown apart from a found quote", () => {
+  const m = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: "اللون أخضر", source: "user", quote: "اللون أخضر" }] } }), { evidence: EVQ(["user", "اللون أخضر"]) }).memory;
+  assert.match(C.render(m), /اقتباس من رسالتك 1/); assert.equal(m.decisions[0].confirmed, undefined);
+  const f = C.applyFix(m, C.validateFix({ decisions: { approve: ["d1"] } }).fix, "x");
+  assert.equal(f.memory.decisions[0].confirmed, true); assert.match(C.render(f.memory), /✓ أكّدته/); assert.match(f.changes.join(), /أكّدتَ d1/);
+});
+test("versions: fields a later version adds survive; a later format is flagged so it is never written over", () => {
+  const later = { format: "conversation-memory/2", novelty: { x: [1, 2] }, decisions: [{ id: "d1", text: "قرار", source: "user", status: "active", weight: 3 }], pending: { constraints: { add: [] }, other: 1 } };
+  const p = C.parseMemory(JSON.stringify(later)); assert.ok(p.ok && p.newer);
+  const r = C.applyDraft(p.memory, DR({}), { date: "x" }).memory;
+  assert.deepEqual(r.novelty, { x: [1, 2] }); assert.equal(r.decisions[0].weight, 3); assert.equal(r.pending.other, 1); assert.equal(r.format, "conversation-memory/2");
+  assert.equal(C.parseMemory(C.serialize(C.emptyMemory())).newer, false);
+  assert.equal(C.normalizeMemory({ toString: 1, __proto__x: 2, "bad key": 3 }).toString, Object.prototype.toString, "no prototype names, no odd keys");
+});
+test("property: random drafts never make an unbacked trusted decision, never revoke yours without your words, never throw", () => {
+  let seed = 7; const rnd = (n) => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) % n);
+  const words = ["لا", "تنشر", "بياناتي", "اللون", "أخضر", "الميزانية", "40", "ألف", "نعم", "تمام", "don't", "publish", "data", "ما", "ابي", "الخط", "عربي", "«سكر»", "d1"];
+  const phrase = () => Array.from({ length: 1 + rnd(5) }, () => words[rnd(words.length)]).join(" ");
+  for (let i = 0; i < 400; i++) {
+    const msgs = Array.from({ length: 1 + rnd(5) }, (_, k) => [k % 2 ? "assistant" : "user", phrase()]);
+    const ev = rnd(4) ? EVQ(...msgs) : undefined;
+    const m0 = C.applyDraft(C.emptyMemory(), DR({ decisions: { add: [{ text: phrase(), source: "user", quote: phrase() }] } }), { evidence: ev }).memory;
+    const draft = C.validateDraft({ batch: "p" + i, entry: { raised: ["نقاش طويل بما يكفي عن البيانات والهوية والقيود"] },
+      decisions: { add: Array.from({ length: rnd(3) }, () => ({ text: phrase(), source: ["user", "assistant-approved", "assistant", "x"][rnd(4)], quote: rnd(3) ? phrase() : undefined, replaces: rnd(4) ? undefined : "d1" })), revoke: rnd(2) ? [rnd(2) ? "d1" : { id: "d1", quote: phrase() }] : [] },
+      constraints: { add: [phrase()], remove: [phrase()] } });
+    const r = C.applyDraft(m0, draft.draft, { date: "2026-10-25", evidence: ev });
+    const evn = ev ? C.evNorm(ev.user) : "";
+    for (const d of r.memory.decisions.slice(m0.decisions.length)) if (d.source !== "assistant") {
+      assert.ok(ev && C.evNorm(d.quote).length >= 2 && evn.includes(C.evNorm(d.quote)), "trusted only with the user's words: " + JSON.stringify(d));
+      if (d.source === "user") assert.equal(C.negated(d.quote), C.negated(d.text), "same polarity");
+    }
+    const was = m0.decisions[0], now = r.memory.decisions.find((d) => d.id === was.id);
+    if (was.source !== "assistant" && was.status === "active" && now.status === "revoked") assert.ok(ev, "a decision of yours is revoked only with the conversation at hand");
+    assert.equal(C.serialize(C.normalizeMemory(JSON.parse(C.serialize(r.memory)))), C.serialize(r.memory), "normalize is stable");
+  }
 });

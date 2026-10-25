@@ -39,11 +39,15 @@ function trustCommand() {
 }
 
 // ---------- fix ----------
+const REVIEW_KIND = { decision: "قرار لم يثبت من كلامه", revoke: "إلغاء قرار له اقتُرح دون دليل", "constraint-add": "إضافة قيد اقتُرحت دون دليل", "constraint-remove": "حذف قيد اقتُرح دون دليل" };
 function fixRequest(f) {
-  return `[conversation-memory] طلب تصحيح الذاكرة من المستخدم: «${f.ask || "(لم يحدد؛ اسأله ماذا يريد أن يصحّح)"}».\n` +
+  const mem = readMemory(), items = mem.memory ? C.reviewItems(mem.memory) : [];
+  const waiting = items.length ? `ما ينتظر مراجعة المستخدم (لم يُطبَّق بعد): ${items.map((x) => `${x.key} = ${REVIEW_KIND[x.kind]}: «${x.text.slice(0, 80)}»`).join("؛ ")}.\n` : "";
+  return `[conversation-memory] طلب تصحيح الذاكرة من المستخدم: «${f.ask || "(لم يحدد؛ اسأله ماذا يريد أن يصحّح)"}».\n` + waiting +
     `اقرأ CONVERSATION_MEMORY.json (فيه معرّفات القرارات d1… ومعرّف كل دفعة في السجل)، ثم اكتب بأداة Write الملف "${draftPath(f.id)}" بالتصحيح المطلوب وحده، واحذف ما لا يلزم من المفاتيح:\n` +
-    `{"decisions": {"edit": [{"id": "d3", "text": "النص الصحيح"}], "approve": ["d5"], "revoke": ["d2"], "remove": ["d7"]}, "constraints": {"add": [], "remove": ["نص القيد كما هو"]}, "summary": {"goal": "…", "status": "…", "next": [], "open": []}, "log": {"remove": ["معرّف الدفعة"]}}\n` +
-    `approve = اقتراحك الذي اعتمده المستخدم. revoke = إلغاء مع بقائه في سجل الملغى. remove = حذف نهائي (لمعلومة خاطئة أو حساسة). summary تُكتب كاملة إن تغيّرت.\n` +
+    `{"decisions": {"edit": [{"id": "d3", "text": "النص الصحيح"}], "approve": ["d5"], "revoke": ["d2"], "remove": ["d7"]}, "constraints": {"add": [], "remove": ["نص القيد كما هو"]}, "pending": {"approve": ["x-d1"], "reject": ["c+a1b2c3"]}, "summary": {"goal": "…", "status": "…", "next": [], "open": []}, "log": {"remove": ["معرّف الدفعة"]}}\n` +
+    `approve = اعتمد المستخدم القرار أو أكّده بنفسه (يصير «أكّدته»). revoke = إلغاء مع بقائه في سجل الملغى. remove = حذف نهائي (لمعلومة خاطئة أو حساسة). pending = جواب المستخدم على ما ينتظر مراجعته بمفاتيحه أعلاه: approve يطبّقه، reject يرفضه. summary تُكتب كاملة إن تغيّرت.\n` +
+    `لا تكتب approve أو pending إلا لما قاله المستخدم صراحة في طلبه.\n` +
     `إن لم يتضح المقصود فاسأل المستخدم أولاً؛ الطلب مفتوح ${PIN_TURNS} رسائل. للإلغاء: {"cancel": true}. النظام يحفظ نسخة احتياطية قبل التصحيح، والتراجع بالأمر /conversation-memory:undo.`;
 }
 // → { ok: {changes, missing} } | { cancelled } | { err }

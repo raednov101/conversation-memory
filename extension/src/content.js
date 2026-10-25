@@ -47,8 +47,11 @@
   // what a summary cost: the request we typed and the reply it produced, in characters (tokens are estimated from them)
   const costOf = (st, w, replyLen) => { const c = { req: w.reqLen || 0, rep: replyLen || 0 }; const t = st.costTotal || { n: 0, chars: 0 }; return { lastCost: c, costTotal: { n: t.n + 1, chars: t.chars + c.req + c.rep } }; };
   // the conversation as read from the page: the writer checks each decision's quote against it (never the extension's own requests)
-  const evidenceOf = (turns) => ({ user: turns.filter((t) => t.role === "user").map((t) => t.text).join("\n"), all: turns.map((t) => t.text).join("\n") });
-  const reviewNote = (r) => (r.unverified && r.unverified.length ? `🔎 ${r.unverified.length === 1 ? "قرار لم أجد دليله" : r.unverified.length === 2 ? "قراران لم أجد دليلهما" : C.count(r.unverified.length, C.W.decision) + " لم أجد دليلها"} في المحادثة، فحُفظ اقتراحاً ينتظر مراجعتك من «راجع القرارات».` : "");
+  // in order too, so a quote is tied to one of your messages (numbered as on the page) and an approval to the reply it answers
+  const evidenceOf = (turns) => ({ user: turns.filter((t) => t.role === "user").map((t) => t.text).join("\n"), all: turns.map((t) => t.text).join("\n"),
+    turns: turns.map((t) => ({ role: t.role, text: t.text })) });
+  const reviewNote = (r) => { const k = (r.unverified ? r.unverified.length : 0) + (r.pending ? r.pending.length : 0);
+    return k ? `🔎 ${k === 1 ? "شيء واحد لم يثبت" : k === 2 ? "شيئان لم يثبتا" : k + " أشياء لم تثبت"} من كلامك في المحادثة، فلم يُعتمد وينتظر مراجعتك من «راجع القرارات».` : ""; };
   const saved = (st, w, note, replyLen) => (saves++, Object.assign(st, { summarizedUpTo: w.to, hashes: w.hashes || [], rhashes: w.rhashes || [], hashSrc: w.src || "page", rewound: null, lastSave: Date.now(), status: "ok", error: "", attempts: 0, failedAt: -1, note }, costOf(st, w, replyLen)));
 
   // ---------- which project of the site this chat belongs to (each has its own memory) ----------
@@ -255,7 +258,7 @@
     if (a === "options") { B.call({ cmd: "openOptions" }); return; }
     if (a === "share") { openShare(); return; }
     if (a === "report") { await report(); return; }
-    if (a === "review") { await folderStatus(true); if (!review.length) { ui.toast("لا قرارات تنتظر مراجعتك."); return; } ui.openReview(review); return; }
+    if (a === "review") { await folderStatus(true); if (!review.length) { ui.toast("لا شيء ينتظر مراجعتك."); return; } ui.openReview(review); return; }
     if (a === "pause") { await B.set("settings", { ...settings, paused: !settings.paused }); return; }
     const id = A.chatId();
     if (a === "link" || a === "unlink") {
@@ -325,9 +328,9 @@
     const r = await B.fs("savePin", { name, text });
     ui.toast(r.ok ? `📌 ثُبّت «${r.name}» — النسخة ${r.v}${r.unchanged ? " (مطابق للسابقة)" : ` · بصمة ${r.hash}`}` : `تعذّر التثبيت: ${B.why(r.error)}`);
   }
-  async function onReview(id, action) {
-    const r = await B.fs("review", { id, action });
-    ui.toast(r.ok ? (action === "approve" ? `✓ اعتُمد ${id}` : `✕ أُلغي ${id}`) + " — يمكنك التراجع من «تراجع عن آخر تغيير»." : `لم يتغيّر شيء: ${B.why(r.error)}`);
+  async function onReview(key, action) {
+    const r = await B.fs("review", { key, action });
+    ui.toast(r.ok ? `${action === "approve" ? "✓" : "✕"} ${(r.changes || []).join("، ") || "تم"} — يمكنك التراجع من «تراجع عن آخر تغيير».` : `لم يتغيّر شيء: ${B.why(r.error)}`);
     await folderStatus(true);
     return { ok: !!r.ok, list: review };
   }

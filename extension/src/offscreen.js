@@ -111,7 +111,7 @@ async function readMemory(r) {
   if (!p.ok) { await sleep(150); jsonText = await readText(r, JSON_FILE); p = C.parseMemory(jsonText); }
   const mdText = await readText(r, MD_FILE);
   if (!p.ok) return { bad: p.error, brokenText: jsonText };
-  return { memory: p.memory, jsonText, mdText, token: C.token(jsonText || ""), exists: jsonText != null };
+  return { memory: p.memory, jsonText, mdText, token: C.token(jsonText || ""), exists: jsonText != null, newer: !!p.newer };
 }
 // Inside the browser nobody edits the file by hand: a cut-off file can only come from a write that was killed (the
 // browser closing the writer at the worst moment, seen about once in a few hundred forced closes under heavy load).
@@ -150,11 +150,16 @@ async function takeWriteLock(r) {
     try { await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`); } catch { await sleep(50); continue; }
     await sleep(40);
     let mine = false; try { mine = String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " "); } catch {}
-    if (mine) return { d, me };
+    if (mine) {
+      // while held, the time in the lock is refreshed: a slow write is never taken for an abandoned one
+      const lk = { d, me };
+      lk.beat = setInterval(async () => { try { if (String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " ")) await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`); } catch {} }, Math.floor(WLOCK_STALE / 3));
+      return lk;
+    }
   }
   return null;
 }
-async function dropWriteLock(lk) { if (!lk || lk.browser) return; try { if (String(await readText(lk.d, C.PROTOCOL.writeLock)).startsWith(lk.me + " ")) await lk.d.removeEntry(C.PROTOCOL.writeLock); } catch {} }
+async function dropWriteLock(lk) { if (!lk || lk.browser) return; clearInterval(lk.beat); try { if (String(await readText(lk.d, C.PROTOCOL.writeLock)).startsWith(lk.me + " ")) await lk.d.removeEntry(C.PROTOCOL.writeLock); } catch {} }
 async function archive(r, entries) {
   if (!entries.length) return;
   await writeVerified(await dir(await dataDir(r), ["archive"]), `${stamp()}-${nonce().slice(0, 4)}.json`, JSON.stringify(entries, null, 1));
@@ -175,6 +180,7 @@ async function writeMemory(r, mutate, confirm, held) {
         if (!note) return { err: cur.bad + " — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة" };
         notes.push(note); healed = true; attempt--; continue;
       }
+      if (cur.newer) return { err: "ملف الذاكرة كتبه إصدار أحدث من هذه الإضافة؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث الإضافة" };
       let m = cur.memory;
       if (!cur.exists && cur.mdText) { m = C.importLegacy(m, cur.mdText, today()); if (!attempt) notes.push("نُقل محتوى CONVERSATION_MEMORY.md القديم كما هو تحت «من الإصدار السابق»."); }
       else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !(await isSomeGeneratedView(r, cur.mdText, m))) {
@@ -210,7 +216,16 @@ async function writeMemory(r, mutate, confirm, held) {
 // and the constraints (not to repeat them). Next steps and open questions are rewritten from the chat anyway.
 // the conversation text a commit is checked against (from the page; strings only, bounded)
 const EVIDENCE_MAX = 4 * 1024 * 1024;
-const evidenceArg = (e) => (e && typeof e.all === "string" && typeof e.user === "string" ? { user: e.user.slice(-EVIDENCE_MAX), all: e.all.slice(-EVIDENCE_MAX) } : null);
+const evidenceArg = (e) => {
+  if (!e || typeof e.all !== "string" || typeof e.user !== "string") return null;
+  // the turns, newest kept, within the same bound
+  let size = 0; const turns = [];
+  for (const x of Array.isArray(e.turns) ? e.turns.slice().reverse() : []) {
+    if (!x || (x.role !== "user" && x.role !== "assistant") || typeof x.text !== "string" || (size += x.text.length) > EVIDENCE_MAX) break;
+    turns.unshift({ role: x.role, text: x.text, ...(Number.isInteger(x.n) ? { n: x.n } : {}) });
+  }
+  return { user: e.user.slice(-EVIDENCE_MAX), all: e.all.slice(-EVIDENCE_MAX), ...(turns.length ? { turns } : {}) };
+};
 function stateForPrompt(m) {
   const s = m.summary, L = [];
   if (s.goal) L.push(`الهدف: ${s.goal}`);
@@ -325,26 +340,25 @@ const ops = {
     }
     if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
     const r = w.extra;
-    return { ok: true, already: !r.applied, redacted: r.redacted, summarySkipped: r.skipped.includes("summary"), unverified: r.unverified || [], notes: w.notes };
+    return { ok: true, already: !r.applied, redacted: r.redacted, summarySkipped: r.skipped.includes("summary"), unverified: r.unverified || [], pending: r.pending || [], notes: w.notes };
   },
-  // decisions the writer could not back with the conversation's words: they wait as suggestions until the user decides
+  // what waits for the user: decisions not backed by their words, and changes to what they decided (C.reviewItems)
   async reviewList() {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
     const cur = await readMemory(h);
     if (cur.bad || !cur.exists) return { ok: true, list: [] };
-    return { ok: true, list: cur.memory.decisions.filter((d) => d.status === "active" && d.unverified).map(({ id, text, quote, date }) => ({ id, text, quote, date })) };
+    return { ok: true, list: C.reviewItems(cur.memory).map(({ key, kind, text, quote, reason, date, msg }) => ({ key, kind, text, quote, reason, date, msg })) };
   },
-  // approve (it becomes "a suggestion the user approved") or revoke one of them — a normal, backed-up, undoable write
-  async review({ id, action }) {
+  // approve (the change happens) or reject it — a normal, backed-up, undoable write
+  async review({ key, action }) {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
-    if (!/^d\d{1,6}$/.test(String(id)) || (action !== "approve" && action !== "revoke")) return { ok: false, error: "طلب مراجعة غير صالح" };
-    const v = C.validateFix({ decisions: { [action]: [id] } });
+    if (!C.isReviewKey(String(key)) || (action !== "approve" && action !== "reject")) return { ok: false, error: "طلب مراجعة غير صالح" };
+    const v = C.validateFix({ pending: { [action]: [key] } });
     let changes = [];
     const w = await writeMemory(h, (m) => {
-      const d = m.decisions.find((x) => x.id === id && x.status === "active" && x.unverified);
-      if (!d) return { err: "لم يعد هذا القرار بانتظار المراجعة" };
+      if (!C.reviewItems(m).some((x) => x.key === key)) return { err: "لم يعد هذا بانتظار المراجعة" };
       const r = C.applyFix(m, v.fix, today()); changes = r.changes; return { memory: r.memory };
-    }, (mm) => !mm.decisions.some((x) => x.id === id && x.status === "active" && x.unverified));
+    }, (mm) => !C.reviewItems(mm).some((x) => x.key === key));
     if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
     return { ok: true, changes };
   },

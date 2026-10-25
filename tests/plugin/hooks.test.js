@@ -413,8 +413,10 @@ test("reliability: a session that crashed without SessionEnd still has its unsum
 const fixPath = (j) => (ctx(j).match(/"([^"]+fix-[a-f0-9]{8}\.json)"/) || [])[1];
 function seed(P, sid) {
   const r = requests(prompts(P, sid, 5)[4])[0];
-  draft(r, { summary: { goal: "هوية مقهى", status: "اخترنا الاسم" }, decisions: { add: [{ text: "الاسم سكر وهيل", source: "user" }, { text: "اقتراح: لون زيتوني", source: "assistant" }, { text: "معلومة خاطئة", source: "user" }] }, constraints: { add: ["الميزانية 5000"] } });
-  run("stop", { session_id: sid, cwd: P });
+  draft(r, { summary: { goal: "هوية مقهى", status: "اخترنا الاسم" }, decisions: { add: [{ text: "الاسم سكر وهيل", source: "user", quote: "الاسم سكر وهيل" }, { text: "اقتراح: لون زيتوني", source: "assistant" }, { text: "معلومة خاطئة", source: "user", quote: "معلومة خاطئة" }] },
+    constraints: { add: [{ text: "الميزانية 5000", quote: "الميزانية 5000" }] } });
+  // the user's words the decisions are checked against
+  run("stop", { session_id: sid, cwd: P, transcript_path: transcript(P, [{ pid: "p1", user: "الاسم سكر وهيل" }, { pid: "p2", user: "معلومة خاطئة والميزانية 5000" }]) });
 }
 
 test("fix: explicit command asks for a correction draft; it is validated, applied, backed up, announced, and undoable", () => {
@@ -779,4 +781,39 @@ test("status names the Claude Code version, and says when it is newer than the o
   const { TESTED_CC } = require("../../plugin/scripts/lib/config");
   assert.match(status(TESTED_CC), new RegExp(`Claude Code: ${TESTED_CC.replace(/\./g, "\\.")} \\(جُرّب`));
   assert.match(status("99.0.0"), /Claude Code: 99\.0\.0 — أحدث من آخر نسخة جُرّب عليها/);
+});
+
+// ---------- 1.5: locks are never taken from a live holder; trust is migrated only for a file this plugin wrote ----------
+test("lock: a holder on this machine that is still running keeps the write lock past 15 s; a slow one stays fresh for the extension", () => {
+  const P = tmp(); const L = path.join(P, ".conversation-memory", "write.lock");
+  fs.mkdirSync(path.dirname(L), { recursive: true });
+  fs.writeFileSync(L, `someone ${Date.now() - 30e3} ${process.pid} ${os.hostname()}`);   // 30 s old, its process alive
+  const j = prompts(P, "a", 5)[4]; const r = requests(j)[0]; draft(r);
+  const busy = run("stop", { session_id: "a", cwd: P });
+  assert.ok(!fs.existsSync(path.join(P, "CONVERSATION_MEMORY.json")), "not pushed out after 15 s while alive"); assert.match(busy.systemMessage, /يكتب في الذاكرة الآن/);
+  fs.unlinkSync(L);
+  // a real slow writer: holds the lock 17 s; its time stays fresh, so a writer that sees only the time (the extension) waits
+  const h = spawn(process.execPath, [path.join(__dirname, "helpers", "hold-lock.js"), "17000"], { env: { ...ENV, CLAUDE_PROJECT_DIR: P }, stdio: "ignore" });
+  const t0 = Date.now(); while (!fs.existsSync(L) && Date.now() - t0 < 5000) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 16000);
+  const at = +fs.readFileSync(L, "utf8").split(" ")[1];
+  assert.ok(Date.now() - at < 15000, "refreshed while held: " + (Date.now() - at) + " ms");
+  h.kill();
+});
+test("trust: the one-time migration trusts only a file whose newest entry this plugin saved here", () => {
+  const P = tmp(); const j = prompts(P, "a", 5)[4]; draft(requests(j)[0], { summary: { goal: "هدف_محلي" } }); run("stop", { session_id: "a", cwd: P });
+  fs.unlinkSync(path.join(PRIV(P), "trust.json"));   // as before this version
+  // since then, someone else's version arrived (git pull): a new entry this plugin never saved
+  const m = memJson(P); m.summary.goal = "هدف_غريب"; m.log.push({ id: "pulled-1", platform: "chatgpt", chat: "", range: "1–5", date: "", raised: ["دخيل"], decided: [], changed: [] });
+  fs.writeFileSync(path.join(P, "CONVERSATION_MEMORY.json"), C.serialize(C.normalizeMemory(m)));
+  const s = run("start", { session_id: "b", cwd: P, source: "startup" });
+  assert.doesNotMatch(ctx(s), /هدف_غريب/, "not loaded on its own");
+});
+test("versions: a memory file from a later format is never written over; the draft waits and the user is told", () => {
+  const P = tmp(); const later = { ...C.emptyMemory(), format: "conversation-memory/2", novelty: 1 };
+  const text = JSON.stringify(later); fs.writeFileSync(path.join(P, "CONVERSATION_MEMORY.json"), text);
+  const j = prompts(P, "a", 5)[4]; const r = requests(j)[0]; draft(r);
+  const s = run("stop", { session_id: "a", cwd: P });
+  assert.equal(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8"), text, "untouched");
+  assert.match(s.systemMessage, /إصدار أحدث/); assert.ok(fs.existsSync(r.path), "the draft is kept");
 });

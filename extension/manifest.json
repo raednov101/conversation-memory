@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ذاكرة المحادثة لـ ChatGPT وClaude",
   "short_name": "ذاكرة المحادثة",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "يلخّص محادثاتك في ChatGPT وClaude ويحفظ ذاكرة كل مشروع داخل المتصفح أو في مجلد تختاره. غير تابعة لـ OpenAI أو Anthropic.",
   "minimum_chrome_version": "122",
   "permissions": [

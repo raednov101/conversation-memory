@@ -6,6 +6,7 @@ const os = require("os");
 const path = require("path");
 const C = require("../../core/memory-core.js");
 const { MAX_JSON, MAX_BACKUPS, TRIM_AT, WLOCK_STALE } = require("./config");
+const LIVE_HOLD = 60000;   // a hook lives 30 s at most (Claude Code kills it): a process number "alive" for longer is reused
 const { sleep, lst, sha256, nonce, int, today, stamp } = require("./util");
 const { safeFile, readSafe, writeAtomic, writeVerified, unlinkSafe, safeDir, breakStale } = require("./fsx");
 const { projectDir, P, PRIV, notes, pubSafe } = require("./context");
@@ -18,7 +19,7 @@ function readMemory() {
   if (md.bad) return { bad: `CONVERSATION_MEMORY.md ${md.bad}` };
   const parsed = C.parseMemory(j.text);
   if (!parsed.ok) return { bad: parsed.error, brokenText: j.text };
-  return { memory: parsed.memory, jsonText: j.text, mdText: md.text, token: C.token(j.text || ""), exists: j.text != null };
+  return { memory: parsed.memory, jsonText: j.text, mdText: md.text, token: C.token(j.text || ""), exists: j.text != null, newer: !!parsed.newer };
 }
 // ---------- trust: memory is loaded into a session only if it came through this plugin or the user approved it ----------
 // The memory file sits in the project and may come from anywhere (a cloned repo, git pull, the browser extension writing to a
@@ -46,7 +47,18 @@ function untrustedChanges(memory) {
   const newLog = memory.log.filter((e) => !logs.has(e.id));
   return { newDecisions, newLog, summaryChanged: memory.summary.goal !== snap.g || memory.summary.status !== snap.s, first: !t.snap };
 }
-function migrateTrust(mem) { const t = readTrust(); if (t.migrate && mem.exists && !mem.bad) { trust(mem.jsonText, mem.memory); return true; } return false; }
+// Trusted once, on the first run of a version that keeps fingerprints — but only if the file's newest entry is one this
+// plugin saved here (the private state lists those batches): a file changed since by anyone else still waits for the user.
+function savedHere() {
+  const r = readSafe(path.join(PRIV, "state.json"), MAX_JSON), ids = new Set();
+  try { for (const s of Object.values(JSON.parse(r.text || "{}").sessions || {})) for (const b of (s && Array.isArray(s.batches) ? s.batches : [])) if (b && b.status === "saved" && typeof b.id === "string") ids.add(b.id); } catch {}
+  return ids;
+}
+function migrateTrust(mem) {
+  const t = readTrust();
+  if (!t.migrate || !mem.exists || mem.bad || !mem.memory.log.length || !savedHere().has(mem.memory.log[mem.memory.log.length - 1].id)) return false;
+  trust(mem.jsonText, mem.memory); return true;
+}
 
 // Backups live in the project's data folder (.conversation-memory/backups/, git-ignored), shared with the browser
 // extension, so "undo" reverts the last change whoever made it. A version is never replaced without its backup:
@@ -139,8 +151,11 @@ function takeWriteLock(wait = 3000) {
       const at = int(a[1]), pid = int(a[2]);
       // a time in the future (clock skew, or a lock file that came with the project) can't hold the lock forever
       const t = at || f.stat.mtimeMs, future = t > Date.now() + C.PROTOCOL.futureSkew;
-      const gone = pid && a[3] === os.hostname() && !alive(pid);
-      if (!gone && !future && Date.now() - t < WLOCK_STALE) { sleep(50); continue; }
+      // a holder on this machine that is still running is never pushed out while it can still be running (a minute);
+      // every holder refreshes the time while it works, so a slow write is never taken for an abandoned one
+      const here = pid && a[3] === os.hostname(), gone = here && !alive(pid);
+      const fresh = here && !gone ? Date.now() - t < LIVE_HOLD : Date.now() - t < WLOCK_STALE;
+      if (!gone && !future && fresh) { sleep(50); continue; }
       if (seen === null) { sleep(20); continue; }
       breakStale(WLOCK, seen);
     }
@@ -149,6 +164,11 @@ function takeWriteLock(wait = 3000) {
     try { if (fs.readFileSync(WLOCK, "utf8").startsWith(me + " ")) return me; } catch {}
   }
   return null;
+}
+// while holding: the time in the lock is refreshed, so a writer that can't see our process (the extension) never takes it as stale
+function touchWriteLock(me) {
+  me = me || heldLock; if (!me) return;
+  try { if (fs.readFileSync(WLOCK, "utf8").startsWith(me + " ")) writeAtomic(WLOCK, `${me} ${Date.now()} ${process.pid} ${os.hostname()}`); } catch {}
 }
 // one Stop takes the lock once, before any draft is consumed, and releases it at the end
 function holdWriteLock(wait) { heldLock = takeWriteLock(wait); return !!heldLock; }
@@ -168,8 +188,10 @@ function writeMemory(mutate, confirm) {
   try {
     let keptEdit = false;
     for (let attempt = 0; attempt < 3; attempt++) {
+      touchWriteLock(me);
       const cur = readMemory();
       if (cur.bad) return { err: cur.bad };
+      if (cur.newer) return { err: "ملف الذاكرة كتبه إصدار أحدث من هذا البلقن؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث البلقن", writeFailed: true };
       let m = cur.memory;
       const baseTrusted = cur.exists ? isTrusted(cur.jsonText) : !cur.mdText;
       if (!cur.exists && cur.mdText) { m = C.importLegacy(m, cur.mdText, today()); if (!attempt) notes.push("ℹ️ ذاكرة المحادثة: نُقل محتوى CONVERSATION_MEMORY.md القديم إلى الصيغة الجديدة كما هو، تحت «من الإصدار السابق»."); }
@@ -187,6 +209,7 @@ function writeMemory(mutate, confirm) {
       const json = C.serialize(next);
       if (Buffer.byteLength(json) > MAX_JSON) return { err: "ملف الذاكرة تجاوز 4 ميجا" };
       if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها", writeFailed: true };
+      touchWriteLock(me);
       // checked as late as possible: changed meanwhile (the extension, say) → redo on the new version, nothing archived twice
       const again = readSafe(P.json, MAX_JSON);
       if (again.bad || again.text !== cur.jsonText) continue;
@@ -249,4 +272,4 @@ function writeShare(text) {
   try { writeVerified(f, text); return { path: f }; } catch (e) { return { err: "تعذّرت الكتابة: " + (e.code || e.message) }; }
 }
 
-module.exports = { isTrusted, trust, untrustedChanges, migrateTrust, pinVersions, writeShare, listBackups, describeBackup, restoreBackup, sweepTemps, readMemory, writeMemory, holdWriteLock, releaseWriteLock, pinsDirOk, savePin };
+module.exports = { isTrusted, trust, untrustedChanges, migrateTrust, pinVersions, writeShare, listBackups, describeBackup, restoreBackup, sweepTemps, readMemory, writeMemory, holdWriteLock, releaseWriteLock, touchWriteLock, pinsDirOk, savePin };

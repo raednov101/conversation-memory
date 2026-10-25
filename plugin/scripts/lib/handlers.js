@@ -102,20 +102,34 @@ function onStop(state, out) {
 // the conversation the writer actually has, to check each decision's quote against (C.applyDraft). Read once per Stop.
 // A recovered batch adds its own captured messages (they may come from a session whose transcript is gone).
 const CAP_USER_RE = /### رسالة المستخدم \(\d+\)\n([\s\S]*?)\n\n### رد Claude\n/g;
+// captured messages as turns, with the user message numbers they were captured with
+const CAP_TURN_RE = /### رسالة المستخدم \((\d+)\)\n([\s\S]*?)\n\n### رد Claude\n([\s\S]*?)(?=\n\n### رسالة المستخدم \(\d+\)\n|$)/g;
 function evidenceSource(s) {
   let base;
   return (b) => {
     if (base === undefined) {
       const turns = readTranscript(s.tp || input.transcript_path);
-      base = turns ? { user: turns.map((t) => t.raw).join("\n"), all: turns.map((t) => t.raw + "\n" + t.assistant.join("\n")).join("\n") + "\n" + (typeof input.last_assistant_message === "string" ? input.last_assistant_message : "") } : null;
+      const last = typeof input.last_assistant_message === "string" ? input.last_assistant_message : "";
+      base = turns ? { user: turns.map((t) => t.raw).join("\n"), all: turns.map((t) => t.raw + "\n" + t.assistant.join("\n")).join("\n") + "\n" + last,
+        // in order, so a quote is tied to one of your messages, and an approval to the reply it answers
+        turns: [...turns.flatMap((t) => [{ role: "user", text: t.raw }, { role: "assistant", text: t.assistant.join("\n") }]), ...(last ? [{ role: "assistant", text: last }] : [])] } : null;
     }
     if (b.kind !== "recovered") return base;
     const c = readCapture(b.id);
     if (!c) return base;
     const body = c.parts.map((p) => p.body).join("");
     const user = [...body.matchAll(CAP_USER_RE)].map((m) => m[1]).join("\n");
-    return { user: (base ? base.user + "\n" : "") + user, all: (base ? base.all + "\n" : "") + body };
+    const capTurns = [...body.matchAll(CAP_TURN_RE)].flatMap((m) => [{ role: "user", text: m[2], n: +m[1] }, { role: "assistant", text: m[3] }]);
+    return { user: (base ? base.user + "\n" : "") + user, all: (base ? base.all + "\n" : "") + body, turns: capTurns.length ? capTurns : base ? base.turns : undefined };
   };
+}
+// what waits for the user after a save: decisions not backed by their words, and changes to what they decided
+function reviewNotes(applied) {
+  const out = [];
+  if (applied.unverified.length) out.push(`🔎 ذاكرة المحادثة: ${applied.unverified.length === 1 ? "قرار لم يثبت من كلامك" : applied.unverified.length === 2 ? "قراران لم يثبتا من كلامك" : C.count(applied.unverified.length, C.W.decision) + " لم تثبت من كلامك"}، فحُفظ اقتراحاً ينتظر مراجعتك: ${applied.unverified.map((u) => `${u.id} «${u.text.slice(0, 80)}» (${u.reason})`).join("؛ ")}.`);
+  if (applied.pending && applied.pending.length) out.push(`🔎 ذاكرة المحادثة: تغييرات على ما قررته اقتُرحت دون دليل من كلامك، فلم تُطبَّق وتنتظر موافقتك: ${applied.pending.map((x) => `${x.key} «${x.text.slice(0, 60)}» (${x.reason})`).join("؛ ")}.`);
+  if (out.length) out.push("للمراجعة: /conversation-memory:fix (اعتمد أو ارفض).");
+  return out.join(" ");
 }
 function stopWork(s, out) {
   const asks = [];
@@ -155,7 +169,7 @@ function stopWork(s, out) {
             else {
               okBases.add(w.token);
               if (applied && applied.redacted) notes.push("🔒 ذاكرة المحادثة: حُذفت بيانات حساسة من الملخص تلقائياً قبل حفظه.");
-              if (applied && applied.unverified.length) notes.push(`🔎 ذاكرة المحادثة: ${applied.unverified.length === 1 ? "قرار لم أجد دليله" : applied.unverified.length === 2 ? "قراران لم أجد دليلهما" : C.count(applied.unverified.length, C.W.decision) + " لم أجد دليلها"} في المحادثة، فحُفظ اقتراحاً ينتظر مراجعتك: ${applied.unverified.map((u) => `${u.id} «${u.text.slice(0, 80)}» (${u.reason})`).join("؛ ")}. للاعتماد أو الإلغاء: /conversation-memory:fix.`);
+              if (applied && reviewNotes(applied)) notes.push(reviewNotes(applied));
               if (applied && applied.skipped.includes("summary")) notes.push("ℹ️ ذاكرة المحادثة: تغيّرت الذاكرة من برنامج آخر أثناء الحفظ، فبقيت خلاصته وأُضيف سجل هذه الرسائل وقراراتها.");
             }
           }
