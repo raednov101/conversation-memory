@@ -123,12 +123,13 @@ with sync_playwright() as pw:
     if os.path.exists(plugin_core):
         ok(core_ext == open(plugin_core).read(), "the extension's memory-core.js is byte-identical to the plugin's")
 
-    print("— nothing to set up: the memory is kept inside the browser, one per project of the site —")
+    print("— nothing to set up: the memory is kept inside the browser; each chat outside a project has its own —")
     p0 = ctx.new_page(); p0.goto(BASE + new_chat("chatgpt", "/c/inbrowser/", "داخل المتصفح - ChatGPT"))
     ok("اختر" not in (wait(lambda: pill(p0) if "🧠" in pill(p0) and "…" not in pill(p0) else None, 10) or "اختر"), "with no folder chosen, it works at once (no folder to pick)", pill(p0))
     for i in range(1, 6): say(p0, f"داخل المتصفح {i}")
-    j0 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json")), 20) or {}
-    ok(j0.get("log") and j0["log"][0]["range"] == "1–5", "…and the summary is saved in the browser, under «chats outside projects»", j0)
+    j0 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-c-inbrowser/CONVERSATION_MEMORY.json")), 20) or {}
+    ok(j0.get("log") and j0["log"][0]["range"] == "1–5", "…and the summary is saved in the browser, in this chat's own memory", j0)
+    ok(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json") is None, "…never in a memory shared by every chat outside a project (they mixed before 1.5)")
     p0.close()
     sw.evaluate("() => chrome.offscreen.closeDocument().catch(() => {})")   # the writer is not running when a chat starts
     pr = ctx.new_page(); pr.goto(BASE + new_chat("chatgpt", "/c/restart/", "إعادة تشغيل - ChatGPT"))
@@ -140,11 +141,11 @@ with sync_playwright() as pw:
     wait(lambda: "🧠" in pill(p0), 10)
     for i in range(1, 6): say(p0, f"داخل مشروع {i}")
     j1 = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-g-p-abc123/CONVERSATION_MEMORY.json")), 20) or {}
-    ok(j1.get("log") and len((json.loads(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json") or "{}")).get("log", [])) == 1, "a chat inside a ChatGPT project gets that project's own memory", j1)
+    ok(j1.get("log") and len((json.loads(read("projects", "chatgpt-c-inbrowser/CONVERSATION_MEMORY.json") or "{}")).get("log", [])) == 1, "a chat inside a ChatGPT project gets that project's own memory", j1)
     p0.close()
     opt.reload(); opt.wait_for_load_state()
-    names = wait(lambda: (lambda t: t if "cafe" in t and "خارج المشاريع" in t else None)(opt.locator("#scopes").inner_text()), 8) or opt.locator("#scopes").inner_text()
-    ok("cafe" in names and "خارج المشاريع" in names and opt.locator("#scopes button").count() == 2, "the settings page lists both projects, each with a download button", names)
+    names = wait(lambda: (lambda t: t if "cafe" in t and "داخل المتصفح" in t else None)(opt.locator("#scopes").inner_text()), 8) or opt.locator("#scopes").inner_text()
+    ok("cafe" in names and "داخل المتصفح" in names and opt.locator("#scopes button").count() == 2, "the settings page lists both memories (the project, and the chat by its title), each with a download button", names)
     with opt.expect_download() as dl:
         opt.locator("#scopes li").filter(has_text="cafe").locator("button").click()
     md = open(dl.value.path(), encoding="utf-8").read()
@@ -152,22 +153,49 @@ with sync_playwright() as pw:
     with opt.expect_download() as dl:
         opt.locator("#exportAll").click()
     full_path = dl.value.path(); full = json.loads(open(full_path, encoding="utf-8").read())
-    ok(full.get("format") == "conversation-memory-backup" and {x["scope"] for x in full["projects"]} >= {"chatgpt-general", "chatgpt-g-p-abc123"},
+    ok(full.get("format") == "conversation-memory-backup" and {x["scope"] for x in full["projects"]} >= {"chatgpt-c-inbrowser", "chatgpt-g-p-abc123"},
        "a full copy of everything kept in the browser can be saved to a file (removing the extension deletes its storage)", [x["scope"] for x in full.get("projects", [])])
     opt.evaluate("async () => { const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('projects'); await d.removeEntry('chatgpt-g-p-abc123', { recursive: true }); }")
     opt.locator("#importFile").set_input_files(full_path)
     km = wait(lambda: (lambda t: t if "استُعيد" in t else None)(opt.locator("#keepMsg").inner_text()), 8) or opt.locator("#keepMsg").inner_text()
     back = json.loads(read("projects", "chatgpt-g-p-abc123/CONVERSATION_MEMORY.json") or "{}")
-    ok("استُعيد 1" in km and back.get("log") == j1.get("log") and "ChatGPT: محادثات خارج المشاريع" in km,
+    ok("استُعيد 1" in km and back.get("log") == j1.get("log") and "داخل المتصفح" in km,
        "…and restored from it, while a project that still exists is never replaced", km)
     # a cut-off file inside the browser (a write the browser killed) heals itself from the newest backup
-    good = read("projects", "chatgpt-general/CONVERSATION_MEMORY.json")
-    write("projects", "chatgpt-general/.conversation-memory/backups/20261024-100000-000.json", good)   # the backup a previous save leaves
-    write("projects", "chatgpt-general/CONVERSATION_MEMORY.json", '{"format":"conversation-memory/1","summ')
-    gid = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status', args: { scope: 'chatgpt-general' } })").get("projectId")
-    pr_ = opt.evaluate("(pid) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { scope: 'chatgpt-general', project: pid } })", gid)
-    ok(pr_.get("ok") and read("projects", "chatgpt-general/CONVERSATION_MEMORY.json") == good and any(f.startswith("CONVERSATION_MEMORY.broken-") for f in ls("projects", "chatgpt-general")),
+    good = read("projects", "chatgpt-c-inbrowser/CONVERSATION_MEMORY.json")
+    write("projects", "chatgpt-c-inbrowser/.conversation-memory/backups/20261024-100000-000.json", good)   # the backup a previous save leaves
+    write("projects", "chatgpt-c-inbrowser/CONVERSATION_MEMORY.json", '{"format":"conversation-memory/1","summ')
+    gid = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status', args: { scope: 'chatgpt-c-inbrowser' } })").get("projectId")
+    pr_ = opt.evaluate("(pid) => chrome.runtime.sendMessage({ cmd: 'fs', op: 'prepare', args: { scope: 'chatgpt-c-inbrowser', project: pid } })", gid)
+    ok(pr_.get("ok") and read("projects", "chatgpt-c-inbrowser/CONVERSATION_MEMORY.json") == good and any(f.startswith("CONVERSATION_MEMORY.broken-") for f in ls("projects", "chatgpt-c-inbrowser")),
        "a cut-off memory file inside the browser heals from the newest backup, and the cut-off file is kept aside", pr_)
+
+    print("— chats outside a project never mix: each its own memory; a new one brings a chosen memory, never a guessed one —")
+    p2 = ctx.new_page(); p2.goto(BASE + new_chat("chatgpt", "/c/sound/", "برنامج الصوت - ChatGPT"))
+    wait(lambda: "🧠" in pill(p2), 10)
+    for i in range(1, 6): say(p2, f"اظن حركتك قديمه {i}")
+    js = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-c-sound/CONVERSATION_MEMORY.json")), 20) or {}
+    req_s = requests(p2)[0] if requests(p2) else ""
+    ok(js.get("log") and "داخل المتصفح" not in req_s and "(لا توجد ذاكرة محفوظة بعد)" in req_s, "a second unrelated chat gets its own memory: its request carries nothing from the first", req_s[:400])
+    ok(len(json.loads(read("projects", "chatgpt-c-inbrowser/CONVERSATION_MEMORY.json") or "{}").get("log", [])) == 1, "…and the first chat's memory is untouched")
+    p2.close()
+    pn = ctx.new_page(); pn.goto(BASE + page("chatgpt", "/", "ChatGPT"))
+    wait(lambda: "محادثة جديدة" in pill(pn), 10)
+    pn.locator("#cm-memory-indicator .pill").click(); pn.locator("#cm-memory-indicator .panel button[data-a=insert]").click()
+    lst = wait(lambda: (lambda t: t if "من أي ذاكرة" in t else None)(pn.locator("#cm-memory-indicator .panel").inner_text()), 8) or ""
+    ok("داخل المتصفح" in lst and "برنامج الصوت" in lst, "a new chat outside a project asks which memory to bring (each chat's by its title)", lst[:300])
+    pn.locator("#cm-memory-indicator .panel button[data-a=pick]").filter(has_text="برنامج الصوت").click()
+    box = wait(lambda: (lambda t: t if "ذاكرة نقاش سابق" in t else None)(pn.locator(f"#{composer_id(pn)}").inner_text()), 8) or ""
+    ok("هوية بصرية لمقهى" in box and len(json.loads(read("projects", "chatgpt-c-sound/CONVERSATION_MEMORY.json") or "{}").get("log", [])) == 1, "…and inserts exactly the chosen one (nothing sent, nothing written)", box[:200])
+    pn.close()
+    # a chat linked to the shared memory of an earlier version stays there: nothing lost, nothing summarized twice
+    gpid = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'status', args: { scope: 'chatgpt-general' } })").get("projectId")
+    opt.evaluate("(k) => chrome.storage.local.set({ [k]: { linked: true, summarizedUpTo: 0, hashes: [], rhashes: [] } })", f"chat:{gpid}:chatgpt-oldchat")
+    page("chatgpt", "/c/oldchat/", "قديمة - ChatGPT", pre=[1, 2])
+    po = ctx.new_page(); po.goto(BASE + "/c/oldchat/")
+    wait(lambda: "🧠" in pill(po), 10)
+    ok(wait(lambda: opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')").get("scope:chatgpt-oldchat", {}).get("key") == "chatgpt-general", 8), "a chat already linked to the earlier shared memory keeps it", opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')"))
+    po.close()
 
     for platform, name, pid in (("chatgpt", "ChatGPT", "chatgpt"), ("claude", "Claude", "claude-web")):
         print(f"— {name}: counter, full transcript, JSON summary every 5 —")
@@ -577,6 +605,28 @@ with sync_playwright() as pw:
     P_.locator("input[data-k=summary]").check(); P_.locator("button[data-a=share-insert]").click(); p.wait_for_timeout(500)
     ok(p.evaluate("document.getElementById('prompt-textarea').innerText") == "مسودتي" and "أفرغ خانة الرسالة" in p.locator("#cm-memory-indicator .toast").inner_text(), "your own draft in the box is never overwritten")
     p.close()
+
+    print("— a chat about something else is not mixed into a project's memory: the model says so, you decide —")
+    proj = "proj-topic"; use_folder(proj)
+    pa = ctx.new_page(); pa.goto(BASE + new_chat("chatgpt", "/c/topic-a/", "مقهى - ChatGPT"))
+    wait(lambda: "🧠" in pill(pa), 10)
+    for i in range(1, 6): say(pa, f"هوية المقهى {i}")
+    wait(lambda: (mem(proj) or {}).get("log"), 20); pa.close()
+    DIFF = "() => { window.__summaryOverride = (t) => { window.__summaryOverride = null; window.__asked = t; return '⟦ذاكرة:بداية⟧ {\"different\": true} ⟦ذاكرة:نهاية⟧'; }; }"
+    for path, answer in (("/c/topic-b/", "unlink"), ("/c/topic-c/", "topic-yes")):
+        pb = ctx.new_page(); pb.goto(BASE + new_chat("chatgpt", path, "رحلة - ChatGPT"))
+        wait(lambda: "🧠" in pill(pb), 10)
+        for i in range(1, 5): say(pb, f"نخطط رحلة العلا {i}")
+        pb.evaluate(DIFF); say(pb, "نخطط رحلة العلا 5")
+        ok(wait(lambda: "موضوع آخر" in pill(pb), 15), f"{answer}: the model says the chat is about something else → ❓, nothing written", pill(pb))
+        ok("موضوع آخر" in (pb.evaluate("window.__asked") or "") and len((mem(proj) or {}).get("log", [])) == 1, f"{answer}: the request asked it (the memory already holds a project), and the memory is untouched")
+        pb.locator("#cm-memory-indicator .pill").click(); pb.locator(f"#cm-memory-indicator .panel button[data-a={answer}]").click()
+        if answer == "unlink":
+            ok(wait(lambda: "غير مربوطة" in pill(pb), 10) and len((mem(proj) or {}).get("log", [])) == 1, "«not this project» unlinks the chat; nothing of it enters the memory", pill(pb))
+        else:
+            ok(wait(lambda: len((mem(proj) or {}).get("log", [])) == 2, 20), "«it belongs» summarizes it into the memory", (mem(proj) or {}).get("log"))
+            ok("موضوع آخر" not in (requests(pb)[-1] if requests(pb) else "موضوع آخر"), "…and the model is no longer asked about it")
+        pb.close()
 
     print("— the indicator: 📝 text saved, ✓ summary updated, and manual mode —")
     proj = "proj-ux"; use_folder(proj)

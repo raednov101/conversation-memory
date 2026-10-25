@@ -42,7 +42,7 @@ async function rememberScopeName() {
   const n = await scopeNames(); if (n[SCOPE] === SCOPE_NAME) return;
   n[SCOPE] = SCOPE_NAME.slice(0, 80); await kvSet("scopeNames", n);
 }
-const GENERAL_NAMES = { general: "محادثات خارج المشاريع (إصدار سابق)", "chatgpt-general": "ChatGPT: محادثات خارج المشاريع", "claude-general": "Claude: محادثات خارج المشاريع" };
+const GENERAL_NAMES = { general: "محادثات خارج المشاريع (إصدار سابق)", "chatgpt-general": "ChatGPT: محادثات خارج المشاريع (قبل 1.5)", "claude-general": "Claude: محادثات خارج المشاريع (قبل 1.5)" };
 const scopeLabel = async (scope) => GENERAL_NAMES[scope] || (await scopeNames())[scope] || scope;
 
 // ---------- fs helpers ----------
@@ -312,7 +312,8 @@ const ops = {
     const { h, err } = await rootFor(project); if (err) return { ok: false, error: err };
     const cur = await readHealed(h);
     if (cur.bad) return { ok: false, error: cur.bad };
-    return { ok: true, base: cur.token, state: stateForPrompt(cur.memory) };
+    const m = cur.memory, has = !!(m.summary.goal || m.summary.status || m.decisions.length || m.constraints.length);
+    return { ok: true, base: cur.token, state: stateForPrompt(m), hasMemory: has };
   },
   async readCompact() {
     const { h, err } = await root(); if (err) return { ok: false, error: err };
@@ -333,6 +334,8 @@ const ops = {
     if (!p.ok) return { ok: false, error: p.error };
     const fields = p.fields && typeof p.fields === "object" && !Array.isArray(p.fields) ? p.fields : null;
     if (!fields) return { ok: false, error: "الملخص ليس كائن JSON" };
+    // the model says this chat is about something else than this memory: nothing is written; the user decides
+    if (fields.different === true) return { ok: false, different: true };
     const v = C.validateDraft({ ...fields, batch, base }, batch);
     if (!v.ok) return { ok: false, error: v.error };
     let w;
@@ -443,6 +446,11 @@ const ops = {
     }
     out.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
     return { ok: true, list: out, linked: !!(await kvGet("root")) };
+  },
+  // this site's memories only (the background sets the site; "*" only on the local test pages)
+  async listSiteScopes({ site }) {
+    const r = await ops.listScopes();
+    return { ok: true, list: (r.list || []).filter((x) => site === "*" || x.scope.startsWith(site + "-")) };
   },
   // the readable memory of one project, to download as a file
   // everything kept inside the browser, as one file to keep: removing the extension deletes its storage with it

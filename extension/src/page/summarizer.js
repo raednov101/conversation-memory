@@ -9,7 +9,9 @@
   const HK = "🧠 ذاكرة المحادثة:";   // prefix of the extension's own request
 
   // rewound: { n, kind: "edit" | "reply" } when the conversation branched at message n
-  function prompt(batch, from, to, firstText, state, rewound) {
+  // askTopic: the chat's first summary into a memory that already holds something — say so if it is about something else
+  const TOPIC = (who) => `- إن كانت هذه المحادثة عن موضوع آخر لا علاقة له بالذاكرة المحفوظة أعلاه، فلا تلخّص شيئاً: اكتب بين العلامتين {"different": true} فقط، حتى ${who} قبل أن تختلط الذاكرة.\n`;
+  function prompt(batch, from, to, firstText, state, rewound, askTopic) {
     const hint = firstText ? ` (أولها رسالتي التي تبدأ بـ «${firstText.replace(/\s+/g, " ").slice(0, 50)}»)` : "";
     const edit = rewound && rewound.n ? `ملاحظة: ${rewound.kind === "reply" ? `أعدتُ توليد ردك على رسالتي رقم ${rewound.n}` : `عدّلتُ رسالتي رقم ${rewound.n}`} فتغيّر مسار المحادثة من عندها؛ ألغِ (revoke) القرارات المحفوظة التي لم تعد صحيحة بعد ذلك.\n` : "";
     return `${HK} طلب آلي من إضافة الذاكرة (${batch}).\n` +
@@ -20,6 +22,7 @@
       ` "decisions":{"add":[{"text":"…","source":"user","quote":"…"}],"revoke":[{"id":"d3","quote":"…"}]},\n` +
       ` "constraints":{"add":[{"text":"…","quote":"…"}],"remove":[]},\n` +
       ` "entry":{"raised":["…"],"decided":["…"],"changed":["…"]}}\n\`\`\`\n${C.END}\n\n` +
+      (askTopic ? TOPIC("أقرر أنا") : "") +
       `- summary: خلاصة المشروع كله محدّثة، لا هذه الرسائل وحدها. entry: ما طُرح وتقرّر وتغيّر في هذه الرسائل فقط.\n` +
       `- decisions.add: الجديدة فقط. source: "user" لما قررتُه، و"assistant-approved" لاقتراحك الذي وافقتُ عليه، و"assistant" لما لم أعتمده.\n` +
       `- quote: اقتباس حرفي قصير من كلامي أنا يذكر الموضوع: ما قررتُ به، أو موافقتي على اقتراحك. وكذلك لكل قيد: كلامي الذي طلبته به، ولكل إلغاء (revoke): كلامي اللاحق الذي ألغيتُه به («ألغِ»، «بدّل»، «ما عاد»…). اكتب القرار بمعناه كما قلتُه، ومع النفي إن نفيتُ. ما لا اقتباس له لا يُطبَّق حتى أراجعه.\n` +
@@ -28,7 +31,7 @@
 
   // with the user's own API key: the model doesn't see the chat, so the messages travel with the request, as data
   const API_TEXT_MAX = 120000;
-  function apiPrompt(batch, from, to, convo, state, rewound) {
+  function apiPrompt(batch, from, to, convo, state, rewound, askTopic) {
     let text = String(convo || "");
     if (text.length > API_TEXT_MAX) text = "…(اقتُطع أوله لطوله)\n" + text.slice(-API_TEXT_MAX);
     const edit = rewound && rewound.n ? `ملاحظة: ${rewound.kind === "reply" ? `أُعيد توليد الرد على الرسالة ${rewound.n}` : `عُدّلت الرسالة ${rewound.n}`} فتغيّر مسار المحادثة من عندها؛ ألغِ (revoke) القرارات المحفوظة التي لم تعد صحيحة بعد ذلك.\n` : "";
@@ -40,6 +43,7 @@
       ` "decisions":{"add":[{"text":"…","source":"user","quote":"…"}],"revoke":[{"id":"d3","quote":"…"}]},\n` +
       ` "constraints":{"add":[{"text":"…","quote":"…"}],"remove":[]},\n` +
       ` "entry":{"raised":["…"],"decided":["…"],"changed":["…"]}}\n\`\`\`\n${C.END}\n\n` +
+      (askTopic ? TOPIC("يقرر المستخدم") : "") +
       `- summary: خلاصة المشروع كله محدّثة، لا هذه الرسائل وحدها. entry: ما طُرح وتقرّر وتغيّر في هذه الرسائل فقط.\n` +
       `- decisions.add: الجديدة فقط. source: "user" لما قرره المستخدم، و"assistant-approved" لاقتراح المساعد الذي وافق عليه، و"assistant" لما لم يعتمده.\n` +
       `- quote: اقتباس حرفي قصير من كلام المستخدم نفسه يذكر الموضوع: ما قرر به، أو موافقته على الاقتراح. وكذلك لكل قيد: كلامه الذي طلبه به، ولكل إلغاء (revoke): كلامه اللاحق الذي ألغاه به («ألغِ»، «بدّل»، «ما عاد»…). اكتب القرار بمعناه كما قاله، ومع النفي إن نفى. ما لا اقتباس له لا يُطبَّق حتى يراجعه.\n` +

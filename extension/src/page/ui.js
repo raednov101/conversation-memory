@@ -55,12 +55,14 @@
       btns.push(["🔗 اربطها بالذاكرة", "link"], SHARE);
       if (v.src === "data") { info += `<br><span class="muted">${VIA_DATA}</span>`; btns.push(REPORT); }
     }
+    else if (v.phase === "new" && v.outside) { text = "🧠 محادثة جديدة"; info = "خارج المشاريع لكل محادثة ذاكرتها، فلا تختلط مواضيعك. لتكمل من محادثة سابقة اختر ذاكرتها."; btns.push(["📥 أدرج ذاكرة محادثة سابقة", "insert"], ["📤 انقل منها معلومات مختارة", "share"]); }
     else if (v.phase === "new") { text = "🧠 محادثة جديدة"; info = v.fsSt.inBrowser ? `الذاكرة: <bdi>${esc(v.fsSt.folder)}</bdi>` : `المجلد: <bdi>${esc(v.fsSt.folder)}</bdi>`; btns.push(["📥 أدرج الذاكرة في الرسالة", "insert"], SHARE); }
     else if (v.phase === "chat") {
       const since = Math.max(0, v.userCount - s.summarizedUpTo), manual = settings.mode === "manual";
       const prog = manual ? `${since} · يدوي` : `${Math.min(since, settings.every)}/${settings.every}`;
       const cost = s.lastCost ? tokens(s.lastCost.req + s.lastCost.rep) : 0;
       if (v.unreadable) { cls = "warn"; text = "🧠 ⏸️ الموقع تغيّر"; info = BROKEN; }
+      else if (s.topicAsk) { cls = "warn"; text = `🧠 ❓ موضوع آخر؟`; info = `يبدو أن هذه المحادثة عن موضوع آخر غير ذاكرة ${q(v.fsSt.folder)}، فلم يُلخَّص شيء فيها حتى لا تختلط. هل تخصّها؟`; btns.push(["🔗 نعم، تخصّها: لخّصها فيها", "topic-yes"], ["✂️ لا، افصلها عن هذه الذاكرة", "unlink"]); }
       else if (s.pending) { cls = "busy"; text = `🧠 ⏳ ${prog} · يحفظ`; info = "طُلب الملخص من النموذج؛ يُحفظ عند اكتمال الرد."; }
       else if (v.apiBusy) { cls = "busy"; text = `🧠 ⏳ ${prog} · 🔑 يلخّص`; info = "يُلخَّص في الخلفية بمفتاحك؛ لا شيء يظهر في المحادثة."; }
       else if (s.status === "error") { cls = "err"; text = `🧠 ⚠️ ${prog} · تعثّر الحفظ`; info = `تعثّر الحفظ: ${esc(s.error)}` + (s.attempts >= maxAttempts ? " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)" : " (يعيد المحاولة بعد رسالتك القادمة)"); }
@@ -150,6 +152,15 @@
         list.map(item).join("") + `<button type="button" data-a="pin-cancel">إغلاق</button>`;
       panel.classList.add("open", "wide");
     }
+    // which saved memory to bring into a new chat outside any project (each such chat has its own)
+    function openPick(list, onPick) {
+      render();
+      share = { pick: onPick };
+      panel.innerHTML = `<p><b>📚 من أي ذاكرة؟</b><br><span class="muted">اختر ذاكرة المحادثة أو المشروع الذي تكمل منه.</span></p>` +
+        list.slice(0, 30).map((x) => `<button type="button" data-a="pick" data-id="${esc(x.scope)}">${esc(x.name)}<br><span class="muted">${esc(x.updated || "")} · ${esc(String(x.decisions))} قرار</span></button>`).join("") +
+        `<button type="button" data-a="pin-cancel">إلغاء</button>`;
+      panel.classList.add("open", "wide");
+    }
     // choose parts of the project's memory, see exactly what will be inserted (and its length), then insert — never sent
     // m: the memory; o: { preview(sel) → text, budget, onInsert(text) }
     function openShare(m, o) {
@@ -201,11 +212,12 @@
         });
         return;
       }
+      if (a === "pick") { const f = share && share.pick; closePin(); if (f) f(b.dataset.id); return; }
       if (a === "share-insert") { if (!share || !share.text) { toast("اختر شيئاً أولاً."); return; } const { o, text } = share; closePin(); o.onInsert(text); return; }
       setOpen(false);
       opts.onAction(a);
     });
-    return { host, render, toast, openPin, openShare, openReview };
+    return { host, render, toast, openPin, openShare, openReview, openPick };
   }
 
   (root.CM = root.CM || {}).ui = { create, describe };

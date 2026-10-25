@@ -84,6 +84,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       const site = host === "chatgpt.com" || host.endsWith(".chatgpt.com") || host === "chat.openai.com" ? "chatgpt" : host === "claude.ai" || host.endsWith(".claude.ai") ? "claude" : (self.CM_TEST_HOSTS ? "*" : "");
       const scope = String((msg.args && msg.args.scope) || "");
       if (!site || ["exportAll", "importAll", "listScopes"].includes(msg.op) || (site !== "*" && !scope.startsWith(site + "-"))) { reply({ ok: false, error: "not allowed" }); return; }
+      // the list of memories to bring into a new chat: this site's only, whatever the page asks
+      if (msg.op === "listSiteScopes") msg.args = { ...msg.args, site };
     }
     toOffscreen(msg.op, msg.args).then((r) => reply(r || { ok: false, error: "no reply" }), (e) => reply({ ok: false, error: String((e && e.message) || e) })); return true;
   }
