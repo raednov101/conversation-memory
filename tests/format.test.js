@@ -108,7 +108,7 @@ test("format: the schema refuses what the core never writes", () => {
     (f) => (f.decisions[0].id = "x1"),
     (f) => (f.decisions[0].confirmed = true) && (f.decisions[0].unverified = true),
     (f) => (f.pins = [{ name: "a", version: 1, path: "../../etc/passwd", sha: "", date: "" }]),
-    (f) => (f.log = [{ id: "b", platform: "gemini", chat: "", range: "", date: "", raised: [], decided: [], changed: [] }]),
+    (f) => (f.log = [{ id: "b", platform: "copilot", chat: "", range: "", date: "", raised: [], decided: [], changed: [] }]),
   ];
   for (const [i, spoil] of bad.entries()) {
     const f = JSON.parse(JSON.stringify(good));
