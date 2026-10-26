@@ -2,11 +2,12 @@
 // (tests/eval/cases.json). Measures what matters to a user, not how many tests pass:
 //   false trust — something the user did not say (or not with that meaning) saved as theirs, or a change they never asked for applied
 //   false hold  — a correct decision or change held back for review (the cost: an extra click)
-// Usage: node tests/eval/run.js [--verbose]        Never tune the rules on these cases: that would make them a training set.
+// Usage: node tests/eval/run.js [--dev] [--verbose]        Never tune the rules on these cases: that would make them a training set.
 "use strict";
 const path = require("path");
 const C = require(path.join(__dirname, "..", "..", "core", "memory-core.js"));
-const cases = require("./cases.json");
+// --dev: the development set (tests/eval/dev.json), the only one the rules may be tuned on
+const cases = require(process.argv.includes("--dev") ? "./dev.json" : "./cases.json");
 const verbose = process.argv.includes("--verbose");
 const userNumber = (turns, idx) => turns.slice(0, idx + 1).filter((t) => t.role === "user").length; // the corpus counts turns from 0
 const stats = { trust: { ok: 0, bad: 0 }, hold: { ok: 0, bad: 0 } },

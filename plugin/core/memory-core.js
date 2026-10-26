@@ -513,6 +513,7 @@
         .map((t) => ({
           role: t.role,
           t: evNorm(t.text),
+          raw: t.text,
           n: t.role !== "user" || t.n === null ? 0 : Number.isInteger(t.n) && t.n > 0 ? (k = t.n) : ++k,
         })); // n: null = number unknown
       if (!turns.some((t) => t.role === "user")) turns = null;
@@ -530,14 +531,17 @@
     (
       "في من على الى عن مع هذا هذه ذلك تلك ان او ثم كل بعد قبل عند اللي الذي التي الذين هو هي هم انا نحن احنا انت انتم هل قد لقد كان يكون " +
       "ايضا بس يعني شي شيء كذا هنا هناك عشان علشان لان لكن بل حتى اذا لو وش ايش كيف متى ليش اي ايه نعم تمام اوكي طيب خلاص " +
-      "the a an to of in on for and or is are was be we i you it this that with as at by from so then just ok okay yes"
+      "اولا ثانيا بعدين لاحقا حاليا الحين الان هلق هلا دابا دلوقتي توه " +
+      "the a an to of in on for and or is are was be we i you it this that with as at by from so then just ok okay yes first firstly later now " +
+      "me my go do up if us am he she his her our"
     ).split(" "),
   );
   const NEG = new Set(
     (
       "لا لاء لاا لم لن ليس ليست لست لسنا مو مب مش ماني مانيب بلاش بدون عدم ممنوع يمنع منع نمنع تمنع امنع رفض نرفض ارفض يرفض ترفض " +
       "ولا فلا ولم ولن وليس وبدون وعدم ومنع لاتنشر مابي مابغي مابغا مابغى ماابي مانبي مانبغي ماودي " +
-      "not no never without cannot nor avoid stop dont nope nah"
+      "دون بلا استبعاد استبعد نستبعد يستبعد تجنب نتجنب يتجنب وتجنب ودون وبلا " +
+      "not no never without cannot nor avoid stop dont nope nah exclude excluding skip skipping instead except unless"
     ).split(" "),
   );
   // «ما» negates a verb or a «there is / I have»: «ما نستخدم»، «ما راح»، «ما ابي»، «ما عندي»، «ما فيه»
@@ -558,8 +562,69 @@
   const negated = (t) => negatedTokens(tokens(t));
   // a change of mind in words: «ألغِ»، «خلاص بدلها»، «ما عاد»، «instead», «cancel»… (or the opposite polarity, checked apart)
   const CHANGE =
-    /(?:^| )(?:الغ|الغي|الغيه|الغيها|الغوه|الغيت|الغينا|نلغي|نلغيه|نلغيها|الغاء|ملغي|خلاص|بدل\S*|نبدل\S*|غيره|غيرها|غيروا|غيرت|غيرنا|نغير\S*|تغيير|تغير|انس|انسى|انساه|انسها|شيل\S*|احذف\S*|حذف\S*|نحذف\S*|امسح\S*|تراجع\S*|نرجع|عدل|عدله|عدلها|نعدل\S*|ما عاد|لا عاد|عاد ما|بلاش|ماعاد|لا داعي|ما له داعي|مو لازم|مب لازم|ما يحتاج|ما نحتاج|no need|not needed|cancel\S*|revok\S*|drop\S*|remov\S*|instead|chang\S*|switch\S*|replac\S*|no longer|forget|scrap\S*|undo|delete\S*)(?= |$)/;
+    /(?:^| )(?:الغ|الغي|الغيه|الغيها|الغوه|الغيت|الغينا|نلغي|نلغيه|نلغيها|الغاء|ملغي|خلاص|بدل\S*|نبدل\S*|غيره|غيرها|غيروا|غيرت|غيرنا|نغير\S*|تغيير|تغير|انس|انسى|انساه|انسها|شيل\S*|احذف\S*|حذف\S*|نحذف\S*|امسح\S*|تراجع\S*|نرجع|عدل|عدله|عدلها|نعدل\S*|ما عاد|لا عاد|عاد ما|بلاش|ماعاد|لا داعي|ما له داعي|مو لازم|مب لازم|ما يحتاج|ما نحتاج|no need|not needed|cancel\S*|revok\S*|drop\S*|remov\S*|instead|chang\S*|switch\S*|replac\S*|no longer|forget|scrap\S*|undo|delete\S*|خلنا من|خلينا من|خلونا من|دعنا من|دعك من|سيبك من|سيبنا من|انسوا|ننسى|ننساه|نساو|نسيو|لنلغ\S*|فلنلغ\S*|بلاها|بلاه|بلاهم|تخل\S*|نتخلى|اتخلى|بطل\S*|كنسل\S*|never ?mind|nevermind|ditch\S*|skip\S*|abandon\S*|no more|not anymore)(?= |$)/;
   const changeWords = (t) => CHANGE.test(evNorm(t));
+  // small numbers spelled out, so «three stools» and «3 stools», «تلات مرات» and «ثلاث مرات» share their number
+  const NUM_WORDS = {
+    two: "2",
+    three: "3",
+    four: "4",
+    five: "5",
+    six: "6",
+    seven: "7",
+    eight: "8",
+    nine: "9",
+    ten: "10",
+    اثنين: "2",
+    اثنان: "2",
+    اتنين: "2",
+    ثنين: "2",
+    جوج: "2",
+    مرتين: "2",
+    يومين: "2",
+    ثلاث: "3",
+    ثلاثه: "3",
+    تلات: "3",
+    تلاته: "3",
+    اربع: "4",
+    اربعه: "4",
+    خمس: "5",
+    خمسه: "5",
+    ست: "6",
+    سته: "6",
+    سبع: "7",
+    سبعه: "7",
+    ثمان: "8",
+    ثمانيه: "8",
+    تمن: "8",
+    تسع: "9",
+    تسعه: "9",
+    عشر: "10",
+    عشره: "10",
+    half: "0.5",
+    quarter: "0.25",
+    نصف: "0.5",
+    نص: "0.5",
+    النصف: "0.5",
+    ربع: "0.25",
+    الربع: "0.25",
+    ثلث: "0.33",
+    الثلث: "0.33",
+  };
+  // days of the week are as easily swapped as numbers («الأحد» → «الاثنين»)
+  const DAYS = [
+    ["sunday", "sun", "الاحد", "احد", "الحد"],
+    ["monday", "mon", "الاثنين", "الاتنين", "الثنين", "التنين", "اثنين"],
+    ["tuesday", "tue", "الثلاثاء", "الثلاثا", "التلات", "التلاتاء", "ثلاثاء"],
+    ["wednesday", "wed", "الاربعاء", "الاربعا", "اربعاء", "الاربع"],
+    ["thursday", "thu", "الخميس", "خميس"],
+    ["friday", "fri", "الجمعه", "جمعه"],
+    ["saturday", "sat", "السبت", "سبت"],
+  ];
+  const daysIn = (t) => {
+    const w = new Set(tokens(t));
+    return new Set(DAYS.map((names, i) => (names.some((n) => w.has(n)) ? i : -1)).filter((i) => i >= 0));
+  };
   // a rough stem: without the conjunction, the article and common suffixes (enough to compare two words, never shown)
   const stem = (w) =>
     w
@@ -569,11 +634,29 @@
   const content = (t) => [
     ...new Set(
       tokens(t)
-        .filter((w) => !STOP.has(w) && !NEG.has(w) && (w.length >= 3 || /^\d{2,}$/.test(w)))
-        .map(stem)
-        .filter((w) => w.length >= 2),
+        .map((w) => NUM_WORDS[w] || w)
+        .filter((w) => !STOP.has(w) && !NEG.has(w) && (w.length >= 3 || /^\d+$/.test(w) || /^[a-z0-9]{2}$/.test(w)))
+        .map((w) => (/^\d+$/.test(w) ? w : stem(w)))
+        .filter((w) => w.length >= 2 || /^\d+$/.test(w)),
     ),
   ];
+  // the decision without the reason given for it («… لأن …», «… because …»): a reason is welcome extra, not the topic
+  const REASON =
+    /(?:^| )(?:لان|لانه|لانها|لأن|بسبب|عشان|علشان|لعدم|رغم|بالرغم|مراعاه|بدل|بدلا|عوضا|because|since|due|despite|as it|so that|instead|rather than)(?= |$)/;
+  const reasonPart = (t) => splitReason(t)[1];
+  // the text split, as written, at its first reason / «instead of» word: [the decision's own part, the rest]
+  const splitReason = (t) => {
+    const w = String(t).split(/(\s+)/);
+    for (let i = 2; i < w.length; i += 2) {
+      const two = evNorm(w[i] + " " + (w[i + 2] || ""));
+      if (REASON.test(" " + evNorm(w[i]) + " ") || REASON.test(" " + two + " ")) {
+        const m = REASON.exec(" " + two + " ");
+        if (m && m.index <= 1) return [w.slice(0, i).join("").trim(), w.slice(i).join("")];
+      }
+    }
+    return [String(t), ""];
+  };
+  const core = (t) => evNorm(splitReason(t)[0]);
   // two words are the same word, roughly: equal, one inside the other (3+ letters), or the same 4-letter start (a leading
   // verb or plural letter aside: «اعتمدنا» ~ «اعتماد», «تنشر» ~ «نشر»). Never a shared fragment in the middle.
   const lead = (w) => (w.length > 4 ? w.replace(/^[ايتن]/, "") : w);
@@ -592,24 +675,85 @@
   };
   const shares = (a, b) => shared(a, b) > 0;
   // names and numbers written in Latin letters (a library, a product, a code) are the most often swapped: each must be in the quote
+  // In Arabic text any Latin word is such a name; in English text only the words that look like one: Capitalized inside a
+  // sentence, CamelCase, ACRONYMS, or with digits (not «Field» opening the sentence, not «returning»).
+  const nameLike = (text) => {
+    const raw = String(text),
+      ar = (raw.match(/[\u0600-\u06FF]/g) || []).length,
+      la = (raw.match(/[A-Za-z]/g) || []).length;
+    if (ar >= la) return null; // Arabic: every Latin word
+    const out = new Set();
+    raw.replace(/(^|[.!?:;\n]\s*|\s)([A-Za-z][A-Za-z0-9-]*)/g, (m, before, w) => {
+      const start = !before.trim() ? before === "" || /[.!?:;\n]\s*$/.test(before) : true;
+      if (/[A-Z].*[A-Z]|\d/.test(w.slice(1)) || /^[A-Z]{2,}$/.test(w) || (/^[A-Z]/.test(w) && !start && !/^I$/.test(w)))
+        out.add(stem(evNorm(w)));
+      return m;
+    });
+    return out;
+  };
+  // (the decision's own part only: a name after «instead of» is the one being replaced)
   const latinMissing = (quote, text) => {
-    const Q = content(quote);
-    return content(text).filter((w) => /^[a-z]{2,}$/.test(w) && !Q.some((y) => near(w, y)));
+    const Q = content(quote),
+      names = nameLike(text);
+    return content(core(text)).filter((w) => /^[a-z]{2,}$/.test(w) && (!names || names.has(w)) && !Q.some((y) => near(w, y)));
   };
   // the quote in its message: the words just before it may negate it («لا أريد [نشر بياناتي]»), so its polarity is read with them
-  function polarityIn(q, ev, at) {
-    if (!at || at.i < 0 || !ev.turns) return negatedTokens(q.split(" "));
-    const msg = ev.turns[at.i].t,
-      k = msg.lastIndexOf(q);
-    const before = (k > 0 ? msg.slice(0, k) : "").replace(AGREE_IDIOM, " ").split(" ").filter(Boolean).slice(-4);
-    return negatedTokens([...before, ...q.replace(AGREE_IDIOM, " ").split(" ").filter(Boolean)]);
+  // Read within the quote's own clause (up to the last «.», «،», «!»…): «لا، أبل لاحقاً. نبدأ بيوتيوب» does not negate
+  // «نبدأ بيوتيوب». A clause that is only a refusal of the previous suggestion («لأ، عربي بس», «No, Antalya») is set aside:
+  // what follows it is the user's choice, stated positively.
+  const REFUSAL_ONLY = /^(?:لا|لاء|لا لا|لأ|no|nope|nah|مو|مش|لا والله)$/;
+  // «لأ خليه L»: a refusal of the last suggestion followed by keep/let/make is the user's own choice, not a negation
+  const REFUSE_THEN_CHOOSE =
+    /^(?:لا|لاء|لأ|no|nope|nah) (?=(?:خلي|خليه|خليها|خله|خلها|خلنا|خلينا|خلوه|خلوها|خليهم|خليني|نخلي|make|keep|let|go|use)(?: |$))/;
+  function polarityIn(q, ev, at, about) {
+    const words = (t) => t.replace(AGREE_IDIOM, " ").replace(REFUSE_THEN_CHOOSE, "").split(" ").filter(Boolean);
+    const raw = at && at.i >= 0 && ev.turns ? ev.turns[at.i].raw : null;
+    if (!raw) return negatedTokens(words(q));
+    const clauses = raw
+      .split(/[.!?؟،,؛;:\n]+/)
+      .map(evNorm)
+      .filter(Boolean);
+    // the clauses the quote covers (whole, or where it begins), and the words before it in its first clause
+    const head = q.split(" ").slice(0, 2).join(" ");
+    const parts = clauses.filter((c) => q.includes(c) || c.includes(q) || c.includes(head));
+    let kept = parts.filter((c) => !REFUSAL_ONLY.test(c));
+    // «let's use cursor pagination, not offset» about «use cursor pagination»: the «not offset» clause is about the other thing
+    if (about && kept.length > 1) {
+      const on = kept.filter((c) => !content(c).length || sharedWeight(c, about) >= 1);
+      if (on.length) kept = on;
+    }
+    if (!kept.length) return negatedTokens(words(q).filter((w, i, a) => !(i === 0 && a.length > 1 && REFUSAL_ONLY.test(w))));
+    const first = kept[0],
+      k = first.indexOf(q.split(" ")[0]);
+    const before = c(first, q) ? [] : words(k > 0 ? first.slice(0, k) : "").slice(-4);
+    return negatedTokens([...before, ...kept.flatMap((x) => words(x.includes(q) ? q : x))]);
+    function c(x, y) {
+      return y.includes(x);
+    }
   }
   // why a quote does not back a text, or "" (polarity, subject, names)
+  // shared topic words, a distinctive one (a name in Latin letters, a number) counting double
+  const sharedWeight = (a, b) => {
+    const B = content(b);
+    return content(a)
+      .filter((x) => B.some((y) => near(x, y)))
+      .reduce((s, x) => s + (/^[a-z][a-z0-9-]{2,}$/.test(x) || /^\d+$/.test(x) ? 2 : 1), 0);
+  };
+  const RESTRICT = /(?:^| )(?:بس|فقط|وحده|وحدها|حصرا|only|just|alone)(?= |$)/;
+  // the decision is positive with an exclusion after it («… فقط دون نسخة إنجليزية», «…, no income», «… لا كنطاق»)
+  const trailingExclusion = (t) => {
+    const w = tokens(core(t)),
+      i = w.findIndex((x, k) => k > 0 && NEG.has(x));
+    return i > 0 && !negatedTokens(w.slice(0, i));
+  };
   function meaningGap(quote, text, negQuote) {
-    if (negQuote !== negated(text)) return T("المعنى قد يعاكس كلامك (نفي في أحدهما فقط)");
-    const n = content(text).length,
-      s = shared(quote, text);
-    if (!s || s < Math.min(2, Math.ceil(n / 4))) return T("الاقتباس لا يذكر موضوع القرار");
+    const negText = negated(core(text));
+    const sameChoice = !negQuote && negText && trailingExclusion(text) && (RESTRICT.test(evNorm(quote)) || changeWords(quote));
+    if (negQuote !== negText && !sameChoice) return T("المعنى قد يعاكس كلامك (نفي في أحدهما فقط)");
+    const n = content(core(text)).length,
+      s = sharedWeight(quote, core(text));
+    const need = content(quote).length <= 3 ? 1 : Math.min(2, Math.ceil(n / 4));
+    if (!s || s < need) return T("الاقتباس لا يذكر موضوع القرار");
     const lm = latinMissing(quote, text);
     if (lm.length) return T`اسم في القرار ليس في كلامك: ${lm.slice(0, 2).join(T("، "))}`;
     return "";
@@ -628,31 +772,122 @@
   // → { why: "" when backed, else the reason (Arabic, shown to the user), msg: your message's number when known }.
   // Every quote must be your own words: for a decision, the words that state it; for an approved suggestion, the words that
   // approve it — and then the suggestion must be what the reply just before your approval proposed.
+  // The numbers a decision states must be in the words it rests on — the message of your quote (and, for an approval, the
+  // suggestion just before it) — or already established (known). Anywhere in the conversation is not enough: when you say
+  // 3 days after the assistant proposed 5, «5 days» is not yours. Single digits and spelled-out small numbers count here.
+  const digitsIn = (t) => {
+    const out = new Set();
+    for (const m of asciiDigits(String(t).normalize("NFKC")).matchAll(/(?<![A-Za-z\d.#])\d+(?:\.\d+)?(?![\dA-Za-z])/g))
+      out.add(String(+m[0]));
+    for (const w of tokens(t)) if (NUM_WORDS[w]) out.add(NUM_WORDS[w]);
+    for (const n of numbersIn(t, false)) out.add(n); // «5K», «40 ألف» as whole values
+    return out;
+  };
+  const localNumbers = (ev, at, prevAssistant) => {
+    if (!at || at.i < 0 || !ev.turns) return ev.numbers;
+    const raw = [ev.turns[at.i].raw || ev.turns[at.i].t, prevAssistant || ""].join("\n");
+    return new Set([...numbersIn(raw, true), ...digitsIn(raw)]);
+  };
+  const numbersMissing = (text, local, known) => [...digitsIn(text)].filter((n) => !local.has(n) && !(known && known.has(n)));
+  // a question is not a decision: «وش رأيك نحط زعيم؟», «What about a raffle?»
+  const QUESTION_START =
+    /^(?:وش رايك|ايش رايك|شو رايك|شرايك|ما رايك|ايش رايكم|وش رايكم|هل|ممكن|يمكن|ليش ما|ليش لا|تتوقع|تقترح|what about|how about|should we|shall we|could we|can we|would it|do you think|what if)(?= |$)/;
+  function asQuestion(q, ev, at) {
+    if (QUESTION_START.test(q)) return true;
+    const raw = at && at.i >= 0 && ev.turns ? ev.turns[at.i].raw : "";
+    if (!raw) return false;
+    // the sentence the quote sits in ends with a question mark
+    for (const m of String(raw).matchAll(/[^.!?؟\n]+[.!?؟]*/g)) if (evNorm(m[0]).includes(q)) return /[?؟]\s*$/.test(m[0]);
+    return false;
+  }
+  // an approval says yes, or names what it approves («do the raffle», «التوقيع أوكي»)
+  const AGREE =
+    /(?:^| )(?:نعم|اي|ايه|ايوه|ايوا|اكيد|تمام|اوكي|اوك|ok|okay|موافق|موافقه|ماشي|طيب|زين|حلو|حلوه|ممتاز|يلا|يالله|yalla|اعتمد\S*|معتمد|بالظبط|بالضبط|ياريت|ياليت|خلاص|توكل|توكلنا|سوها|سوه|نفذ\S*|كمل|مزيان|واخا|صافي|تمشي|بتمشي|يمشي|منيح|yes|yep|yeah|sure|fine|great|perfect|agreed|deal|sounds|go ahead|do it|lets do it|approved|good|love it|كذا تمام)(?= |$)/;
+  // «…, but …»: what follows a reservation in the approval message is the user changing part of it
+  const RESERVATION = /(?:^| )(?:بس|لكن|بشرط|الا|غير ان|but|however|except|only if|as long as)(?= )/;
   function checkDecision(a, ev, known) {
     const q = evNorm(a.quote || "");
-    let msg = 0;
+    let msg = 0,
+      atRef = null,
+      prevRaw = "";
     if (a.source !== "assistant") {
       if (q.replace(/\s/g, "").length < (a.source === "user" ? QUOTE_MIN : APPROVAL_MIN)) return { why: T("بلا اقتباس من كلامك"), msg };
       const at = findUserQuote(q, ev);
       if (!at) return { why: notYours(q, ev), msg };
       msg = at.n;
+      atRef = at;
+      if (asQuestion(q, ev, at)) return { why: T("اقتباسك سؤال، لا قرار"), msg };
+      if (ev.turns && at.i >= 0) {
+        const dd = [...daysIn(a.text)].filter((d) => !daysIn(ev.turns[at.i].raw || ev.turns[at.i].t).has(d));
+        let j = at.i - 1;
+        while (j >= 0 && ev.turns[j].role !== "assistant") j--;
+        const prevDays = a.source === "assistant-approved" && j >= 0 ? daysIn(ev.turns[j].raw || ev.turns[j].t) : new Set();
+        if (dd.some((d) => !prevDays.has(d))) return { why: T("يوم في القرار ليس في كلامك"), msg };
+      }
       if (a.source === "user") {
-        const gap = meaningGap(a.quote, a.text, polarityIn(q, ev, at));
+        const gap = meaningGap(a.quote, a.text, polarityIn(q, ev, at, core(a.text)));
         if (gap) return { why: gap, msg };
       } else {
         // an approval is a plain yes: no refusal or reservation anywhere in that message («نعم، لكن لا تحذف…» is not one)
-        if (negated(a.quote) || (at.i >= 0 && negatedTokens(ev.turns[at.i].t.replace(AGREE_IDIOM, " ").split(" ").filter(Boolean))))
+        // «آبل باي ماشي، تابي لا» approves Apple Pay: the «لا» is about something else
+        const negClauseAbout = (raw) =>
+          String(raw || "")
+            .split(/[.!?؟،,؛;:\n]+/)
+            .map(evNorm)
+            .filter((c) => c && negated(c))
+            .some((c) => !content(c).length || sharedWeight(c, core(a.text)) >= 1);
+        if (negated(a.quote) || (at.i >= 0 && negClauseAbout(ev.turns[at.i].raw || ev.turns[at.i].t)))
           return { why: T("اقتباس الموافقة فيه رفض أو نفي أو تحفّظ"), msg };
+        if (!AGREE.test(q) && !shares(q, core(a.text))) return { why: T("الاقتباس ليس موافقة"), msg };
+        if (at.i >= 0) {
+          const m = ev.turns[at.i].t,
+            r = RESERVATION.exec(m);
+          // a reservation about the same thing: the user changed this part («Okay, but make it March 15»)
+          if (r && r.index >= Math.max(0, m.indexOf(q))) {
+            const rest = m.slice(r.index + r[0].length);
+            if (content(rest).length >= 1 && sharedWeight(rest, core(a.text)) >= 1)
+              return { why: T("وافقتَ مع تعديل على هذا نفسه؛ القرار لا يعكس تعديلك"), msg };
+          }
+          // numbers the user stated in the approval itself are the ones that count
+          const own = digitsIn(ev.turns[at.i].raw || m);
+          if (own.size) {
+            const off = [...digitsIn(a.text)].filter((n) => !own.has(n) && !(known && known.has(n)));
+            if (off.length) return { why: T`رقم ليس في كلامك الذي بُني عليه: ${off.slice(0, 3).join(T("، "))}`, msg };
+          }
+        }
         if (ev.turns && at.i >= 0) {
           let j = at.i - 1;
           while (j >= 0 && ev.turns[j].role !== "assistant") j--;
-          const n = content(a.text).length;
-          if (j < 0 || shared(a.text, ev.turns[j].t) < Math.max(1, Math.ceil(n / 2)) || latinMissing(ev.turns[j].t, a.text).length)
+          // the suggestion approved must be what that reply proposed: a third of the decision's topic words (its reason
+          // aside) are in it, and every name
+          const n = content(core(a.text)).length;
+          if (j >= 0) prevRaw = ev.turns[j].raw || ev.turns[j].t;
+          const yoursBefore = ev.turns
+            .slice(0, at.i + 1)
+            .filter((x) => x.role === "user")
+            .map((x) => x.t)
+            .join(" ");
+          if (
+            j < 0 ||
+            sharedWeight(ev.turns[j].t, core(a.text)) < Math.max(1, Math.ceil(n / 3)) ||
+            latinMissing(ev.turns[j].t + " " + yoursBefore, a.text).length
+          )
             return { why: T("موافقتك لا تتبع اقتراحاً بهذا المضمون"), msg };
         }
       }
     }
     const miss = numbersIn(a.text, false).filter((n) => !ev.numbers.has(n) && !known.has(n));
+    if (!miss.length && a.source !== "assistant" && atRef) {
+      let j = atRef.i - 1;
+      while (ev.turns && j >= 0 && ev.turns[j].role !== "assistant") j--;
+      const prev = ev.turns && j >= 0 ? ev.turns[j].raw || ev.turns[j].t : "";
+      const local = localNumbers(ev, atRef, a.source === "assistant-approved" ? prevRaw : "");
+      const off = [
+        ...numbersMissing(splitReason(a.text)[0], local, known),
+        ...numbersMissing(reasonPart(a.text), localNumbers(ev, atRef, prev), known),
+      ];
+      if (off.length) return { why: T`رقم ليس في كلامك الذي بُني عليه: ${off.slice(0, 3).join(T("، "))}`, msg };
+    }
     return { why: miss.length ? T`رقم لا يظهر في المحادثة: ${miss.slice(0, 3).join(T("، "))}` : "", msg };
   }
   // A change to something you decided (revoking or replacing a decision, removing a constraint) needs your words for that
@@ -665,12 +900,16 @@
     if (q.replace(/\s/g, "").length < QUOTE_MIN) return { why: T("بلا اقتباس من كلامك"), msg: 0 };
     const at = findUserQuote(q, ev);
     if (!at) return { why: notYours(q, ev), msg: 0 };
-    const neg = polarityIn(q, ev, at);
+    const neg = polarityIn(q, ev, at, kind === "add" ? core(target.text) : "");
     if (kind === "add") {
+      const off = ev.turns && at.i >= 0 ? numbersMissing(target.text, localNumbers(ev, at, ""), null) : [];
+      if (off.length) return { why: T`رقم ليس في كلامك الذي بُني عليه: ${off.slice(0, 3).join(T("، "))}`, msg: at.n };
       const gap = meaningGap(quote, target.text, neg);
       return { why: gap === T("الاقتباس لا يذكر موضوع القرار") ? T("الاقتباس لا يذكر موضوع القيد") : gap, msg: at.n };
     }
-    if (!shares(quote, target.text)) return { why: T("الاقتباس لا يذكر ما يُلغى"), msg: at.n };
+    // what is replaced must be named by your words — or, for a replacement, by the new decision those words back
+    if (!shares(quote, target.text) && !(kind === "replace" && target.next && shares(target.next, target.text)))
+      return { why: T("الاقتباس لا يذكر ما يُلغى"), msg: at.n };
     if (target.quote && (q.includes(evNorm(target.quote)) || evNorm(target.quote).includes(q)))
       return { why: T("الاقتباس هو كلامك الذي قررته به، لا كلامك الذي ألغيته به"), msg: at.n };
     if (target.msg && at.n && at.n <= target.msg) return { why: T("الاقتباس من رسالة قبل القرار أو منها"), msg: at.n };
@@ -822,7 +1061,7 @@
             revokeOrHold(old, a.quote, "");
             replaced = old.id;
           } else if (old && a.source !== "assistant") {
-            const ch = checkChange(a.quote, old, ev, "replace").why;
+            const ch = checkChange(a.quote, { ...old, next: core(a.text) }, ev, "replace").why;
             revokeOrHold(old, a.quote, ch);
             if (!ch) replaced = old.id;
           }
