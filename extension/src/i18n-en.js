@@ -870,6 +870,10 @@
       "This summary was not requested from here (or is more than a week old); nothing was saved",
     "طُلب هذا الملخص لذاكرة أخرى؛ لم يُحفظ في هذه": "This summary was requested for another memory; it was not saved in this one",
     "طُلب هذا الملخص لمحادثة أخرى؛ لم يُحفظ هنا": "This summary was requested for another chat; it was not saved here",
+    "كتب إصدار أقدم من الإضافة في الذاكرة فأسقط بعض العلامات (مراجعات تنتظرك، موافقاتك، اللغة)؛ أُعيد {0} منها من آخر نسخة.":
+      "An older version of the extension wrote to the memory and dropped some marks (reviews waiting for you, your approvals, the language); {0} of them were brought back from the last version.",
+    "ℹ️ ذاكرة المحادثة: كتب إصدار أقدم من الإضافة في الذاكرة فأسقط بعض العلامات (مراجعات تنتظرك، موافقاتك، اللغة)؛ أُعيد {0} منها من آخر نسخة.":
+      "ℹ️ Conversation memory: an older version of the extension wrote to the memory and dropped some marks (reviews waiting for you, your approvals, the language); {0} of them were brought back from the last version.",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

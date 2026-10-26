@@ -1425,6 +1425,33 @@
     }
     return n;
   };
+  // A writer from before 2.0 (the extension 1.4) keeps only the fields it knew, so writing over a newer file it drops
+  // the marks added since: a suggested cancellation waiting for you, your approval mark, the message number, waiting
+  // constraint changes, the memory's language, and anything a later version added. What it drops is never a decision
+  // or a constraint, and never turns a suggestion into yours (tests/compat14.test.js) — but it should not stay lost.
+  // Before writing over such a file, a newer writer brings back from the last version it saved what still applies.
+  // A file written by 2.0 always has "lang"; one without it whose backup has it was rewritten by an older writer.
+  const droppedByOlder = (jsonText) => typeof jsonText === "string" && jsonText.trim() !== "" && !/"lang"\s*:/.test(jsonText);
+  function recoverDropped(memory, previous) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory))),
+      p = normalizeMemory(previous);
+    let n = 0;
+    if (m.lang !== p.lang) (m.lang = p.lang), n++;
+    for (const k of Object.keys(p)) if (!KNOWN_TOP.has(k) && !(k in m)) (m[k] = p[k]), n++;
+    for (const d of m.decisions) {
+      const o = p.decisions.find((x) => x.id === d.id && x.text === d.text);
+      if (!o) continue;
+      if (o.msg && !d.msg) (d.msg = o.msg), n++;
+      if (o.confirmed && !d.confirmed && !d.unverified && d.status === "active") (d.confirmed = true), n++;
+      if (o.pendingRevoke && !d.pendingRevoke && d.status === "active") (d.pendingRevoke = o.pendingRevoke), n++;
+      for (const k of Object.keys(o)) if (!KNOWN_DEC.has(k) && !(k in d)) (d[k] = o[k]), n++;
+    }
+    const P = m.pending.constraints,
+      has = (l, x) => l.some((y) => y.text === x.text);
+    for (const x of p.pending.constraints.add) if (!m.constraints.includes(x.text) && !has(P.add, x)) P.add.push(x), n++;
+    for (const x of p.pending.constraints.remove) if (m.constraints.includes(x.text) && !has(P.remove, x)) P.remove.push(x), n++;
+    return { memory: normalizeMemory(m), restored: n };
+  }
   function trimForSize(memory, maxBytes) {
     const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
     const archived = [];
@@ -1493,5 +1520,7 @@
     T,
     setLang,
     lang,
+    droppedByOlder,
+    recoverDropped,
   };
 });

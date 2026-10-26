@@ -363,6 +363,20 @@ function writeMemory(mutate, confirm) {
           return { err: T("تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أكتب فوقها") };
         }
       }
+      // an older writer (the extension 1.4) wrote over this file and dropped the marks it didn't know: bring back what still applies
+      if (cur.exists && C.droppedByOlder(cur.jsonText)) {
+        const prev = listBackups()
+          .map(describeBackup)
+          .find((b) => b.ok && b.text !== cur.jsonText && !C.droppedByOlder(b.text));
+        const rec = prev && C.recoverDropped(m, prev.memory);
+        if (rec && rec.restored) {
+          m = rec.memory;
+          if (!attempt)
+            notes.push(
+              T`ℹ️ ذاكرة المحادثة: كتب إصدار أقدم من الإضافة في الذاكرة فأسقط بعض العلامات (مراجعات تنتظرك، موافقاتك، اللغة)؛ أُعيد ${rec.restored} منها من آخر نسخة.`,
+            );
+        }
+      }
       let next = mutate(m, cur.token);
       if (!next) return { err: T("لا تغيير") };
       const t = C.trimForSize(next, TRIM_AT);

@@ -1044,6 +1044,37 @@ test("language: follows the language the user writes in, a setting overrides it,
   assert.equal(status("o").lang, "ar", "no clear language yet: the memory's own language");
 });
 
+test("an older extension (1.4) rewrote the file: the plugin's next save brings back the marks it dropped", () => {
+  const OLD = require("../fixtures/memory-core-1.4.js");
+  const P = tmp();
+  let r = requests(prompts(P, "a", 5)[4])[0];
+  draft(r, { summary: { goal: "هوية مقهى" }, constraints: { add: [{ text: "قيد بلا كلام صاحبه", quote: "" }], remove: [] } });
+  run("stop", { session_id: "a", cwd: P });
+  const f = path.join(P, "CONVERSATION_MEMORY.json"),
+    v1 = fs.readFileSync(f, "utf8");
+  assert.match(v1, /"lang"/);
+  assert.equal(memJson(P).pending.constraints.add.length, 1, "a constraint change waits for review");
+  // 1.4 saves a summary: backs up the current file (as every writer does), then writes what it knows
+  const bk = path.join(P, ".conversation-memory", "backups");
+  fs.mkdirSync(bk, { recursive: true });
+  fs.writeFileSync(path.join(bk, "29991231-235959-999.json"), v1);
+  const old = OLD.normalizeMemory(JSON.parse(v1)),
+    md = OLD.render(old);
+  old.mdHash = OLD.hash(md);
+  fs.writeFileSync(f, OLD.serialize(old));
+  fs.writeFileSync(path.join(P, "CONVERSATION_MEMORY.md"), md);
+  assert.ok(!memJson(P).pending, "1.4 dropped the waiting change");
+  // the plugin's next save
+  r = requests(prompts(P, "a", 5)[4])[0];
+  draft(r, { summary: { goal: "هوية مقهى" } });
+  const s = run("stop", { session_id: "a", cwd: P });
+  assert.match(all(s), /إصدار أقدم من الإضافة/);
+  const m = memJson(P);
+  assert.equal(m.pending.constraints.add.length, 1, "the waiting change is back");
+  assert.match(fs.readFileSync(f, "utf8"), /"lang"/);
+  assert.ok(!fs.readdirSync(P).some((x) => /edited/.test(x)), "1.4's Markdown view is not taken for a hand edit");
+});
+
 test("locks: a stale lock is removed only if it is still the one judged stale; a newer live lock is put back", () => {
   const { breakStale } = require("../../plugin/scripts/lib/fsx.js");
   const d = tmp(),

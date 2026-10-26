@@ -185,6 +185,18 @@
           keptEdit = true;
           notes.push(T`عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${name} قبل إعادة توليده.`);
         }
+        // an older writer (1.4) wrote over this file and dropped the marks it didn't know: bring back what still applies
+        if (cur.exists && C.droppedByOlder(cur.jsonText)) {
+          const prev = (await describeBackups(r, cur.jsonText)).find((b) => !C.droppedByOlder(b.text));
+          const rec = prev && C.recoverDropped(m, prev.memory);
+          if (rec && rec.restored) {
+            m = rec.memory;
+            if (!attempt)
+              notes.push(
+                T`كتب إصدار أقدم من الإضافة في الذاكرة فأسقط بعض العلامات (مراجعات تنتظرك، موافقاتك، اللغة)؛ أُعيد ${rec.restored} منها من آخر نسخة.`,
+              );
+          }
+        }
         const out = mutate(m, cur.token);
         if (out.err) return { err: out.err };
         const t = C.trimForSize(out.memory, TRIM_AT);

@@ -6,3 +6,4 @@ extension/src/memory-core.js
 *.html
 *.md
 *.json
+tests/fixtures/

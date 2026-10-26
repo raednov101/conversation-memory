@@ -48,7 +48,7 @@ const browser = Object.fromEntries(
   ].map((k) => [k, "readonly"]),
 );
 export default [
-  { ignores: ["dist/**", "**/node_modules/**"] },
+  { ignores: ["dist/**", "**/node_modules/**", "tests/fixtures/**"] },
   {
     files: ["plugin/**/*.js", "tests/**/*.js"],
     languageOptions: { ecmaVersion: 2022, sourceType: "commonjs", globals: node },
