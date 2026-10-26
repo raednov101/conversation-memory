@@ -44,6 +44,7 @@ const browser = Object.fromEntries(
     "history",
     "fetch",
     "AbortController",
+    "NodeFilter",
   ].map((k) => [k, "readonly"]),
 );
 export default [
@@ -62,5 +63,8 @@ export default [
     },
     rules: { "no-undef": "error", "no-unused-vars": ["error", { args: "none", caughtErrors: "none", ignoreRestSiblings: true }] },
   },
-  { files: ["**/memory-core.js"], languageOptions: { globals: { self: "readonly" } } },
+  // the shared core runs in both: Node (the plugin) and the browser (the extension)
+  { files: ["**/memory-core.js", "**/i18n-en.js"], languageOptions: { globals: { self: "readonly", chrome: "readonly", navigator: "readonly", process: "readonly" } } },
+  { files: ["extension/tests/**/*.js"], languageOptions: { globals: { process: "readonly" } } },
+  { files: ["extension/src/background.js"], languageOptions: { globals: { importScripts: "readonly" } } },
 ];

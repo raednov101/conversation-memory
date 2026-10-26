@@ -2,6 +2,7 @@
 // What is due and what Claude is asked: batches, pin requests, status text, commands.
 const path = require("path");
 const C = require("../../core/memory-core.js");
+const T = C.T;
 const { MAX_DRAFT, KEEP_MSGS, MAX_UNDONE, PIN_TURNS, CMD, TESTED_CC } = require("./config");
 const { nonce, int } = require("./util");
 const { readSafe, unlinkSafe } = require("./fsx");
@@ -10,28 +11,30 @@ const { readCapture, claudeCodeVersion, newerThan } = require("./transcript");
 
 // ---------------- drafts & requests ----------------
 const draftPath = (id) => path.join(P.inbox, `${id}.json`);
+// the range a batch covers, as stored in the log (no words: the view adds them in the memory's language)
+const rangeOf = (b) => (b.kind === "recovered" ? b.label : b.idx.length ? `${Math.min(...b.idx)}–${Math.max(...b.idx)}` : "");
 const labelOf = (b) =>
-  b.kind === "recovered" ? `رسائل منسوخة ${b.label}` : `الرسائل ${b.idx.length ? `${Math.min(...b.idx)}–${Math.max(...b.idx)}` : ""}`;
+  b.kind === "recovered" ? T`رسائل منسوخة ${b.label}` : T`الرسائل ${b.idx.length ? `${Math.min(...b.idx)}–${Math.max(...b.idx)}` : ""}`;
 function readDraft(id, created) {
-  if (!pubSafe()) return { err: "مجلد .conversation-memory في المشروع رابط رمزي أو غير صالح" };
+  if (!pubSafe()) return { err: T("مجلد .conversation-memory في المشروع رابط رمزي أو غير صالح") };
   const p = draftPath(id),
     r = readSafe(p, MAX_DRAFT);
   if (r.text == null && !r.bad) return null;
   if (r.bad) {
     unlinkSafe(p);
-    return { err: `ملف المسودة ${r.bad}` };
+    return { err: T`ملف المسودة ${r.bad}` };
   }
   // ids carry a random part, so only a leftover far older than the request is suspect; the margin covers clock skew
   // between this process and a network or synced drive
   if (created && r.stat.mtimeMs < created - 10 * 60000) {
     unlinkSafe(p);
-    return { err: "مسودة أقدم من الطلب (تُجوهلت)" };
+    return { err: T("مسودة أقدم من الطلب (تُجوهلت)") };
   }
   try {
     return { json: JSON.parse(r.text), path: p };
   } catch (e) {
     unlinkSafe(p);
-    return { err: "المسودة ليست JSON صالحاً: " + e.message };
+    return { err: T("المسودة ليست JSON صالحاً: ") + e.message };
   }
 }
 function batchRequest(list, token) {
@@ -41,22 +44,22 @@ function batchRequest(list, token) {
       if (b.kind === "recovered") {
         const c = readCapture(b.id);
         if (c)
-          src = ` — نصها وصلك في بداية الجلسة ضمن «رسائل سابقة نُسخت»؛ لا تقرأ ملفاتها إلا إن لم يكن كاملاً في سياقك: ${c.parts.map((x) => `"${x.file}"`).join("، ")}`;
+          src = T` — نصها وصلك في بداية الجلسة ضمن «رسائل سابقة نُسخت»؛ لا تقرأ ملفاتها إلا إن لم يكن كاملاً في سياقك: ${c.parts.map((x) => `"${x.file}"`).join(T("، "))}`;
       }
-      return `- ${labelOf(b)}${src}\n  الملف: "${draftPath(b.id)}" ، وفيه "batch": "${b.id}" و "base": "${token}"`;
+      return T`- ${labelOf(b)}${src}\n  الملف: "${draftPath(b.id)}" ، وفيه "batch": "${b.id}" و "base": "${token}"`;
     })
     .join("\n");
   return (
-    `[conversation-memory] مطلوب حفظ الذاكرة. أولاً أجب المستخدم إجابة كاملة؛ هذه مهمة جانبية بعد الإجابة ولا تحل محلها.\n` +
-    `اكتب بأداة Write ملف JSON لكل دفعة (الصيغة في مهارة conversation-memory)، والنظام يتحقق منه ويحفظه بعد ردك. لا تعدّل CONVERSATION_MEMORY.json أو .md مباشرة.\n${items}\n` +
-    `ضع "summary" في ملف واحد فقط إن تعددت الدفعات، واقرأ CONVERSATION_MEMORY.md قبلها إن احتجت. ثم اذكر للمستخدم بسطر واحد أن الذاكرة ستُحفظ.`
+    T`[conversation-memory] مطلوب حفظ الذاكرة. أولاً أجب المستخدم إجابة كاملة؛ هذه مهمة جانبية بعد الإجابة ولا تحل محلها.\n` +
+    T`اكتب بأداة Write ملف JSON لكل دفعة (الصيغة في مهارة conversation-memory)، والنظام يتحقق منه ويحفظه بعد ردك. لا تعدّل CONVERSATION_MEMORY.json أو .md مباشرة.\n${items}\n` +
+    T`ضع "summary" في ملف واحد فقط إن تعددت الدفعات، واقرأ CONVERSATION_MEMORY.md قبلها إن احتجت. ثم اذكر للمستخدم بسطر واحد أن الذاكرة ستُحفظ.`
   );
 }
 function pinRequest(p) {
   return (
-    `[conversation-memory] طلب تثبيت نص${p.name ? ` باسم «${p.name}»` : ""}. حدّد النص المقصود (إن لم يتضح فاسأل المستخدم؛ الطلب مفتوح ${PIN_TURNS} رسائل)، ثم اكتب بأداة Write الملف "${draftPath(p.id)}":\n` +
-    `{"name": "${p.name || "اسم قصير"}", "start": "أول 20–80 حرفاً من النص منسوخة حرفياً", "end": "آخر 20–80 حرفاً منسوخة حرفياً"}\n` +
-    `النظام يستخرج النص كاملاً من المحادثة نفسها حرفاً بحرف (لا تكتب النص كاملاً، ولا تقتبس البداية والنهاية في ردك). للإلغاء: {"cancel": true}.`
+    T`[conversation-memory] طلب تثبيت نص${p.name ? T` باسم «${p.name}»` : ""}. حدّد النص المقصود (إن لم يتضح فاسأل المستخدم؛ الطلب مفتوح ${PIN_TURNS} رسائل)، ثم اكتب بأداة Write الملف "${draftPath(p.id)}":\n` +
+    T`{"name": "${p.name || T("اسم قصير")}", "start": "أول 20–80 حرفاً من النص منسوخة حرفياً", "end": "آخر 20–80 حرفاً منسوخة حرفياً"}\n` +
+    T`النظام يستخرج النص كاملاً من المحادثة نفسها حرفاً بحرف (لا تكتب النص كاملاً، ولا تقتبس البداية والنهاية في ردك). للإلغاء: {"cancel": true}.`
   );
 }
 // the backups the user can restore, newest first, numbered as /conversation-memory:restore expects
@@ -66,19 +69,21 @@ function backupsText(list) {
         .slice(0, 10)
         .map(
           (b, i) =>
-            `  ${i + 1}. ${b.when} — القرارات السارية: ${C.count(b.decisions, C.W.decision)}، والسجل: ${C.count(b.log, C.W.batch)}${b.goal ? `، الهدف: «${b.goal}»` : ""}`,
+            T`  ${i + 1}. ${b.when} — القرارات السارية: ${C.count(b.decisions, C.W.decision)}، والسجل: ${C.count(b.log, C.W.batch)}${b.goal ? T`، الهدف: «${b.goal}»` : ""}`,
         )
         .join("\n")
-    : "  لا توجد نسخ سابقة بعد";
+    : T("  لا توجد نسخ سابقة بعد");
 }
 const fmt = (n) => Number(n || 0).toLocaleString("en-US");
 // what summarizing costs, measured from the text actually sent and written (an estimate in tokens, said to be one)
 function costText(s) {
   const L = [];
-  if (s.lastCost.chars) L.push(`آخر تلخيص ${fmt(s.lastCost.chars)} حرفاً (الطلب والمسودة) ≈ ${fmt(C.estTokens(s.lastCost.chars))} توكن`);
-  if (s.costTotal.n) L.push(`في هذه الجلسة ${C.count(s.costTotal.n, C.W.summary)} ≈ ${fmt(C.estTokens(s.costTotal.chars))} توكن`);
-  if (s.injected) L.push(`الذاكرة المحمّلة عند بداية الجلسة ${fmt(s.injected)} حرفاً ≈ ${fmt(C.estTokens(s.injected))} توكن`);
-  return L.length ? L.join("؛ ") + " (تقدير من عدد الحروف؛ لا يشمل ما قد يقرؤه Claude من ملف الذاكرة)" : "لم يُلخَّص شيء في هذه الجلسة بعد";
+  if (s.lastCost.chars) L.push(T`آخر تلخيص ${fmt(s.lastCost.chars)} حرفاً (الطلب والمسودة) ≈ ${fmt(C.estTokens(s.lastCost.chars))} توكن`);
+  if (s.costTotal.n) L.push(T`في هذه الجلسة ${C.count(s.costTotal.n, C.W.summary)} ≈ ${fmt(C.estTokens(s.costTotal.chars))} توكن`);
+  if (s.injected) L.push(T`الذاكرة المحمّلة عند بداية الجلسة ${fmt(s.injected)} حرفاً ≈ ${fmt(C.estTokens(s.injected))} توكن`);
+  return L.length
+    ? L.join(T("؛ ")) + T(" (تقدير من عدد الحروف؛ لا يشمل ما قد يقرؤه Claude من ملف الذاكرة)")
+    : T("لم يُلخَّص شيء في هذه الجلسة بعد");
 }
 // which Claude Code runs here, against the newest one the plugin was tried on live
 function ccLine(s) {
@@ -90,34 +95,34 @@ function ccLine(s) {
   return (
     `\n- Claude Code: ${v}` +
     (newerThan(v, TESTED_CC)
-      ? ` — أحدث من آخر نسخة جُرّب عليها البلقن حياً (${TESTED_CC}). يعمل عادة كما هو؛ وإن لاحظت خللاً بعد التحديث فأبلغ في github.com/raednov101/conversation-memory/issues`
-      : ` (جُرّب عليها البلقن حياً حتى ${TESTED_CC})`)
+      ? T` — أحدث من آخر نسخة جُرّب عليها البلقن حياً (${TESTED_CC}). يعمل عادة كما هو؛ وإن لاحظت خللاً بعد التحديث فأبلغ في github.com/raednov101/conversation-memory/issues`
+      : T` (جُرّب عليها البلقن حياً حتى ${TESTED_CC})`)
   );
 }
 const REVIEW_KIND = { decision: "قرار", revoke: "إلغاء قرار", "constraint-add": "إضافة قيد", "constraint-remove": "حذف قيد" };
-const reviewLine = (x) => `${x.key} ${REVIEW_KIND[x.kind]} «${x.text.slice(0, 60)}»${x.reason ? ` (${x.reason})` : ""}`;
+const reviewLine = (x) => `${x.key} ${T(REVIEW_KIND[x.kind])} «${x.text.slice(0, 60)}»${x.reason ? ` (${x.reason})` : ""}`;
 function statusText(s, mem, backups, cfg) {
   const by = (st) =>
     s.batches
       .filter((b) => b.status === st)
       .map(labelOf)
-      .join("، ") || "لا شيء";
+      .join(T("، ")) || T("لا شيء");
   const m = mem.memory;
   return (
-    `[conversation-memory] حالة الذاكرة (من النظام؛ انقلها للمستخدم بإيجاز ولا تخمّن):\n` +
-    `- الملف: ${P.json}${mem.bad ? ` (${mem.bad})` : mem.exists ? "" : " (لم يُنشأ بعد)"}\n` +
-    `- طريقة التلخيص: ${modeText(cfg)} — للتغيير: /conversation-memory:settings\n` +
-    `- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}${cfg.mode === "auto" ? "/" + cfg.every : ""}، آخر تحديث للملخص: ${s.lastSave || "لا يوجد بعد"}${s.lastCapture ? `، آخر نسخ للنص: ${s.lastCapture}` : ""}\n` +
-    `- الكلفة: ${costText(s)}\n` +
-    `- بانتظار الحفظ: ${by("pending")}\n- متعثرة: ${by("stuck")}${s.lastError ? ` (آخر خطأ: ${s.lastError})` : ""}\n- نُسخت قبل الضغط/الإغلاق: ${by("captured")}\n` +
+    T`[conversation-memory] حالة الذاكرة (من النظام؛ انقلها للمستخدم بإيجاز ولا تخمّن):\n` +
+    T`- الملف: ${P.json}${mem.bad ? ` (${mem.bad})` : mem.exists ? "" : T(" (لم يُنشأ بعد)")}\n` +
+    T`- طريقة التلخيص: ${modeText(cfg)} — للتغيير: /conversation-memory:settings\n` +
+    T`- رسائل هذه الجلسة: ${s.count}، منذ آخر حفظ: ${Math.max(0, s.count - s.lastBatchEnd)}${cfg.mode === "auto" ? "/" + cfg.every : ""}، آخر تحديث للملخص: ${s.lastSave || T("لا يوجد بعد")}${s.lastCapture ? T`، آخر نسخ للنص: ${s.lastCapture}` : ""}\n` +
+    T`- الكلفة: ${costText(s)}\n` +
+    T`- بانتظار الحفظ: ${by("pending")}\n- متعثرة: ${by("stuck")}${s.lastError ? T` (آخر خطأ: ${s.lastError})` : ""}\n- نُسخت قبل الضغط/الإغلاق: ${by("captured")}\n` +
     (m && C.reviewItems(m).length
-      ? `- ⚠️ تنتظر مراجعتك (لم تثبت من كلامك في المحادثة، فلم تُعتمد ولم تُطبَّق): ${C.reviewItems(m).map(reviewLine).join("، ")} — اعتمد أو ارفض بـ /conversation-memory:fix\n`
+      ? T`- ⚠️ تنتظر مراجعتك (لم تثبت من كلامك في المحادثة، فلم تُعتمد ولم تُطبَّق): ${C.reviewItems(m).map(reviewLine).join(T("، "))} — اعتمد أو ارفض بـ /conversation-memory:fix\n`
       : "") +
     (m
-      ? `- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => `${p.name} (ن${p.version})`).join("، ") || "لا شيء"}، دفعات السجل: ${m.log.length}\n`
+      ? T`- القرارات السارية: ${m.decisions.filter((d) => d.status === "active").length}، النصوص المعتمدة: ${m.pins.map((p) => T`${p.name} (ن${p.version})`).join(T("، ")) || T("لا شيء")}، دفعات السجل: ${m.log.length}\n`
       : "") +
-    `- النسخ السابقة (للاسترجاع: /conversation-memory:restore رقم، أو /conversation-memory:undo للأحدث):\n${backupsText(backups || [])}\n` +
-    `- البيانات الخاصة: ${PRIV}` +
+    T`- النسخ السابقة (للاسترجاع: /conversation-memory:restore رقم، أو /conversation-memory:undo للأحدث):\n${backupsText(backups || [])}\n` +
+    T`- البيانات الخاصة: ${PRIV}` +
     ccLine(s)
   );
 }
@@ -167,7 +172,7 @@ function recordPrompt(s, pid, h, cmd, cfg) {
       dropped++;
     }
   }
-  if (dropped) notes.push(`⚠️ ذاكرة المحادثة: ${dropped} رسالة قديمة لم تُلخّص خرجت من نطاق التتبع.`);
+  if (dropped) notes.push(T`⚠️ ذاكرة المحادثة: ${dropped} رسالة قديمة لم تُلخّص خرجت من نطاق التتبع.`);
   let changed = false;
   if (cmd.save)
     for (const b of s.batches)
@@ -216,32 +221,48 @@ function recordPrompt(s, pid, h, cmd, cfg) {
 // the project's setting in words (status, settings, notes)
 const modeText = (cfg) =>
   cfg.mode === "manual"
-    ? "يدوي: بالأمر /conversation-memory:save فقط"
+    ? T("يدوي: بالأمر /conversation-memory:save فقط")
     : cfg.mode === "auto"
-      ? `تلقائي كل ${cfg.every} رسائل`
-      : "عند حدود الجلسة: قبل ضغط السياق وعند الإغلاق، دون كلفة أثناء العمل";
-// /conversation-memory:settings [session | every N | auto | manual] → { cfg, changed } | { err }
+      ? T`تلقائي كل ${cfg.every} رسائل`
+      : T("عند حدود الجلسة: قبل ضغط السياق وعند الإغلاق، دون كلفة أثناء العمل");
+// the language setting in words
+const langText = (cfg) => (cfg.lang === "ar" ? "العربية" : cfg.lang === "en" ? "English" : T("تلقائي (لغة رسائلك)"));
+// /conversation-memory:settings [session | every N | auto | manual | lang ar|en|auto] → { cfg, changed } | { err }
 function parseSettings(args, cfg) {
   const a = String(args || "").trim();
   if (!a) return { cfg, changed: false };
   const n = a.match(/^(?:every|كل)\s*(\d{1,3})(?:\s*رسائل|\s*رسالة)?$/i) || a.match(/^(\d{1,3})$/);
   if (n) {
     const every = +n[1];
-    if (every < 1 || every > C.LIMITS.every) return { err: `العدد بين 1 و${C.LIMITS.every}` };
-    return { cfg: { every, mode: "auto" }, changed: true };
+    if (every < 1 || every > C.LIMITS.every) return { err: T`العدد بين 1 و${C.LIMITS.every}` };
+    return { cfg: { ...cfg, every, mode: "auto" }, changed: true };
+  }
+  const l = a.match(/^(?:lang(?:uage)?|اللغة|لغة)\s+(\S+)$/i);
+  if (l) {
+    const v = /^(ar|arabic|عربي|العربية)$/i.test(l[1])
+      ? "ar"
+      : /^(en|english|انجليزي|إنجليزي|الإنجليزية)$/i.test(l[1])
+        ? "en"
+        : /^(auto|تلقائي)$/i.test(l[1])
+          ? "auto"
+          : "";
+    if (!v) return { err: T`لم أفهم اللغة «${l[1].slice(0, 20)}». الصيغ: lang ar، lang en، lang auto` };
+    return { cfg: { ...cfg, lang: v }, changed: true, lang: true };
   }
   if (/^(manual|يدوي)$/i.test(a)) return { cfg: { ...cfg, mode: "manual" }, changed: true };
   if (/^(auto|تلقائي)$/i.test(a)) return { cfg: { ...cfg, mode: "auto" }, changed: true };
   if (/^(session|الجلسة|نهاية الجلسة)$/i.test(a)) return { cfg: { ...cfg, mode: "session" }, changed: true };
   return {
-    err: `لم أفهم «${a.slice(0, 40)}». الصيغ: session (نهاية الجلسة، الافتراضي)، every 10 (أو كل 10)، manual (يدوي)، auto (تلقائي)`,
+    err: T`لم أفهم «${a.slice(0, 40)}». الصيغ: session (نهاية الجلسة، الافتراضي)، every 10 (أو كل 10)، manual (يدوي)، auto (تلقائي)، lang ar أو lang en (اللغة)`,
   };
 }
 
 module.exports = {
   modeText,
+  langText,
   draftPath,
   labelOf,
+  rangeOf,
   readDraft,
   batchRequest,
   pinRequest,

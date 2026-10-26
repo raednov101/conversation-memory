@@ -16,7 +16,7 @@
     for (const m of adapter.messages()) {
       const text = (m.text != null ? String(m.text) : textOf(m.el)).replace(/\r\n/g, "\n").trim();
       if (m.role === "user") {
-        if (text.startsWith(HK)) {
+        if ((Array.isArray(HK) ? HK : [HK]).some((h) => text.startsWith(h))) {
           inHK = true;
           hk.push({ text, reply: null });
           continue;

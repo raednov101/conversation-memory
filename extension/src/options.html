@@ -100,6 +100,8 @@
 
     <section class="card">
       <h2>التلخيص</h2>
+      <div class="field"><label for="lang">اللغة</label>
+        <select id="lang"><option value="auto">تلقائي (لغة المتصفح)</option><option value="ar" lang="ar">العربية</option><option value="en" lang="en">English</option></select></div>
       <div class="field"><label for="mode">الطريقة</label>
         <select id="mode"><option value="auto">تلقائي</option><option value="manual">يدوي (بالزر فقط)</option></select></div>
       <div class="field"><label for="every">لخّص كل</label><span><input id="every" type="number" min="1" max="50"> رسائل</span></div>
@@ -166,6 +168,7 @@
     </details>
   </footer>
 </main>
+<script src="i18n-en.js"></script>
 <script src="memory-core.js"></script>
 <script src="options.js"></script>
 </body>

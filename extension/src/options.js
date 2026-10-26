@@ -1,5 +1,6 @@
 "use strict";
 /* global MemoryCore, URL */
+const T = self.MemoryCore.T;
 function idb() {
   return new Promise((res, rej) => {
     const r = indexedDB.open("cm", 1);
@@ -30,12 +31,12 @@ if (inPopup) document.body.classList.add("popup");
 const scopeSel = () => $("scopeSel").value || "general"; // a single project leaves the (hidden) selector holding it
 const fsOp = (op, args) =>
   chrome.runtime
-    .sendMessage({ cmd: "fs", op, args: { scope: scopeSel(), ...(args || {}) } })
+    .sendMessage({ cmd: "fs", op, args: { scope: scopeSel(), lang: self.MemoryCore.lang(), ...(args || {}) } })
     .catch((err) => ({ ok: false, error: String(err) }));
 function showMemorySections(ready) {
   $("tools").hidden = !ready || inPopup;
   const c = $("folderChip");
-  c.textContent = ready ? "✓ تعمل" : "يلزم إذن";
+  c.textContent = ready ? T("✓ تعمل") : T("يلزم إذن");
   c.className = "chip " + (ready ? "ok" : "warn");
 }
 document.querySelector(".tabs").addEventListener("click", (e) => {
@@ -51,10 +52,10 @@ async function refresh() {
   $("keepRow").hidden = $("keepNote").hidden = !!h || inPopup; // a full copy is about what lives inside the browser
   if (!h) {
     // the default: inside the browser, nothing to choose
-    s.textContent = "تلقائياً داخل المتصفح، ولكل مشروع في Claude أو ChatGPT ذاكرته.";
+    s.textContent = T("تلقائياً داخل المتصفح، ولكل مشروع في Claude أو ChatGPT ذاكرته.");
     s.className = "state ok";
     $("grant").hidden = true;
-    $("pick").textContent = "📁 ربط بمجلد على الجهاز (اختياري)";
+    $("pick").textContent = T("📁 ربط بمجلد على الجهاز (اختياري)");
     showMemorySections(true);
     await loadScopes();
     if (!inPopup) {
@@ -65,14 +66,14 @@ async function refresh() {
   }
   $("scopes").hidden = true;
   $("scopeField").hidden = true;
-  $("pick").textContent = "📁 تغيير المجلد";
+  $("pick").textContent = T("📁 تغيير المجلد");
   const p = await h.queryPermission({ mode: "readwrite" });
   showMemorySections(p === "granted");
   if (p === "granted" && !inPopup) {
     loadMemory();
     loadBackups();
   }
-  s.textContent = p === "granted" ? `في مجلد «${h.name}» على جهازك.` : `مجلد «${h.name}» — يلزم منح الإذن.`;
+  s.textContent = p === "granted" ? T`في مجلد «${h.name}» على جهازك.` : T`مجلد «${h.name}» — يلزم منح الإذن.`;
   s.className = "state " + (p === "granted" ? "ok" : "warn");
   $("grant").hidden = p === "granted";
 }
@@ -91,16 +92,16 @@ async function loadScopes() {
     const dl = document.createElement("button");
     dl.type = "button";
     dl.className = "small";
-    dl.textContent = "⬇️ تنزيل";
+    dl.textContent = T("⬇️ تنزيل");
     dl.onclick = async () => {
       const e = await fsOp("exportMd", { scope: x.scope });
       if (!e.ok) {
-        dl.textContent = "تعذّر";
+        dl.textContent = T("تعذّر");
         return;
       }
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([e.text], { type: "text/markdown" }));
-      a.download = `ذاكرة - ${String(e.name)
+      a.download = T`ذاكرة - ${String(e.name)
         .replace(/[\\/:*?"<>|]/g, " ")
         .slice(0, 60)}.md`;
       a.click();
@@ -111,7 +112,7 @@ async function loadScopes() {
     t.className = "txt";
     t.innerHTML = "<b></b> <span class=muted></span>";
     t.firstChild.textContent = x.name;
-    t.lastChild.textContent = `— ${self.MemoryCore.count(x.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(x.log, self.MemoryCore.W.batch)}`;
+    t.lastChild.textContent = T`— ${self.MemoryCore.count(x.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(x.log, self.MemoryCore.W.batch)}`;
     li.append(t, dl);
     ul.append(li);
     const o = document.createElement("option");
@@ -134,8 +135,8 @@ $("pick").addEventListener("click", async () => {
       st.className = "state err";
       st.textContent =
         e.name === "SecurityError" || e.name === "NotAllowedError"
-          ? "لم يُسمح بهذا المجلد؛ اختر مجلداً داخل مجلد المستخدم (مثل المستندات)، لا مجلد النظام."
-          : "تعذّر اختيار المجلد؛ أعد المحاولة.";
+          ? T("لم يُسمح بهذا المجلد؛ اختر مجلداً داخل مجلد المستخدم (مثل المستندات)، لا مجلد النظام.")
+          : T("تعذّر اختيار المجلد؛ أعد المحاولة.");
       return;
     }
   }
@@ -164,8 +165,26 @@ $("unlink").addEventListener("click", async () => {
   await chrome.storage.local.set({ folderAt: Date.now() });
   refresh();
 });
+// the page is written in Arabic and translates itself: every text, title, placeholder and label found in the catalog
+function translatePage() {
+  const en = self.MemoryCore.lang() === "en";
+  document.documentElement.lang = en ? "en" : "ar";
+  document.documentElement.dir = en ? "ltr" : "rtl";
+  if (!en) return;
+  const tr = (s) => {
+    const k = s.replace(/\s+/g, " ").trim();
+    const v = k && T(k);
+    return v && v !== k ? s.replace(/\S[\s\S]*\S|\S/, v) : s;
+  };
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) if (/[\u0600-\u06FF]/.test(n.nodeValue)) n.nodeValue = tr(n.nodeValue);
+  for (const a of ["title", "placeholder", "aria-label"])
+    for (const el of document.querySelectorAll(`[${a}]`)) el.setAttribute(a, tr(el.getAttribute(a)));
+  document.title = tr(document.title);
+}
 async function loadSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
+  $("lang").value = settings.lang || "auto";
   $("every").value = settings.every || 10;
   $("mode").value = settings.mode || "auto";
   $("autoLink").checked = settings.autoLink !== false;
@@ -174,14 +193,24 @@ async function saveSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
   const every = Math.min(self.MemoryCore.LIMITS.every, Math.max(1, parseInt($("every").value, 10) || 10));
   await chrome.storage.local.set({ settings: { ...settings, every, mode: $("mode").value, autoLink: $("autoLink").checked } });
-  $("saved").textContent = "حُفظت الإعدادات ✓";
+  $("saved").textContent = T("حُفظت الإعدادات ✓");
   setTimeout(() => ($("saved").textContent = ""), 2000);
 }
 $("every").addEventListener("change", saveSettings);
 $("mode").addEventListener("change", saveSettings);
 $("autoLink").addEventListener("change", saveSettings);
-loadSettings();
-refresh();
+$("lang").addEventListener("change", async () => {
+  const { settings = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...settings, lang: $("lang").value } });
+  location.reload(); // every text on the page is drawn again in the new language
+});
+// the language first, so everything drawn after it (and every request to the writer) speaks it
+chrome.storage.local.get("settings").then(({ settings = {} }) => {
+  self.MemoryCore.setLang(settings.lang || "auto");
+  translatePage();
+  loadSettings();
+  refresh();
+});
 
 // earlier versions of the memory, newest first; restoring one keeps the current version as a backup
 async function loadBackups() {
@@ -189,16 +218,16 @@ async function loadBackups() {
   const r = await fsOp("listBackups");
   ol.textContent = "";
   $("restoreMsg").textContent =
-    r && r.broken ? `⚠️ ملف الذاكرة الحالي تالف (${r.broken}). استرجع نسخة سابقة؛ يُحفظ الملف التالف جانباً.` : "";
+    r && r.broken ? T`⚠️ ملف الذاكرة الحالي تالف (${r.broken}). استرجع نسخة سابقة؛ يُحفظ الملف التالف جانباً.` : "";
   if (!r || !r.ok || !r.list.length) {
     const li = document.createElement("li");
     li.className = "muted";
     li.textContent =
       r && !r.ok
         ? r.error === "needPermission"
-          ? "امنح إذن الكتابة للمجلد أولاً."
-          : `تعذّرت قراءة النسخ: ${r.error}`
-        : "لا توجد نسخ سابقة بعد.";
+          ? T("امنح إذن الكتابة للمجلد أولاً.")
+          : T`تعذّرت قراءة النسخ: ${r.error}`
+        : T("لا توجد نسخ سابقة بعد.");
     ol.append(li);
     return;
   }
@@ -206,9 +235,9 @@ async function loadBackups() {
     const li = document.createElement("li"),
       span = document.createElement("span"),
       btn = document.createElement("button");
-    span.textContent = `${b.when} — ${self.MemoryCore.count(b.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(b.log, self.MemoryCore.W.batch)}${b.goal ? ` — «${b.goal}»` : ""}`;
+    span.textContent = T`${b.when} — ${self.MemoryCore.count(b.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(b.log, self.MemoryCore.W.batch)}${b.goal ? ` — «${b.goal}»` : ""}`;
     btn.type = "button";
-    btn.textContent = "استرجاع";
+    btn.textContent = T("استرجاع");
     btn.dataset.n = String(i + 1);
     li.append(span, btn);
     ol.append(li);
@@ -219,8 +248,8 @@ $("backups").addEventListener("click", async (e) => {
   if (!n) return;
   const r = await fsOp("restore", { n: +n });
   $("restoreMsg").textContent = r.ok
-    ? `استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.${r.kept ? ` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}`
-    : `لم يُسترجع شيء: ${r.error}`;
+    ? T`استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.${r.kept ? T` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}`
+    : T`لم يُسترجع شيء: ${r.error}`;
   loadBackups();
 });
 
@@ -244,8 +273,8 @@ async function loadMemory() {
         className: "muted",
         textContent:
           r && r.error === "needPermission"
-            ? "امنح إذن الكتابة للمجلد أولاً."
-            : `تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.`,
+            ? T("امنح إذن الكتابة للمجلد أولاً.")
+            : T`تعذّرت قراءة الذاكرة${r && r.error ? ": " + r.error : ""}.`,
       }),
     );
     return;
@@ -263,7 +292,7 @@ function renderPins() {
     ul.append(
       el("li", {
         className: "muted",
-        textContent: "لا توجد نصوص معتمدة بعد. حدّد نصاً في المحادثة ثم «📌 ثبّت النص المحدد» من قائمة الزر الأيمن.",
+        textContent: T("لا توجد نصوص معتمدة بعد. حدّد نصاً في المحادثة ثم «📌 ثبّت النص المحدد» من قائمة الزر الأيمن."),
       }),
     );
   for (const p of mem.pins)
@@ -271,11 +300,11 @@ function renderPins() {
       el(
         "li",
         {},
-        el("div", { className: "txt" }, el("b", { textContent: p.name }), ` — النسخة المعتمدة ${p.version} (${p.date})`),
+        el("div", { className: "txt" }, el("b", { textContent: p.name }), T` — النسخة المعتمدة ${p.version} (${p.date})`),
         el(
           "div",
           { className: "acts" },
-          btn("🕘 السجل والمقارنة", () => showPin(p.name)),
+          btn(T("🕘 السجل والمقارنة"), () => showPin(p.name)),
         ),
       ),
     );
@@ -291,7 +320,7 @@ function showDiff(vs, a, b) {
     $("diffLabel").textContent = "";
     return;
   }
-  $("diffLabel").textContent = a === b ? `نص النسخة ${a}:` : `الفرق بين النسخة ${a} والنسخة ${b} (الأحمر حُذف، والأخضر أُضيف):`;
+  $("diffLabel").textContent = a === b ? T`نص النسخة ${a}:` : T`الفرق بين النسخة ${a} والنسخة ${b} (الأحمر حُذف، والأخضر أُضيف):`;
   const lines = a === b ? A.text.split("\n").map((line) => ({ op: " ", line })) : MemoryCore.diffLines(A.text, B.text);
   for (const d of lines)
     box.append(
@@ -301,12 +330,12 @@ function showDiff(vs, a, b) {
 async function showPin(name, keep) {
   const r = await fsOp("pinVersions", { name });
   if (!r.ok) {
-    say("pinMsg", `تعذّرت قراءة النسخ: ${r.error}`);
+    say("pinMsg", T`تعذّرت قراءة النسخ: ${r.error}`);
     return;
   }
   openPin = name;
   $("pinHist").hidden = false;
-  $("pinTitle").textContent = `سجل «${name}» — ${self.MemoryCore.count(r.versions.length, self.MemoryCore.W.version)}`;
+  $("pinTitle").textContent = T`سجل «${name}» — ${self.MemoryCore.count(r.versions.length, self.MemoryCore.W.version)}`;
   const ul = $("pinVers");
   ul.textContent = "";
   const vs = r.versions,
@@ -315,20 +344,20 @@ async function showPin(name, keep) {
     const acts = el(
       "div",
       { className: "acts" },
-      btn("عرض", () => showDiff(vs, x.v, x.v)),
+      btn(T("عرض"), () => showDiff(vs, x.v, x.v)),
     );
-    if (x.v > 1) acts.append(btn("قارن بالسابقة", () => showDiff(vs, vs[vs.indexOf(x) - 1].v, x.v)));
+    if (x.v > 1) acts.append(btn(T("قارن بالسابقة"), () => showDiff(vs, vs[vs.indexOf(x) - 1].v, x.v)));
     if (x.v !== cur)
       acts.append(
-        btn("↩️ استرجاع", async () => {
+        btn(T("↩️ استرجاع"), async () => {
           const w = await fsOp("pinRestore", { name, v: x.v });
           say(
             "pinMsg",
             w.ok
               ? w.unchanged
-                ? `«${name}» مطابق للنسخة ${x.v} أصلاً.`
-                : `أُعيد «${name}» إلى نص النسخة ${x.v}، وحُفظ نسخةً جديدة رقم ${w.v}. النسخ السابقة باقية.`
-              : `لم يُسترجع: ${w.error}`,
+                ? T`«${name}» مطابق للنسخة ${x.v} أصلاً.`
+                : T`أُعيد «${name}» إلى نص النسخة ${x.v}، وحُفظ نسخةً جديدة رقم ${w.v}. النسخ السابقة باقية.`
+              : T`لم يُسترجع: ${w.error}`,
           );
           await loadMemory();
         }),
@@ -340,10 +369,10 @@ async function showPin(name, keep) {
         el(
           "div",
           { className: "txt" },
-          el("b", { textContent: `النسخة ${x.v}` }),
-          `${x.v === cur ? " (المعتمدة)" : ""} — ${x.date} — ${x.text.length} حرفاً`,
+          el("b", { textContent: T`النسخة ${x.v}` }),
+          T`${x.v === cur ? T(" (المعتمدة)") : ""} — ${x.date} — ${x.text.length} حرفاً`,
           el("br"),
-          el("span", { className: "muted", textContent: "بصمة " + x.sha.slice(0, 12) }),
+          el("span", { className: "muted", textContent: T("بصمة ") + x.sha.slice(0, 12) }),
         ),
         acts,
       ),
@@ -373,10 +402,13 @@ $("diagExport").addEventListener("click", async () => {
   };
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
-  a.download = `ذاكرة المحادثة - سجل التشخيص ${new Date().toLocaleDateString("sv-SE")}.json`;
+  a.download = T`ذاكرة المحادثة - سجل التشخيص ${new Date().toLocaleDateString("sv-SE")}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  say("diagMsg", diag.length ? `✓ نُزّل السجل (عدد الأحداث: ${diag.length})، بلا أي نص من محادثاتك.` : "✓ السجل فارغ: لم يحدث شيء يُذكر.");
+  say(
+    "diagMsg",
+    diag.length ? T`✓ نُزّل السجل (عدد الأحداث: ${diag.length})، بلا أي نص من محادثاتك.` : T("✓ السجل فارغ: لم يحدث شيء يُذكر."),
+  );
 });
 
 // ---------- optional: summaries in the background with your own API key ----------
@@ -400,10 +432,10 @@ async function loadKey() {
   $("provider").value = (k && k.provider) || "anthropic";
   $("model").value = (k && k.model) || MODEL[$("provider").value];
   $("apiKey").value = "";
-  $("apiKey").placeholder = k && k.key ? "محفوظ ••••" + k.key.slice(-4) : "sk-…";
+  $("apiKey").placeholder = k && k.key ? T("محفوظ ••••") + k.key.slice(-4) : "sk-…";
   say(
     "keyMsg",
-    s.byok && k && k.key ? `✓ مفعّل: يُلخَّص في الخلفية بـ ${k.model || MODEL[k.provider]}.` : "غير مفعّل: يُلخَّص داخل المحادثة.",
+    s.byok && k && k.key ? T`✓ مفعّل: يُلخَّص في الخلفية بـ ${k.model || MODEL[k.provider]}.` : T("غير مفعّل: يُلخَّص داخل المحادثة."),
   );
 }
 $("provider").addEventListener("change", () => {
@@ -419,13 +451,13 @@ $("keySave").addEventListener("click", async () => {
     granted = await chrome.permissions.request({ origins: [ORIGIN[provider]] });
   } catch {}
   if (!granted) {
-    say("keyMsg", "لم يُمنح إذن الاتصال بموقع المزوّد، فلم يُفعَّل.");
+    say("keyMsg", T("لم يُمنح إذن الاتصال بموقع المزوّد، فلم يُفعَّل."));
     return;
   }
   const old = await keyGet();
   const key = typed || (old && old.provider === provider ? old.key : "");
   if (!/^[\x21-\x7e]{20,300}$/.test(key)) {
-    say("keyMsg", "اكتب المفتاح أولاً.");
+    say("keyMsg", T("اكتب المفتاح أولاً."));
     return;
   }
   await keyPut({ provider, model, key });
@@ -434,11 +466,11 @@ $("keySave").addEventListener("click", async () => {
   loadKey();
 });
 $("keyTest").addEventListener("click", async () => {
-  say("keyMsg", "يختبر…");
+  say("keyMsg", T("يختبر…"));
   const r = await chrome.runtime
     .sendMessage({ cmd: "byok", text: "Reply with the single word OK.", test: true })
     .catch((e) => ({ ok: false, error: String(e) }));
-  say("keyMsg", r && r.ok ? `✓ المفتاح يعمل (${r.model}).` : `لم ينجح: ${(r && r.error) || "خطأ غير معروف"}`);
+  say("keyMsg", r && r.ok ? T`✓ المفتاح يعمل (${r.model}).` : T`لم ينجح: ${(r && r.error) || T("خطأ غير معروف")}`);
 });
 $("keyOff").addEventListener("click", async () => {
   const k = await keyGet();
@@ -455,19 +487,19 @@ $("exportAll").addEventListener("click", async () => {
   const r = await fsOp("exportAll"),
     msg = $("keepMsg");
   if (!r || !r.ok) {
-    msg.textContent = "تعذّر حفظ النسخة.";
+    msg.textContent = T("تعذّر حفظ النسخة.");
     return;
   }
   if (!r.count) {
-    msg.textContent = "لا توجد ذاكرة محفوظة بعد.";
+    msg.textContent = T("لا توجد ذاكرة محفوظة بعد.");
     return;
   }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(r.data, null, 1)], { type: "application/json" }));
-  a.download = `ذاكرة المحادثة - نسخة كاملة ${new Date().toLocaleDateString("sv-SE")}.json`;
+  a.download = T`ذاكرة المحادثة - نسخة كاملة ${new Date().toLocaleDateString("sv-SE")}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  msg.textContent = `✓ حُفظت نسخة فيها ${self.MemoryCore.count(r.count, self.MemoryCore.W.project)}.`;
+  msg.textContent = T`✓ حُفظت نسخة فيها ${self.MemoryCore.count(r.count, self.MemoryCore.W.project)}.`;
 });
 $("importAll").addEventListener("click", () => $("importFile").click());
 $("importFile").addEventListener("change", async (e) => {
@@ -476,22 +508,22 @@ $("importFile").addEventListener("change", async (e) => {
   e.target.value = "";
   if (!f) return;
   if (f.size > 64 * 1024 * 1024) {
-    msg.textContent = "الملف أكبر من المتوقع لنسخة ذاكرة.";
+    msg.textContent = T("الملف أكبر من المتوقع لنسخة ذاكرة.");
     return;
   }
   let data;
   try {
     data = JSON.parse(await f.text());
   } catch {
-    msg.textContent = "الملف ليس نسخة من ذاكرة المحادثة.";
+    msg.textContent = T("الملف ليس نسخة من ذاكرة المحادثة.");
     return;
   }
   const r = await fsOp("importAll", { data });
   if (!r || !r.ok) {
-    msg.textContent = (r && r.error) || "تعذّرت الاستعادة.";
+    msg.textContent = (r && r.error) || T("تعذّرت الاستعادة.");
     return;
   }
   msg.textContent =
-    `✓ استُعيد ${r.added} من المشاريع.` + (r.skipped.length ? ` لم يُستبدل ما هو موجود أصلاً: ${r.skipped.join("، ")}.` : "");
+    T`✓ استُعيد ${r.added} من المشاريع.` + (r.skipped.length ? T` لم يُستبدل ما هو موجود أصلاً: ${r.skipped.join(T("، "))}.` : "");
   refresh();
 });

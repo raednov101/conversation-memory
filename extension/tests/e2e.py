@@ -65,8 +65,8 @@ KV = """async (k, v) => { const db = await new Promise((res, rej) => { const r =
 EXE = os.environ.get("CHROMIUM") or ("/opt/pw-browsers/chromium-1194/chrome-linux/chrome" if os.path.exists("/opt/pw-browsers/chromium-1194/chrome-linux/chrome") else None)
 
 with sync_playwright() as pw:
-    ctx = pw.chromium.launch_persistent_context(tempfile.mkdtemp(), headless=False, executable_path=EXE, args=[
-        "--headless=new", f"--disable-extensions-except={build}", f"--load-extension={build}"])
+    ctx = pw.chromium.launch_persistent_context(tempfile.mkdtemp(), headless=False, locale="ar", executable_path=EXE, args=[
+        "--headless=new", "--lang=ar", f"--disable-extensions-except={build}", f"--load-extension={build}"])
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
     ext_id = sw.url.split("/")[2]
     # on install the extension opens its own options page; use a page of ours, retrying if that opening interrupts it
@@ -779,6 +779,24 @@ with sync_playwright() as pw:
     ok(wait(lambda: "الموقع تغيّر" in pill(p), 25), "no readable messages and no readable data → «the site changed», memory safe", pill(p))
     ok("ذاكرتك المحفوظة سليمة" in panel_text(p), "…saying the saved memory is safe", panel_text(p))
     p.close()
+
+    print("— in English: the same extension for an English-speaking user —")
+    SETLANG = "l => chrome.storage.local.get('settings').then(({settings = {}}) => chrome.storage.local.set({settings: {...settings, lang: l}}))"
+    sw.evaluate(SETLANG, "en")
+    p = ctx.new_page(); p.goto(BASE + new_chat("chatgpt", "/c/english-ui/", "English UI - ChatGPT"))
+    ok(wait(lambda: "🧠" in pill(p) and "…" not in pill(p) and not re.search(r"[\u0600-\u06FF]", pill(p)), 15), "the indicator speaks English", pill(p))
+    for i in range(1, 6): say(p, f"English message {i}")
+    sent = wait(lambda: [s for s in requests(p) if s.startswith("🧠 Conversation memory:")], 15) or requests(p)
+    ok(sent and sent[0].startswith("🧠 Conversation memory:") and "Summarize my messages from 1 to 5" in sent[0], "the summary request is written in English", (sent or [""])[0][:200])
+    ok(wait(lambda: "✓" in pill(p), 20) and not re.search(r"[\u0600-\u06FF]", pill(p)), "…its reply is checked and saved, the indicator still in English", pill(p))
+    p.locator("#cm-memory-indicator .pill").click()
+    ok(p.evaluate("getComputedStyle(document.getElementById('cm-memory-indicator')).getPropertyValue('--cm-dir').trim()") == "ltr", "the panel reads left to right")
+    p.close()
+    opt.reload(); opt.wait_for_load_state()
+    ok(wait(lambda: opt.evaluate("document.documentElement.dir") == "ltr" and "Settings" in opt.title(), 8), "the settings page translates itself and turns left to right", opt.title())
+    left = opt.evaluate("[...document.querySelectorAll('h1,h2,label,button,summary')].map(e => e.textContent).filter(t => /[\u0600-\u06FF]/.test(t) && !/العربية/.test(t))")
+    ok(not left, "…with no Arabic left in its headings, labels and buttons", left[:5])
+    sw.evaluate(SETLANG, "ar"); opt.reload()
 
     ctx.close()
 srv.shutdown()

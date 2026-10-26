@@ -3,15 +3,16 @@
 const fs = require("fs");
 const path = require("path");
 const { lst, nonce, sleep, uid } = require("./util");
+const { T } = require("../../core/memory-core.js");
 
 // a regular file we may read or replace: not a link, single hard link, within size
 function safeFile(p, max) {
   const s = lst(p);
   if (!s) return { missing: true };
-  if (s.isSymbolicLink()) return { bad: "رابط رمزي (symlink)" };
-  if (!s.isFile()) return { bad: "ليس ملفاً عادياً" };
-  if (s.nlink > 1) return { bad: "مرتبط بملف آخر (hard link)", stat0: s };
-  if (max && s.size > max) return { bad: `أكبر من الحد (${Math.round(max / 1024)} ك.ب)` };
+  if (s.isSymbolicLink()) return { bad: T("رابط رمزي (symlink)") };
+  if (!s.isFile()) return { bad: T("ليس ملفاً عادياً") };
+  if (s.nlink > 1) return { bad: T("مرتبط بملف آخر (hard link)"), stat0: s };
+  if (max && s.size > max) return { bad: T`أكبر من الحد (${Math.round(max / 1024)} ك.ب)` };
   return { stat: s };
 }
 function readSafe(p, max) {

@@ -3,6 +3,7 @@
 // Every memory write: read → (migrate / keep hand edits) → apply → re-read to detect a concurrent writer → backup → write → read back.
 "use strict";
 const C = self.MemoryCore;
+const T = C.T;
 // file names, backup naming, sizes and the shared lock come from the core: the plugin follows the same definition
 const {
   json: JSON_FILE,
@@ -79,11 +80,13 @@ async function rememberScopeName() {
   await kvSet("scopeNames", n);
 }
 const GENERAL_NAMES = {
+  // translated where shown: T(GENERAL_NAMES[x])
+
   general: "محادثات خارج المشاريع (إصدار سابق)",
   "chatgpt-general": "ChatGPT: محادثات خارج المشاريع (قبل 1.5)",
   "claude-general": "Claude: محادثات خارج المشاريع (قبل 1.5)",
 };
-const scopeLabel = async (scope) => GENERAL_NAMES[scope] || (await scopeNames())[scope] || scope;
+const scopeLabel = async (scope) => (GENERAL_NAMES[scope] && T(GENERAL_NAMES[scope])) || (await scopeNames())[scope] || scope;
 
 // ---------- fs helpers ----------
 async function dir(base, parts, create = true) {
@@ -94,7 +97,7 @@ async function dir(base, parts, create = true) {
 async function readText(d, name) {
   try {
     const f = await (await d.getFileHandle(name)).getFile();
-    if (f.size > MAX_JSON) throw new Error(`${name} أكبر من 4 ميجا`);
+    if (f.size > MAX_JSON) throw new Error(T`${name} أكبر من 4 ميجا`);
     return await f.text();
   } catch (e) {
     if (e.name === "NotFoundError" || e.name === "TypeMismatchError") return null;
@@ -106,7 +109,7 @@ async function writeVerified(d, name, text) {
   const w = await fh.createWritable(); // a swap file; the original is replaced only on close()
   await w.write(text);
   await w.close();
-  if ((await (await fh.getFile()).text()) !== text) throw new Error("فشل التحقق بعد الكتابة: " + name);
+  if ((await (await fh.getFile()).text()) !== text) throw new Error(T("فشل التحقق بعد الكتابة: ") + name);
 }
 async function sha256(t) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
@@ -201,7 +204,7 @@ async function healCut(r, cur) {
   m.mdHash = C.hash(md);
   await writeVerified(r, JSON_FILE, C.serialize(m));
   await writeVerified(r, MD_FILE, md);
-  return `وُجد ملف الذاكرة مقطوعاً (كتابة قُطعت)، فاستُرجعت آخر نسخة سليمة (${b.when}) وحُفظ المقطوع جانباً.`;
+  return T`وُجد ملف الذاكرة مقطوعاً (كتابة قُطعت)، فاستُرجعت آخر نسخة سليمة (${b.when}) وحُفظ المقطوع جانباً.`;
 }
 // the approved version of each pinned text, verified against its fingerprint (for inserting it verbatim into a chat)
 async function pinTextsOf(r, m) {
@@ -304,28 +307,28 @@ async function writeMemory(r, mutate, confirm, held) {
   let keptEdit = false,
     healed = false;
   const lk = held || (await takeWriteLock(r));
-  if (!lk) return { err: "برنامج آخر يكتب في الذاكرة الآن", busy: true };
+  if (!lk) return { err: T("برنامج آخر يكتب في الذاكرة الآن"), busy: true };
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
       const cur = await readMemory(r);
       if (cur.bad) {
         const note = healed ? null : await healCut(r, cur);
-        if (!note) return { err: cur.bad + " — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة" };
+        if (!note) return { err: cur.bad + T(" — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة") };
         notes.push(note);
         healed = true;
         attempt--;
         continue;
       }
-      if (cur.newer) return { err: "ملف الذاكرة كتبه إصدار أحدث من هذه الإضافة؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث الإضافة" };
+      if (cur.newer) return { err: T("ملف الذاكرة كتبه إصدار أحدث من هذه الإضافة؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث الإضافة") };
       let m = cur.memory;
       if (!cur.exists && cur.mdText) {
         m = C.importLegacy(m, cur.mdText, today());
-        if (!attempt) notes.push("نُقل محتوى CONVERSATION_MEMORY.md القديم كما هو تحت «من الإصدار السابق».");
+        if (!attempt) notes.push(T("نُقل محتوى CONVERSATION_MEMORY.md القديم كما هو تحت «من الإصدار السابق»."));
       } else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !(await isSomeGeneratedView(r, cur.mdText, m))) {
         const name = `CONVERSATION_MEMORY.edited-${stamp()}.md`;
         await writeVerified(r, name, cur.mdText);
         keptEdit = true;
-        notes.push(`عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${name} قبل إعادة توليده.`);
+        notes.push(T`عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${name} قبل إعادة توليده.`);
       }
       const out = mutate(m, cur.token);
       if (out.err) return { err: out.err };
@@ -334,17 +337,17 @@ async function writeMemory(r, mutate, confirm, held) {
       const md = C.render(next);
       next.mdHash = C.hash(md);
       const json = C.serialize(next);
-      if (new Blob([json]).size > MAX_JSON) return { err: "ملف الذاكرة سيتجاوز 4 ميجا" };
+      if (new Blob([json]).size > MAX_JSON) return { err: T("ملف الذاكرة سيتجاوز 4 ميجا") };
       try {
         await backupJson(r, cur.jsonText);
       } catch {
-        return { err: "تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها" };
+        return { err: T("تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها") };
       }
       // checked as late as possible: someone else wrote meanwhile → start over on their version (nothing archived twice)
       if ((await readText(r, JSON_FILE)) !== cur.jsonText) continue;
       if (t.archived.length) {
         await archive(r, t.archived);
-        notes.push(`نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`);
+        notes.push(T`نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`);
       }
       await writeVerified(r, JSON_FILE, json);
       await writeVerified(r, MD_FILE, md);
@@ -352,7 +355,7 @@ async function writeMemory(r, mutate, confirm, held) {
       if (!after.ok || (confirm && !confirm(after.memory))) continue;
       return { memory: after.memory, notes, extra: out.extra };
     }
-    return { err: "الملف يتغيّر باستمرار من برنامج آخر؛ أعد المحاولة بعد قليل" };
+    return { err: T("الملف يتغيّر باستمرار من برنامج آخر؛ أعد المحاولة بعد قليل") };
   } finally {
     if (!held) await dropWriteLock(lk);
   }
@@ -379,12 +382,12 @@ const evidenceArg = (e) => {
 function stateForPrompt(m) {
   const s = m.summary,
     L = [];
-  if (s.goal) L.push(`الهدف: ${s.goal}`);
-  if (s.status) L.push(`الوضع: ${s.status}`);
+  if (s.goal) L.push(T`الهدف: ${s.goal}`);
+  if (s.status) L.push(T`الوضع: ${s.status}`);
   const act = m.decisions.filter((d) => d.status === "active");
-  if (act.length) L.push("القرارات السارية:", ...act.slice(-30).map((d) => `${d.id} [${d.source}] ${d.text}`));
-  if (m.constraints.length) L.push("القيود: " + m.constraints.slice(-20).join("؛ "));
-  const t = L.join("\n") || "(لا توجد ذاكرة محفوظة بعد)";
+  if (act.length) L.push(T("القرارات السارية:"), ...act.slice(-30).map((d) => `${d.id} [${d.source}] ${d.text}`));
+  if (m.constraints.length) L.push(T("القيود: ") + m.constraints.slice(-20).join(T("؛ ")));
+  const t = L.join("\n") || T("(لا توجد ذاكرة محفوظة بعد)");
   return t.length > STATE_BUDGET ? t.slice(0, STATE_BUDGET) + "\n…" : t;
 }
 
@@ -402,14 +405,14 @@ async function rootFor(project) {
   const { h, err } = await root();
   if (err) return { err };
   if (project !== undefined && project !== (await projectId(h)))
-    return { err: "تغيّر مجلد المشروع منذ طُلب الملخص؛ لم يُحفظ في المجلد الجديد" };
+    return { err: T("تغيّر مجلد المشروع منذ طُلب الملخص؛ لم يُحفظ في المجلد الجديد") };
   return { h };
 }
 
 // ---------- pinned texts ----------
 async function withLock(h, fn) {
   const lk = await takeWriteLock(h); // before writing anything
-  if (!lk) return { ok: false, busy: true, error: "برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات" };
+  if (!lk) return { ok: false, busy: true, error: T("برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات") };
   try {
     return await fn(lk);
   } finally {
@@ -451,7 +454,7 @@ async function pinWrite(h, name, text, lk) {
     await writeVerified(d, `v${v}.md`, text);
     if ((await sha256(await readText(d, `v${v}.md`))) !== sha) {
       await d.removeEntry(`v${v}.md`).catch(() => {});
-      return { ok: false, error: "فشل التحقق من البصمة" };
+      return { ok: false, error: T("فشل التحقق من البصمة") };
     }
   }
   const w = await writeMemory(
@@ -460,7 +463,7 @@ async function pinWrite(h, name, text, lk) {
     (mm) => mm.pins.some((x) => x.name === name && x.version === v),
     lk,
   );
-  if (w.err) return { ok: false, error: "حُفظ النص لكن لم يُحدَّث فهرسه: " + w.err };
+  if (w.err) return { ok: false, error: T("حُفظ النص لكن لم يُحدَّث فهرسه: ") + w.err };
   return { ok: true, name, v, unchanged, hash: sha.slice(0, 12), notes: w.notes };
 }
 
@@ -481,7 +484,7 @@ const ops = {
           projectId: await projectId(b),
         };
       } catch (e) {
-        return { ok: false, error: "تعذّر الحفظ داخل المتصفح: " + String((e && e.message) || e) };
+        return { ok: false, error: T("تعذّر الحفظ داخل المتصفح: ") + String((e && e.message) || e) };
       }
     }
     const permission = await h.queryPermission({ mode: "readwrite" });
@@ -527,7 +530,7 @@ const ops = {
     const p = C.parseModelReply(String(reply || ""));
     if (!p.ok) return { ok: false, error: p.error };
     const fields = p.fields && typeof p.fields === "object" && !Array.isArray(p.fields) ? p.fields : null;
-    if (!fields) return { ok: false, error: "الملخص ليس كائن JSON" };
+    if (!fields) return { ok: false, error: T("الملخص ليس كائن JSON") };
     // the model says this chat is about something else than this memory: nothing is written; the user decides
     if (fields.different === true) return { ok: false, different: true };
     const v = C.validateDraft({ ...fields, batch, base }, batch);
@@ -551,7 +554,7 @@ const ops = {
       );
     } catch (e) {
       // the file system refused (permission withdrawn, disk full…): the reply itself is valid — keep it and retry
-      return { ok: false, writeFailed: true, error: "تعذّرت الكتابة في الملفات: " + String((e && e.message) || e) };
+      return { ok: false, writeFailed: true, error: T("تعذّرت الكتابة في الملفات: ") + String((e && e.message) || e) };
     }
     if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
     const r = w.extra;
@@ -588,13 +591,13 @@ const ops = {
   async review({ key, action }) {
     const { h, err } = await root();
     if (err) return { ok: false, error: err };
-    if (!C.isReviewKey(String(key)) || (action !== "approve" && action !== "reject")) return { ok: false, error: "طلب مراجعة غير صالح" };
+    if (!C.isReviewKey(String(key)) || (action !== "approve" && action !== "reject")) return { ok: false, error: T("طلب مراجعة غير صالح") };
     const v = C.validateFix({ pending: { [action]: [key] } });
     let changes = [];
     const w = await writeMemory(
       h,
       (m) => {
-        if (!C.reviewItems(m).some((x) => x.key === key)) return { err: "لم يعد هذا بانتظار المراجعة" };
+        if (!C.reviewItems(m).some((x) => x.key === key)) return { err: T("لم يعد هذا بانتظار المراجعة") };
         const r = C.applyFix(m, v.fix, today());
         changes = r.changes;
         return { memory: r.memory };
@@ -625,20 +628,21 @@ const ops = {
     const { h, err } = await root();
     if (err) return { ok: false, error: err };
     const lk = await takeWriteLock(h);
-    if (!lk) return { ok: false, busy: true, error: "برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات" };
+    if (!lk) return { ok: false, busy: true, error: T("برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات") };
     try {
       const cur = await readMemory(h);
       // a broken memory file is exactly when a restore is needed: the broken file is kept aside, never thrown away
       const list = await describeBackups(h, cur.bad ? null : cur.jsonText),
         b = list[(Math.floor(+n) || 1) - 1];
-      if (!b) return { ok: false, error: cur.bad ? cur.bad : list.length ? `لا توجد نسخة رقم ${n}` : "لا توجد نسخة سابقة للاسترجاع بعد" };
+      if (!b)
+        return { ok: false, error: cur.bad ? cur.bad : list.length ? T`لا توجد نسخة رقم ${n}` : T("لا توجد نسخة سابقة للاسترجاع بعد") };
       if (cur.bad) {
         if (typeof cur.brokenText === "string") await writeVerified(h, `CONVERSATION_MEMORY.broken-${stamp()}.json`, cur.brokenText);
       } else
         try {
           await backupJson(h, cur.jsonText);
         } catch {
-          return { ok: false, error: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" };
+          return { ok: false, error: T("تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً") };
         }
       let kept = ""; // a hand-edited .md is kept aside first, as every other write does
       if (!cur.bad && cur.exists && cur.mdText != null && cur.memory.mdHash && !(await isSomeGeneratedView(h, cur.mdText, cur.memory))) {
@@ -659,11 +663,11 @@ const ops = {
   async saveRaw({ project, chatKey, label, url, turns }) {
     const { h, err } = await rootFor(project);
     if (err) return { ok: false, error: err };
-    if (!/^[a-z-]{3,12}-[a-z0-9-]{1,40}$/.test(chatKey)) return { ok: false, error: "معرّف محادثة غير صالح" };
+    if (!/^[a-z-]{3,12}-[a-z0-9-]{1,40}$/.test(chatKey)) return { ok: false, error: T("معرّف محادثة غير صالح") };
     const list = (Array.isArray(turns) ? turns : []).filter((t) => t && typeof t.text === "string");
-    const body = list.map((t) => `### ${t.role === "user" ? `أنت (${t.n})` : "المساعد"}\n${t.text}\n`).join("\n");
+    const body = list.map((t) => `### ${t.role === "user" ? T`أنت (${t.n})` : T("المساعد")}\n${t.text}\n`).join("\n");
     const text =
-      `# نص المحادثة كاملاً — ${C.cleanStr(String(label || ""), 200)}\n\n> ${C.cleanStr(String(url || ""), 500)}\n> آخر حفظ: ${today()} · رسائلك: ${list.filter((t) => t.role === "user").length}\n\n` +
+      T`# نص المحادثة كاملاً — ${C.cleanStr(String(label || ""), 200)}\n\n> ${C.cleanStr(String(url || ""), 500)}\n> آخر حفظ: ${today()} · رسائلك: ${list.filter((t) => t.role === "user").length}\n\n` +
       C.redact(body).text;
     await writeVerified(await dir(await dataDir(h), ["chats"]), `${chatKey}.md`, text);
     return { ok: true };
@@ -676,10 +680,10 @@ const ops = {
       .trim()
       .replace(/\s+/g, " ");
     text = String(text || "");
-    if (!C.pinNameOk(name)) return { ok: false, error: "اسم غير صالح (حتى 60 حرفاً، بلا / أو : أو رموز)" };
-    if (!text.trim()) return { ok: false, error: "لا يوجد نص محدد" };
-    if (text.length > 200000) return { ok: false, error: "النص طويل جداً" };
-    if (C.hasSecret(text)) return { ok: false, error: "النص يحتوي بيانات حساسة؛ لن يُحفظ" };
+    if (!C.pinNameOk(name)) return { ok: false, error: T("اسم غير صالح (حتى 60 حرفاً، بلا / أو : أو رموز)") };
+    if (!text.trim()) return { ok: false, error: T("لا يوجد نص محدد") };
+    if (text.length > 200000) return { ok: false, error: T("النص طويل جداً") };
+    if (C.hasSecret(text)) return { ok: false, error: T("النص يحتوي بيانات حساسة؛ لن يُحفظ") };
     return withLock(h, (lk) => pinWrite(h, name, text, lk));
   },
   // the whole memory, for the correction page and the share panel (read only)
@@ -698,7 +702,7 @@ const ops = {
     name = String(name || "")
       .trim()
       .replace(/\s+/g, " ");
-    if (!C.pinNameOk(name)) return { ok: false, error: "اسم غير صالح" };
+    if (!C.pinNameOk(name)) return { ok: false, error: T("اسم غير صالح") };
     return { ok: true, name, versions: await versionsOf(h, name) };
   },
   // the projects saved inside the browser, for the settings page
@@ -717,7 +721,7 @@ const ops = {
       if (!cur || !cur.exists) continue;
       out.push({
         scope,
-        name: GENERAL_NAMES[scope] || names[scope] || scope,
+        name: (GENERAL_NAMES[scope] && T(GENERAL_NAMES[scope])) || names[scope] || scope,
         decisions: cur.memory.decisions.filter((x) => x.status === "active").length,
         log: cur.memory.log.length,
         updated: cur.memory.updated,
@@ -761,7 +765,7 @@ const ops = {
   // brings such a file back; an existing memory is never replaced (its project is skipped and reported)
   async importAll({ data }) {
     if (!data || data.format !== "conversation-memory-backup" || !Array.isArray(data.projects))
-      return { ok: false, error: "الملف ليس نسخة من ذاكرة المحادثة" };
+      return { ok: false, error: T("الملف ليس نسخة من ذاكرة المحادثة") };
     let added = 0;
     const skipped = [],
       names = await scopeNames();
@@ -775,7 +779,7 @@ const ops = {
       const r = await browserRoot(scope),
         cur = await readMemory(r).catch(() => ({ bad: true }));
       if (cur.bad || cur.exists) {
-        skipped.push(GENERAL_NAMES[scope] || names[scope] || p.name || scope);
+        skipped.push((GENERAL_NAMES[scope] && T(GENERAL_NAMES[scope])) || names[scope] || p.name || scope);
         continue;
       }
       for (const pin of parsed.memory.pins) {
@@ -801,7 +805,7 @@ const ops = {
     if (err) return { ok: false, error: err };
     const cur = await readMemory(h);
     if (cur.bad) return { ok: false, error: cur.bad };
-    if (!cur.exists) return { ok: false, error: "لا توجد ذاكرة محفوظة لهذا المشروع بعد" };
+    if (!cur.exists) return { ok: false, error: T("لا توجد ذاكرة محفوظة لهذا المشروع بعد") };
     return { ok: true, text: C.render(cur.memory), name: await scopeLabel(SCOPE) };
   },
   // bring back version v of a pinned text: saved as a new version, the older ones stay
@@ -811,9 +815,9 @@ const ops = {
     name = String(name || "")
       .trim()
       .replace(/\s+/g, " ");
-    if (!C.pinNameOk(name)) return { ok: false, error: "اسم غير صالح" };
+    if (!C.pinNameOk(name)) return { ok: false, error: T("اسم غير صالح") };
     const src = (await versionsOf(h, name)).find((x) => x.v === +v);
-    if (!src) return { ok: false, error: `لا توجد النسخة ${v} من «${name}»` };
+    if (!src) return { ok: false, error: T`لا توجد النسخة ${v} من «${name}»` };
     const r = await withLock(h, (lk) => pinWrite(h, name, src.text, lk));
     return r.ok ? { ...r, from: +v } : r;
   },
@@ -829,6 +833,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   }
   navigator.locks
     .request("cm-write", () => {
+      C.setLang(args.lang || "auto"); // write in the language of the page that asked
       SCOPE = cleanScope(args.scope);
       SCOPE_NAME = String(args.scopeName || "");
       return ops[msg.op](args);

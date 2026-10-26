@@ -6,9 +6,10 @@ const path = require("path");
 const { EVERY, MODE, MODES, MAX_JSON, MAX_SESSIONS, LOCK_WAIT, LOCK_STALE } = require("./config");
 const { sleep, lst, nonce, int } = require("./util");
 const { readSafe, writeAtomic, unlinkSafe, breakStale } = require("./fsx");
-const { input, sid, HOME, PRIV, notes } = require("./context");
+const { input, sid, HOME, PRIV, P, notes } = require("./context");
 const { capture } = require("./transcript");
 const C = require("../../core/memory-core.js");
+const T = C.T;
 
 // ---------------- lock (every state change happens under it) ----------------
 let lockFile = null,
@@ -166,7 +167,7 @@ function loadState() {
     } catch {}
   }
   if (lst(path.join(PRIV, "state.json")))
-    notes.push("ℹ️ ذاكرة المحادثة: ملف الحالة الخاص كان تالفاً، فبدأ عدّاد جديد. ملف الذاكرة نفسه سليم.");
+    notes.push(T("ℹ️ ذاكرة المحادثة: ملف الحالة الخاص كان تالفاً، فبدأ عدّاد جديد. ملف الذاكرة نفسه سليم."));
   return { v: 1, sessions: {} };
 }
 const undone = (x) => Object.keys(x.msgs).some((i) => !x.done[i]);
@@ -183,7 +184,7 @@ function saveState(state) {
       try {
         capture(x, "evicted", x.tp, id);
       } catch {}
-      if (undone(x)) notes.push("⚠️ ذاكرة المحادثة: جلسة قديمة أُزيلت من التتبع وفيها رسائل لم تُلخّص ولم يمكن نسخها.");
+      if (undone(x)) notes.push(T("⚠️ ذاكرة المحادثة: جلسة قديمة أُزيلت من التتبع وفيها رسائل لم تُلخّص ولم يمكن نسخها."));
     }
   }
   state.sessions = Object.fromEntries(sorted.slice(0, MAX_SESSIONS));
@@ -194,7 +195,7 @@ function saveState(state) {
     return true;
   } catch (e) {
     if (process.env.CM_DEBUG) process.stderr.write(`saveState: ${e.code || e.message}\n`);
-    notes.push(`⚠️ ذاكرة المحادثة: تعذّر حفظ حالة العدّ (${e.code || "خطأ"})؛ قد يُعاد طلب تلخيص سبق.`);
+    notes.push(T`⚠️ ذاكرة المحادثة: تعذّر حفظ حالة العدّ (${e.code || T("خطأ")})؛ قد يُعاد طلب تلخيص سبق.`);
     return false;
   }
 }
@@ -212,10 +213,42 @@ function loadCfg() {
     o = JSON.parse(r.text || "{}") || {};
   } catch {}
   const every = Math.min(100, Math.max(1, Math.floor(Number(o.every)) || EVERY));
-  return { every, mode: MODES.includes(o.mode) ? o.mode : MODE };
+  const L = (l) => (l === "ar" || l === "en" ? l : "");
+  // lang: the user's choice (ar | en | auto); seen: the language the user was last clearly writing in (for auto)
+  return { every, mode: MODES.includes(o.mode) ? o.mode : MODE, lang: L(o.lang) || "auto", seen: L(o.seen) };
 }
 function saveCfg(c) {
-  writeAtomic(path.join(PRIV, "settings.json"), JSON.stringify({ every: c.every, mode: c.mode }));
+  writeAtomic(
+    path.join(PRIV, "settings.json"),
+    JSON.stringify({ every: c.every, mode: c.mode, lang: c.lang || "auto", seen: c.seen || "" }),
+  );
+}
+// the language a text is clearly written in, or "" (short prompts such as "continue" or a pasted command decide nothing)
+function scriptOf(t) {
+  const s = String(t || "").replace(/```[\s\S]*?```|`[^`]*`|https?:\/\/\S+|\/[\w:-]+/g, " ");
+  const ar = (s.match(/[\u0600-\u06FF]/g) || []).length,
+    la = (s.match(/[A-Za-z]/g) || []).length;
+  if (ar + la < 12) return "";
+  return ar >= la * 0.5 ? "ar" : la >= ar * 4 ? "en" : "";
+}
+// the language the plugin speaks in this project: the user's choice; else (auto) the language they are writing in,
+// else the one they last wrote in, else the memory file's own language, else the system's
+function applyLang(cfg, prompt) {
+  if (cfg.lang === "ar" || cfg.lang === "en") return C.setLang(cfg.lang);
+  if (process.env.CONV_MEMORY_LANG) return C.setLang(process.env.CONV_MEMORY_LANG);
+  const now = scriptOf(prompt);
+  if (now && now !== cfg.seen)
+    try {
+      saveCfg({ ...cfg, seen: now });
+    } catch {}
+  let l = now || cfg.seen;
+  if (!l)
+    try {
+      const m = /"lang"\s*:\s*"(ar|en)"/.exec(readSafe(P.json, MAX_JSON).text || "");
+      // a memory written before 2.0 has no lang field and is Arabic
+      l = m ? m[1] : readSafe(P.json, 64).text ? "ar" : "";
+    } catch {}
+  return C.setLang(l || "auto");
 }
 // what the status-line indicator reads
 function writeStatus(s) {
@@ -235,6 +268,7 @@ function writeStatus(s) {
       lastCapture: s.lastCapture,
       cost: s.lastCost.chars ? C.estTokens(s.lastCost.chars) : 0,
       error: s.lastError,
+      lang: C.lang(), // the indicator's words follow the plugin's language
       updated: Date.now(),
     };
     writeAtomic(path.join(HOME, "status", `${sid.replace(/[^A-Za-z0-9-]/g, "").slice(0, 80) || "default"}.json`), JSON.stringify(st));
@@ -252,4 +286,17 @@ function queueEvent(ev) {
   }
 }
 
-module.exports = { lock, unlock, normSession, loadState, saveState, session, writeStatus, queueEvent, loadCfg, saveCfg };
+module.exports = {
+  lock,
+  unlock,
+  normSession,
+  loadState,
+  saveState,
+  session,
+  writeStatus,
+  queueEvent,
+  loadCfg,
+  saveCfg,
+  applyLang,
+  scriptOf,
+};

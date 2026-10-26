@@ -1,0 +1,5 @@
+{
+  "appName": { "message": "ذاكرة المحادثة لـ ChatGPT وClaude" },
+  "appShort": { "message": "ذاكرة المحادثة" },
+  "appDesc": { "message": "يلخّص محادثاتك في ChatGPT وClaude ويحفظ ذاكرة كل مشروع داخل المتصفح أو في مجلد تختاره. غير تابعة لـ OpenAI أو Anthropic." }
+}

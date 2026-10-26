@@ -1,0 +1,5 @@
+{
+  "appName": { "message": "Conversation Memory for ChatGPT and Claude" },
+  "appShort": { "message": "Conversation Memory" },
+  "appDesc": { "message": "Summarizes your ChatGPT and Claude chats into a memory for each project, kept in your browser or a folder you choose. Not affiliated with OpenAI or Anthropic." }
+}

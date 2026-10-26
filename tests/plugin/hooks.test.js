@@ -1010,6 +1010,8 @@ test(
     assert.equal(format({ ...base, lastCapture: "2026-10-19 09:00" }), "🧠 2/5 · ✓ 10:00", "an older copy is superseded by the summary");
     assert.equal(format({ ...base, stuck: 1 }), "🧠 ⚠️ 2/5 · تعثّر الحفظ");
     assert.equal(format({ ...base, mode: "manual", since: 9 }), "🧠 9 · يدوي · ✓ 10:00");
+    assert.equal(format({ ...base, lang: "en", stuck: 1 }), "🧠 ⚠️ 2/5 · save failed", "in English when the plugin speaks English");
+    assert.equal(format({ ...base, lang: "en", cost: 612 }), "🧠 2/5 · ✓ 10:00 · ≈612 tokens");
     const P = tmp();
     const js = prompts(P, "a", 2);
     run("end", { session_id: "a", cwd: P, transcript_path: tfrom(P, js) });
@@ -1017,6 +1019,30 @@ test(
     assert.match(format(status("a")), /📝 \d\d:\d\d$/);
   },
 );
+
+test("language: follows the language the user writes in, a setting overrides it, an Arabic memory stays Arabic", () => {
+  const say = (P, sid, text) => run("prompt", { session_id: sid, cwd: P, prompt: text, prompt_id: `pid-${++n}` }, { CONV_MEMORY_LANG: "" });
+  const E = tmp();
+  for (let i = 1; i <= 5; i++) say(E, "e", `Please refactor the payment module, step ${i} of the plan we agreed on`);
+  assert.equal(status("e").lang, "en", "an English-writing user gets an English plugin");
+  let j = say(E, "e", "/conversation-memory:status");
+  assert.match(ctx(j), /Conversation memory|conversation-memory\]/);
+  assert.doesNotMatch(ctx(j), /[\u0600-\u06FF]{4}/, "the status is written in English");
+  j = say(E, "e", "ok"); // a short prompt decides nothing: still English
+  assert.equal(status("e").lang, "en");
+  j = say(E, "e", "/conversation-memory:settings lang ar");
+  assert.match(j.systemMessage, /اللغة الآن العربية/);
+  for (let i = 0; i < 2; i++) say(E, "e", "Another long English message that would otherwise switch the language back");
+  assert.equal(status("e").lang, "ar", "the user's choice wins over the language they write in");
+  assert.match(say(E, "e", "/conversation-memory:settings lang klingon").systemMessage, /لم أفهم اللغة/);
+  assert.match(say(E, "e", "/conversation-memory:settings every 4").systemMessage, /كل 4 رسائل/);
+  assert.equal(status("e").lang, "ar", "changing the frequency keeps the language");
+  // a project with an Arabic memory from before 2.0 (no lang field), opened by someone whose system is English
+  const A = tmp();
+  fs.writeFileSync(path.join(A, "CONVERSATION_MEMORY.json"), JSON.stringify({ v: 1, project: "قديم", decisions: [], log: [] }));
+  say(A, "o", "ok");
+  assert.equal(status("o").lang, "ar", "no clear language yet: the memory's own language");
+});
 
 test("locks: a stale lock is removed only if it is still the one judged stale; a newer live lock is put back", () => {
   const { breakStale } = require("../../plugin/scripts/lib/fsx.js");

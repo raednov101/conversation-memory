@@ -16,19 +16,27 @@ type Status = {
   lastCapture?: string;
   cost?: number;
   error: string;
+  lang?: string;
   updated: number;
+};
+
+// the indicator's few words, in the plugin's language (the status file says which; files from before 2.0 are Arabic)
+const WORDS = {
+  ar: { manual: "يدوي", session: "نهاية الجلسة", stuck: "تعثّر الحفظ", saving: "يحفظ", tokens: "توكن" },
+  en: { manual: "manual", session: "session end", stuck: "save failed", saving: "saving", tokens: "tokens" },
 };
 
 export function format(s: Status): string {
   // auto: «3/5»; manual: «3 · يدوي»; session (the default): «3 · نهاية الجلسة» (summarized before compaction and at exit)
+  const w = s.lang === "en" ? WORDS.en : WORDS.ar;
   const prog =
-    s.mode === "auto" ? `${Math.min(s.since, s.every)}/${s.every}` : `${s.since} · ${s.mode === "manual" ? "يدوي" : "نهاية الجلسة"}`;
-  if (s.stuck > 0) return `🧠 ⚠️ ${prog} · تعثّر الحفظ`;
-  if (s.pending > 0) return `🧠 ⏳ ${prog} · يحفظ`;
+    s.mode === "auto" ? `${Math.min(s.since, s.every)}/${s.every}` : `${s.since} · ${s.mode === "manual" ? w.manual : w.session}`;
+  if (s.stuck > 0) return `🧠 ⚠️ ${prog} · ${w.stuck}`;
+  if (s.pending > 0) return `🧠 ⏳ ${prog} · ${w.saving}`;
   const cap = s.lastCapture || "";
   if (cap && cap > (s.lastSave || "")) return `🧠 ${prog} · 📝 ${cap.slice(11, 16)}`;
   const t = s.lastSave ? s.lastSave.slice(11, 16) : "";
-  return `🧠 ${prog}` + (t ? ` · ✓ ${t}` : "") + (t && s.cost ? ` · ≈${s.cost.toLocaleString("en-US")} توكن` : "");
+  return `🧠 ${prog}` + (t ? ` · ✓ ${t}` : "") + (t && s.cost ? ` · ≈${s.cost.toLocaleString("en-US")} ${w.tokens}` : "");
 }
 
 async function show($: EngineInterface): Promise<void> {

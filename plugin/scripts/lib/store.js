@@ -5,6 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const C = require("../../core/memory-core.js");
+const T = C.T;
 const { MAX_JSON, MAX_BACKUPS, TRIM_AT, WLOCK_STALE } = require("./config");
 const LIVE_HOLD = 60000; // a hook lives 30 s at most (Claude Code kills it): a process number "alive" for longer is reused
 const { sleep, lst, sha256, nonce, int, today, stamp } = require("./util");
@@ -178,26 +179,26 @@ function restoreBackup(n = 1) {
       err: cur.bad
         ? cur.bad
         : usable.length
-          ? `لا توجد نسخة رقم ${n} (المتاح: 1 إلى ${usable.length})`
-          : "لا توجد نسخة سابقة للاسترجاع بعد",
+          ? T`لا توجد نسخة رقم ${n} (المتاح: 1 إلى ${usable.length})`
+          : T("لا توجد نسخة سابقة للاسترجاع بعد"),
     };
   if (cur.bad) {
     const keep = path.join(projectDir, `CONVERSATION_MEMORY.broken-${stamp()}.json`);
     try {
       writeAtomic(keep, cur.brokenText);
-      notes.push(`ℹ️ ذاكرة المحادثة: كان ملف الذاكرة تالفاً، فحُفظ كما هو في ${path.basename(keep)} قبل الاسترجاع.`);
+      notes.push(T`ℹ️ ذاكرة المحادثة: كان ملف الذاكرة تالفاً، فحُفظ كما هو في ${path.basename(keep)} قبل الاسترجاع.`);
     } catch {
-      return { err: "تعذّر حفظ الملف التالف جانباً، فلم أسترجع شيئاً" };
+      return { err: T("تعذّر حفظ الملف التالف جانباً، فلم أسترجع شيئاً") };
     }
-  } else if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً" };
+  } else if (!backupJson(cur.jsonText)) return { err: T("تعذّر حفظ النسخة الحالية احتياطياً، فلم أسترجع شيئاً") };
   // a hand-edited .md is kept aside first, as every other write does
   if (!cur.bad && cur.exists && cur.mdText != null && cur.memory.mdHash && !isSomeGeneratedView(cur.mdText, cur.memory)) {
     const keep = path.join(projectDir, `CONVERSATION_MEMORY.edited-${stamp()}.md`);
     try {
       writeAtomic(keep, cur.mdText);
-      notes.push(`ℹ️ ذاكرة المحادثة: عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${path.basename(keep)} قبل الاسترجاع.`);
+      notes.push(T`ℹ️ ذاكرة المحادثة: عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${path.basename(keep)} قبل الاسترجاع.`);
     } catch {
-      return { err: "تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أسترجع شيئاً" };
+      return { err: T("تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أسترجع شيئاً") };
     }
   }
   const m = b.memory,
@@ -208,7 +209,7 @@ function restoreBackup(n = 1) {
     writeVerified(P.json, json);
     writeVerified(P.md, md);
   } catch (e) {
-    return { err: "تعذّرت الكتابة: " + (e.code || e.message) };
+    return { err: T("تعذّرت الكتابة: ") + (e.code || e.message) };
   }
   trust(json, m); // the user chose this version
   return { ok: true, when: b.when, log: b.log, decisions: b.decisions };
@@ -337,7 +338,7 @@ function archive(entries) {
 function writeMemory(mutate, confirm) {
   sweepTemps(projectDir);
   const me = heldLock ? null : takeWriteLock();
-  if (!heldLock && !me) return { err: "كاتب آخر يكتب في الذاكرة الآن", busy: true };
+  if (!heldLock && !me) return { err: T("كاتب آخر يكتب في الذاكرة الآن"), busy: true };
   try {
     let keptEdit = false;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -345,47 +346,47 @@ function writeMemory(mutate, confirm) {
       const cur = readMemory();
       if (cur.bad) return { err: cur.bad };
       if (cur.newer)
-        return { err: "ملف الذاكرة كتبه إصدار أحدث من هذا البلقن؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث البلقن", writeFailed: true };
+        return { err: T("ملف الذاكرة كتبه إصدار أحدث من هذا البلقن؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث البلقن"), writeFailed: true };
       let m = cur.memory;
       const baseTrusted = cur.exists ? isTrusted(cur.jsonText) : !cur.mdText;
       if (!cur.exists && cur.mdText) {
         m = C.importLegacy(m, cur.mdText, today());
         if (!attempt)
-          notes.push("ℹ️ ذاكرة المحادثة: نُقل محتوى CONVERSATION_MEMORY.md القديم إلى الصيغة الجديدة كما هو، تحت «من الإصدار السابق».");
+          notes.push(T("ℹ️ ذاكرة المحادثة: نُقل محتوى CONVERSATION_MEMORY.md القديم إلى الصيغة الجديدة كما هو، تحت «من الإصدار السابق»."));
       } else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !isSomeGeneratedView(cur.mdText, m)) {
         const keep = path.join(projectDir, `CONVERSATION_MEMORY.edited-${stamp()}.md`);
         try {
           writeAtomic(keep, cur.mdText);
           keptEdit = true;
-          notes.push(`ℹ️ ذاكرة المحادثة: عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${path.basename(keep)} قبل إعادة توليده.`);
+          notes.push(T`ℹ️ ذاكرة المحادثة: عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${path.basename(keep)} قبل إعادة توليده.`);
         } catch {
-          return { err: "تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أكتب فوقها" };
+          return { err: T("تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أكتب فوقها") };
         }
       }
       let next = mutate(m, cur.token);
-      if (!next) return { err: "لا تغيير" };
+      if (!next) return { err: T("لا تغيير") };
       const t = C.trimForSize(next, TRIM_AT);
       next = t.memory;
       const md = C.render(next);
       next.mdHash = C.hash(md);
       const json = C.serialize(next);
-      if (Buffer.byteLength(json) > MAX_JSON) return { err: "ملف الذاكرة تجاوز 4 ميجا" };
-      if (!backupJson(cur.jsonText)) return { err: "تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها", writeFailed: true };
+      if (Buffer.byteLength(json) > MAX_JSON) return { err: T("ملف الذاكرة تجاوز 4 ميجا") };
+      if (!backupJson(cur.jsonText)) return { err: T("تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها"), writeFailed: true };
       touchWriteLock(me);
       // checked as late as possible: changed meanwhile (the extension, say) → redo on the new version, nothing archived twice
       const again = readSafe(P.json, MAX_JSON);
       if (again.bad || again.text !== cur.jsonText) continue;
       if (t.archived.length) {
-        if (!archive(t.archived)) return { err: "الملف كبير وتعذّر نقل أقدم السجل إلى الأرشيف" };
+        if (!archive(t.archived)) return { err: T("الملف كبير وتعذّر نقل أقدم السجل إلى الأرشيف") };
         notes.push(
-          `ℹ️ ذاكرة المحادثة: نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`,
+          T`ℹ️ ذاكرة المحادثة: نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`,
         );
       }
       try {
         writeVerified(P.json, json);
         writeVerified(P.md, md);
       } catch (e) {
-        return { err: "تعذّرت الكتابة: " + (e.code || e.message), writeFailed: true };
+        return { err: T("تعذّرت الكتابة: ") + (e.code || e.message), writeFailed: true };
       }
       // confirm from the file itself, not from our copy
       const after = C.parseMemory(readSafe(P.json, MAX_JSON).text);
@@ -393,7 +394,7 @@ function writeMemory(mutate, confirm) {
       if (baseTrusted) trust(json, after.memory); // built on a trusted version → still trusted; else it stays for the user to approve
       return { memory: after.memory, token: C.token(json) };
     }
-    return { err: "ملف الذاكرة يتغيّر باستمرار من برنامج آخر؛ سأعيد المحاولة لاحقاً" };
+    return { err: T("ملف الذاكرة يتغيّر باستمرار من برنامج آخر؛ سأعيد المحاولة لاحقاً") };
   } finally {
     dropWriteLock(me);
   }
@@ -404,11 +405,11 @@ const pinsDirOk = () => {
   return !s || (!s.isSymbolicLink() && s.isDirectory());
 };
 function savePin(name, text) {
-  if (!C.pinNameOk(name)) return { err: "اسم النص غير صالح (بلا / أو : أو أسماء محجوزة)" };
-  if (!pinsDirOk()) return { err: "CONVERSATION_PINS رابط رمزي أو غير صالح" };
+  if (!C.pinNameOk(name)) return { err: T("اسم النص غير صالح (بلا / أو : أو أسماء محجوزة)") };
+  if (!pinsDirOk()) return { err: T("CONVERSATION_PINS رابط رمزي أو غير صالح") };
   const d = path.join(P.pins, name);
-  if (path.dirname(d) !== P.pins) return { err: "اسم النص غير صالح" };
-  if (!safeDir(P.pins, 0o755) || !safeDir(d, 0o755)) return { err: "مجلد النص غير صالح" };
+  if (path.dirname(d) !== P.pins) return { err: T("اسم النص غير صالح") };
+  if (!safeDir(P.pins, 0o755) || !safeDir(d, 0o755)) return { err: T("مجلد النص غير صالح") };
   // the next version number is claimed with an exclusive create, so two writers (two sessions, or the extension on a
   // linked folder) can never both take it; the loser simply takes the following number
   for (let tries = 0; tries < 5; tries++) {
@@ -432,11 +433,11 @@ function savePin(name, text) {
     writeAtomic(f, text);
     if (sha256(fs.readFileSync(f, "utf8")) !== sha256(text)) {
       unlinkSafe(f);
-      return { err: "فشل التحقق من البصمة بعد الحفظ" };
+      return { err: T("فشل التحقق من البصمة بعد الحفظ") };
     }
     return { name, v: last + 1, sha: sha256(text) };
   }
-  return { err: "تعارض في رقم النسخة؛ أعد المحاولة" };
+  return { err: T("تعارض في رقم النسخة؛ أعد المحاولة") };
 }
 
 // every version of one pinned text, oldest first: { v, text, sha, date }
@@ -457,15 +458,15 @@ function pinVersions(name) {
 }
 // a chosen part of the memory written for another conversation (.conversation-memory/share/, git-ignored)
 function writeShare(text) {
-  if (!pubSafe() || !safeDir(P.pub, 0o755)) return { err: "مجلد .conversation-memory غير صالح" };
+  if (!pubSafe() || !safeDir(P.pub, 0o755)) return { err: T("مجلد .conversation-memory غير صالح") };
   const d = path.join(P.pub, "share");
-  if (!safeDir(d, 0o755)) return { err: "مجلد المشاركة غير صالح" };
+  if (!safeDir(d, 0o755)) return { err: T("مجلد المشاركة غير صالح") };
   const f = path.join(d, `${stamp()}.md`);
   try {
     writeVerified(f, text);
     return { path: f };
   } catch (e) {
-    return { err: "تعذّرت الكتابة: " + (e.code || e.message) };
+    return { err: T("تعذّرت الكتابة: ") + (e.code || e.message) };
   }
 }
 

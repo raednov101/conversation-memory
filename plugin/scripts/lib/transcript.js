@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const C = require("../../core/memory-core.js");
+const T = C.T;
 const { PART_CHARS, MAX_TRANSCRIPT } = require("./config");
 const { lst, nonce, int, sid8of, today, normText, fullHash } = require("./util");
 const { readSafe, writeAtomic, unlinkSafe } = require("./fsx");
@@ -103,7 +104,7 @@ function capture(s, reason, tp, forSid = sid) {
   if (!want.length) return;
   const turns = readTranscript(tp);
   if (!turns) {
-    notes.push(`⚠️ ذاكرة المحادثة: تعذّرت قراءة سجل المحادثة؛ الرسائل ${want.join("، ")} لم تُنسخ وستُعاد المحاولة.`);
+    notes.push(T`⚠️ ذاكرة المحادثة: تعذّرت قراءة سجل المحادثة؛ الرسائل ${want.join(T("، "))} لم تُنسخ وستُعاد المحاولة.`);
     return;
   }
   const byPid = new Map(),
@@ -133,13 +134,14 @@ function capture(s, reason, tp, forSid = sid) {
   matched.sort((a, b) => a.i - b.i);
   if (missing.length)
     notes.push(
-      `⚠️ ذاكرة المحادثة: لم يُعثر في سجل المحادثة على الرسائل ${missing.sort((a, b) => a - b).join("، ")}؛ بقيت معلّقة وستُعاد محاولة نسخها.`,
+      T`⚠️ ذاكرة المحادثة: لم يُعثر في سجل المحادثة على الرسائل ${missing.sort((a, b) => a - b).join(T("، "))}؛ بقيت معلّقة وستُعاد محاولة نسخها.`,
     );
   if (!matched.length) return;
   const chunks = [];
   let cur = "";
   for (const { i, t } of matched) {
-    let block = C.redact(`### رسالة المستخدم (${i})\n${t.user}\n\n### رد Claude\n${t.assistant.join("\n\n") || "(لا يوجد نص)"}\n\n`).text;
+    // the capture format is read back (handlers.js CAP_*_RE): never translated
+    let block = C.redact(`### رسالة المستخدم (${i})\n${t.user}\n\n### رد Claude\n${t.assistant.join("\n\n") || "(لا يوجد نص)"}\n\n`).text; // i18n-skip
     if (cur && cur.length + block.length > PART_CHARS) {
       chunks.push(cur);
       cur = "";
@@ -177,7 +179,7 @@ function capture(s, reason, tp, forSid = sid) {
     });
   } catch {
     written.forEach(unlinkSafe);
-    notes.push("⚠️ ذاكرة المحادثة: فشل حفظ الرسائل غير الملخّصة؛ ستُعاد المحاولة.");
+    notes.push(T("⚠️ ذاكرة المحادثة: فشل حفظ الرسائل غير الملخّصة؛ ستُعاد المحاولة."));
     return;
   }
   for (const { i } of matched) s.done[i] = 1;

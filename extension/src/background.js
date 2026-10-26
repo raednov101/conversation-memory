@@ -1,6 +1,8 @@
 // Routes page requests to the offscreen writer, serializes "who sends the summary request" between tabs,
 // and owns the "pin selected text" menu.
 "use strict";
+importScripts("i18n-en.js", "memory-core.js"); // the interface's language (T) for the few messages written here
+const T = self.MemoryCore.T;
 const OFFSCREEN = "src/offscreen.html";
 const SITES = ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"];
 const DEFAULTS = { every: 10, mode: "auto", paused: false, autoLink: true, byok: false };
@@ -30,12 +32,12 @@ const keyGet = () =>
   });
 async function byok(text, maxTokens) {
   const c = await keyGet();
-  if (!c || !c.key || !API[c.provider]) return { ok: false, error: "لا يوجد مفتاح محفوظ؛ أضفه من الإعدادات" };
+  if (!c || !c.key || !API[c.provider]) return { ok: false, error: T("لا يوجد مفتاح محفوظ؛ أضفه من الإعدادات") };
   const model = String(c.model || MODELS[c.provider]).slice(0, 80);
   const hide = (t) =>
     String(t || "")
       .split(c.key)
-      .join("(المفتاح)")
+      .join(T("(المفتاح)"))
       .slice(0, 200);
   const ctl = new AbortController(),
     t = setTimeout(() => ctl.abort(), 120000);
@@ -83,9 +85,9 @@ async function byok(text, maxTokens) {
     return {
       ok: false,
       error: /abort/i.test(String(e))
-        ? "لم يرد المزوّد خلال دقيقتين"
+        ? T("لم يرد المزوّد خلال دقيقتين")
         : /failed to fetch|network/i.test(String(e))
-          ? "تعذّر الاتصال بالمزوّد (هل منحت الإذن من الإعدادات؟)"
+          ? T("تعذّر الاتصال بالمزوّد (هل منحت الإذن من الإعدادات؟)")
           : hide(e && e.message),
     };
   } finally {
@@ -116,6 +118,11 @@ async function ensureOffscreen() {
 }
 // a writer just created may not be listening yet ("Receiving end does not exist"): ask again for up to ~2 s
 async function toOffscreen(op, args) {
+  // the writer answers in the asker's language; a caller that didn't say gets the one chosen in the settings
+  if (!args || !args.lang) {
+    const { settings = {} } = await chrome.storage.local.get("settings").catch(() => ({}));
+    args = { ...(args || {}), lang: settings.lang || chrome.i18n.getUILanguage() };
+  }
   for (let i = 0; ; i++) {
     await ensureOffscreen();
     try {
@@ -212,7 +219,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "cm-pin",
-      title: "📌 ثبّت النص المحدد في ذاكرة المشروع",
+      title: T("📌 ثبّت النص المحدد في ذاكرة المشروع"),
       contexts: ["selection"],
       documentUrlPatterns: [...SITES, ...(self.CM_TEST_HOSTS || [])],
     });

@@ -37,9 +37,10 @@
 // lib/: config (limits) · util · fsx (safe files) · context (input, paths) · state (private state, lock)
 //       transcript (read + capture) · requests (what is due) · store (memory files) · handlers (one per event)
 const { mode, input, sid, HOME, notes, privateDirOk } = require("./lib/context");
+const { T } = require("../core/memory-core.js");
 const { fullHash } = require("./lib/util");
 const { unlinkSafe } = require("./lib/fsx");
-const { lock, unlock, loadState, saveState, session, writeStatus, queueEvent } = require("./lib/state");
+const { lock, unlock, loadState, saveState, session, writeStatus, queueEvent, loadCfg, applyLang } = require("./lib/state");
 const { capture } = require("./lib/transcript");
 const { parseCommand } = require("./lib/requests");
 const { onPrompt, onStop, onStart, onPreTool, replayEvents } = require("./lib/handlers");
@@ -48,8 +49,9 @@ const { onPrompt, onStop, onStart, onPreTool, replayEvents } = require("./lib/ha
 function main() {
   const out = {};
   try {
+    applyLang(loadCfg(), mode === "prompt" ? input.prompt : ""); // every word below is written in this project's language
     if (!privateDirOk()) {
-      if (mode === "start") notes.push(`⚠️ ذاكرة المحادثة: تعذّر إنشاء المجلد الخاص ${HOME}؛ الحفظ التلقائي متوقف.`);
+      if (mode === "start") notes.push(T`⚠️ ذاكرة المحادثة: تعذّر إنشاء المجلد الخاص ${HOME}؛ الحفظ التلقائي متوقف.`);
     } else if (mode === "pretool") onPreTool(out);
     else {
       const locked = lock();
@@ -63,25 +65,26 @@ function main() {
             // a command can't run later on its own (its answer belongs to this turn): say so instead of pretending
             notes.push(
               isCmd
-                ? "⚠️ ذاكرة المحادثة: النظام مشغول بجلسة أخرى فلم يُنفَّذ الأمر؛ أعده بعد لحظات."
+                ? T("⚠️ ذاكرة المحادثة: النظام مشغول بجلسة أخرى فلم يُنفَّذ الأمر؛ أعده بعد لحظات.")
                 : ok
-                  ? "⚠️ ذاكرة المحادثة: النظام مشغول؛ سُجّلت الرسالة وستُحتسب لاحقاً."
-                  : "⚠️ ذاكرة المحادثة: تعذّر تسجيل هذه الرسالة.",
+                  ? T("⚠️ ذاكرة المحادثة: النظام مشغول؛ سُجّلت الرسالة وستُحتسب لاحقاً.")
+                  : T("⚠️ ذاكرة المحادثة: تعذّر تسجيل هذه الرسالة."),
             );
             if (isCmd)
               out.hookSpecificOutput = {
                 hookEventName: "UserPromptSubmit",
-                additionalContext:
+                additionalContext: T(
                   "[conversation-memory] النظام مشغول بجلسة أخرى فلم يُنفَّذ أمر الذاكرة هذا. أخبر المستخدم في سطر أن يعيده بعد لحظات، ولا تدّعِ أنه نُفّذ.",
+                ),
               };
           } else if (mode === "precompact" || mode === "end")
             notes.push(
               queueEvent({ type: "capture", sid, tp: String(input.transcript_path || ""), reason: mode === "end" ? "end" : "compact" })
-                ? "⚠️ ذاكرة المحادثة: النظام مشغول؛ سيُنسخ ما لم يُلخّص في أقرب فرصة."
-                : "⚠️ ذاكرة المحادثة: تعذّر نسخ الرسائل غير الملخّصة الآن.",
+                ? T("⚠️ ذاكرة المحادثة: النظام مشغول؛ سيُنسخ ما لم يُلخّص في أقرب فرصة.")
+                : T("⚠️ ذاكرة المحادثة: تعذّر نسخ الرسائل غير الملخّصة الآن."),
             );
           else if (mode === "start") onStart(null, out, false);
-          else if (mode === "stop") notes.push("⚠️ ذاكرة المحادثة: النظام مشغول؛ يُتحقق من الحفظ في الرد القادم.");
+          else if (mode === "stop") notes.push(T("⚠️ ذاكرة المحادثة: النظام مشغول؛ يُتحقق من الحفظ في الرد القادم."));
         } else {
           const state = loadState();
           let used = [];
@@ -98,7 +101,7 @@ function main() {
             } else if (mode === "start") onStart(state, out, true);
           } catch (e) {
             if (process.env.CM_DEBUG) process.stderr.write(String(e && e.stack) + "\n");
-            notes.push(`⚠️ ذاكرة المحادثة: خطأ داخلي (${e.code || e.name || "?"}). المحادثة لم تتأثر، وما حُفظ قبله محفوظ.`);
+            notes.push(T`⚠️ ذاكرة المحادثة: خطأ داخلي (${e.code || e.name || "?"}). المحادثة لم تتأثر، وما حُفظ قبله محفوظ.`);
           } finally {
             if (saveState(state)) for (const p of used) unlinkSafe(p);
           }
