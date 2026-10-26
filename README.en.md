@@ -44,7 +44,7 @@ The interface follows your browser's language (Arabic or English), or the one yo
 - **Architecture and decisions:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), in Arabic.
 - **How accurate the checks are:** [tests/eval/README.md](tests/eval/README.md). Held-out sets were labelled by authors who never saw the rules; the results are published as measured, including where 2.0 is not better.
 - **Tests:**
-  - `npm test`: 151 unit tests.
+  - `npm test`: 158 unit tests.
   - `npm run e2e`: 229 checks in Chromium.
   - `npm run integration`: a live Claude Code run.
 

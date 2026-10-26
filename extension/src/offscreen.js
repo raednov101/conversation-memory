@@ -428,7 +428,9 @@ const ops = {
     if (!/^(chatgpt|claude|gemini)?-?general$/.test(String(from)) || !/^[a-z0-9-]{3,80}$/.test(String(key)))
       return { ok: false, error: T("طلب فصل غير صالح") };
     // a batch keeps only the first 24 characters of a chat's key: without the whole key the chat would never find its memory
-    if (String(key).length <= 24) return { ok: false, error: T("لم أتعرّف على هذه المحادثة كاملة؛ افتحها مرة في الموقع ثم أعد المحاولة") };
+    // (a key shorter than 24 is whole; one of exactly 24 may be cut, unless the chat's saved text carries that name)
+    if (String(key).length === 24 && !(await transcriptsOf(await browserRoot(String(from))))[key])
+      return { ok: false, error: T("لم أتعرّف على هذه المحادثة كاملة؛ افتحها مرة في الموقع ثم أعد المحاولة") };
     const site = String(key).split("-")[0],
       to = String(key).replace(`${site}-`, `${site}-c-`);
     const src = await browserRoot(String(from)),
