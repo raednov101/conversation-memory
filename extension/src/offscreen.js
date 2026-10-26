@@ -28,6 +28,7 @@ const {
   stamp,
   today,
   writeVerified,
+  DATA,
 } = self.CMW.storage;
 const {
   readMemory,
@@ -393,6 +394,48 @@ const ops = {
     }
     out.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
     return { ok: true, list: out, linked: !!(await kvGet("root")) };
+  },
+  // Housekeeping: each chat outside a project gets its own folder in the browser; one that never got a memory, a pinned
+  // text or a saved conversation, untouched for a week, is removed (never in a folder you linked: only the browser's own).
+  async sweepEmpty() {
+    let d;
+    try {
+      d = await dir(await navigator.storage.getDirectory(), ["projects"]);
+    } catch {
+      return { ok: true, removed: 0 };
+    }
+    const names = await scopeNames(),
+      gone = [],
+      weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const hasEntries = async (h) => {
+      for await (const e of h.entries()) {
+        void e;
+        return true;
+      }
+      return false;
+    };
+    for await (const [scope, fh] of d.entries()) {
+      if (fh.kind !== "directory" || !/-c-/.test(scope) || scope === ctx.scope) continue;
+      let keep = false,
+        newest = 0;
+      for await (const [n, h] of fh.entries()) {
+        if (n !== DATA || h.kind !== "directory") {
+          keep = true;
+          break;
+        }
+        for await (const [, x] of h.entries()) {
+          if (x.kind === "directory") keep = keep || (await hasEntries(x));
+          else newest = Math.max(newest, (await x.getFile()).lastModified);
+        }
+        if (keep) break;
+      }
+      if (keep || newest > weekAgo) continue;
+      await d.removeEntry(scope, { recursive: true }).catch(() => {});
+      gone.push(scope);
+      delete names[scope];
+    }
+    if (gone.length) await kvSet("scopeNames", names);
+    return { ok: true, removed: gone.length };
   },
   // this site's memories only (the background sets the site; "*" only on the local test pages)
   async listSiteScopes({ site }) {

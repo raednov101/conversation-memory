@@ -166,3 +166,25 @@ test("history: a file near the size limit moves the oldest events to the archive
   );
   assert.equal(t.memory.archived, 0, "the count of archived summaries is not inflated by them");
 });
+
+test("relevance: a task picks the decisions, pins and log entries about it; summary and constraints always come", () => {
+  const m = C.normalizeMemory({
+    summary: { goal: "افتتاح مقهى" },
+    constraints: ["الميزانية 40 ألف"],
+    decisions: [
+      { id: "d1", text: "موعد الافتتاح 15 نوفمبر", quote: "الافتتاح 15 نوفمبر" },
+      { id: "d2", text: "مكان الافتتاح حديقة المبنى", quote: "في الحديقة" },
+      { id: "d3", text: "خط الكوفي للشعار", quote: "الكوفي للشعار" },
+      { id: "d4", text: "دعوة الافتتاح باللونين الأزرق والذهبي", quote: "الدعوة أزرق وذهبي", status: "revoked" },
+    ],
+    pins: [{ name: "نص دعوة الافتتاح", version: 1 }],
+    log: [{ id: "b1", raised: ["نقاش الشعار والخطوط"] }, { id: "b2", raised: ["تجهيز دعوة الافتتاح وقائمة الضيوف"] }],
+  });
+  const s = C.relevant(m, "أكتب دعوة الافتتاح");
+  assert.equal(s.summary, true);
+  assert.equal(s.constraints, true);
+  assert.deepEqual(s.decisions.sort(), ["d1", "d2"], "the opening's date and place; not the logo font, not a revoked decision");
+  assert.deepEqual(s.pins, ["نص دعوة الافتتاح"]);
+  assert.deepEqual(s.log, ["b2"]);
+  assert.deepEqual(C.relevant(m, "").decisions, [], "nothing typed: nothing picked beyond the summary");
+});

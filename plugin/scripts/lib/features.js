@@ -171,13 +171,15 @@ function shareCommand(args) {
     );
     return (
       T(
-        "[conversation-memory] ما يمكن نقله إلى محادثة أخرى (اعرض القائمة للمستخدم كما هي، ثم يكتب الأمر مع ما يختاره، مثل: /conversation-memory:share summary d1 d3 L2):\n",
+        "[conversation-memory] ما يمكن نقله إلى محادثة أخرى (اعرض القائمة للمستخدم كما هي، ثم يكتب الأمر مع ما يختاره، مثل: /conversation-memory:share summary d1 d3 L2، أو يصف مهمته: /conversation-memory:share about دعوة الافتتاح):\n",
       ) + dataBlock(lines.map((l) => "- " + l).join("\n"))
     );
   }
-  const sel = { summary: false, constraints: false, decisions: [], pins: [], log: [] },
+  // /conversation-memory:share about <words>: what in the memory is about that task (C.relevant)
+  const about = args.match(/^(?:about|عن|حول)\s+([\s\S]+)$/i);
+  const sel = about ? C.relevant(m, about[1]) : { summary: false, constraints: false, decisions: [], pins: [], log: [] },
     unknown = [];
-  for (const t of args.split(/\s+/)) {
+  for (const t of about ? [] : args.split(/\s+/)) {
     if (/^(summary|الخلاصة)$/i.test(t)) sel.summary = true;
     else if (/^(constraints|القيود)$/i.test(t)) sel.constraints = true;
     else if (/^d\d{1,6}$/.test(t)) sel.decisions.push(t);

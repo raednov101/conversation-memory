@@ -6,8 +6,10 @@
 "use strict";
 const path = require("path");
 const C = require(path.join(__dirname, "..", "..", "core", "memory-core.js"));
-// --dev: the development set (tests/eval/dev.json), the only one the rules may be tuned on
-const cases = require(process.argv.includes("--dev") ? "./dev.json" : "./cases.json");
+// Sets: --dev (dev.json) and --dev2 (dev2.json) are the only ones the rules may be tuned on; the default is the first
+// held-out set (cases.json, already measured, so no longer blind), --v2 the second held-out set (cases2.json).
+const pick = (f) => process.argv.includes(f);
+const cases = require(pick("--dev") ? "./dev.json" : pick("--dev2") ? "./dev2.json" : pick("--v2") ? "./cases2.json" : "./cases.json");
 const verbose = process.argv.includes("--verbose");
 const userNumber = (turns, idx) => turns.slice(0, idx + 1).filter((t) => t.role === "user").length; // the corpus counts turns from 0
 const stats = { trust: { ok: 0, bad: 0 }, hold: { ok: 0, bad: 0 } },

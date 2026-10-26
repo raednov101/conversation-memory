@@ -214,6 +214,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
 });
 
+// housekeeping once per browser start: empty folders of chats that never got a memory (inside the browser only)
+chrome.runtime.onStartup.addListener(() => toOffscreen("sweepEmpty", {}).catch(() => {}));
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") chrome.runtime.openOptionsPage();
   chrome.contextMenus.removeAll(() => {

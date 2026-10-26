@@ -27,6 +27,8 @@
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media (max-width:640px){.grid{grid-template-columns:1fr}}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;backdrop-filter:blur(6px)}
+  .welcome{margin-bottom:12px;border-color:var(--primary2);box-shadow:0 6px 20px rgba(9,82,168,.15)}
+  .welcome h2{font-size:16px}.welcome p{margin:4px 0 10px}
   h2{font-size:14px;margin:0 0 8px;color:var(--gold);font-weight:700}
   h3{font-size:13px;margin:14px 0 4px;font-weight:700}
   .muted{color:var(--muted);font-size:12.5px}
@@ -74,6 +76,26 @@
     </div>
     <span id="folderChip" class="chip">…</span>
   </header>
+
+  <section class="card welcome" id="welcome" hidden aria-live="polite">
+    <div class="step" data-step="1">
+      <h2>🧠 تعمل وحدها</h2>
+      <p>افتح أي محادثة في ChatGPT أو Claude وتكلّم كعادتك. كل 10 رسائل تلخّص الإضافة ما طُرح وتقرّر، وتحفظه في ذاكرة المشروع داخل متصفحك. لا حساب ولا إعداد.</p>
+    </div>
+    <div class="step" data-step="2" hidden>
+      <h2>الشارة أسفل الصفحة</h2>
+      <p>📝 حُفظ نص المحادثة · ✓ حُدّث الملخص · 🔎 شيء ينتظر رأيك · ⚠️ تعثّر، ومعه السبب. اضغطها لترى التفاصيل والأزرار.</p>
+    </div>
+    <div class="step" data-step="3" hidden>
+      <h2>أنت صاحب القرار</h2>
+      <p>لا يُحفظ قرار باسمك إلا ومعه كلامك. ما لا يثبت ينتظرك في «🔎 راجع القرارات»، وكل تغيير في «🕘 سجل التغييرات» هنا، ويمكنك التراجع عن أي تغيير وحده.</p>
+    </div>
+    <div class="step" data-step="4" hidden>
+      <h2>في محادثة جديدة</h2>
+      <p>«📥 أدرج الذاكرة» تضعها في خانة الرسالة، أو «📤 انقل معلومات» واكتب مهمتك فأختار ما يخصها. لا يُرسل شيء دون أن تضغط أنت.</p>
+    </div>
+    <div class="row"><button type="button" id="tourBack" hidden>السابق</button><button type="button" id="tourNext" class="primary">التالي</button><button type="button" id="tourSkip">تخطَّ الجولة</button><span id="tourDots" class="muted"></span></div>
+  </section>
 
   <div class="grid">
     <section class="card">
@@ -169,6 +191,7 @@
         • «📤 انقل معلومات مختارة»: تختار، وتعاين، ثم تُدرج دون إرسال.<br>
         • «🔎 راجع القرارات»: ما كتبه النموذج ولم يثبت من كلامك (قرار، أو إلغاء قرار، أو تغيير قيد)، فلم يُطبَّق حتى توافق عليه أو ترفضه.</p>
     </details>
+    <p><button type="button" id="tourAgain">🧭 جولة التعريف من جديد</button></p>
     <details><summary>عند مشكلة: سجل التشخيص</summary>
       <p>سجل تقني قصير بآخر ما حدث (أعطال الحفظ، وتغيّر صفحات المواقع)، بلا أي نص من محادثاتك أو ذاكرتك. نزّله وأرفقه ببلاغك.</p>
       <div class="row"><button id="diagExport" type="button">نزّل سجل التشخيص</button><span id="diagMsg" class="muted"></span></div>

@@ -1,0 +1,3889 @@
+[
+  {
+    "id": "gulf-dubai-hotel-car-partial",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بنروح دبي آخر الشهر أنا والعيال، ساعدني أرتب"
+      },
+      {
+        "role": "assistant",
+        "text": "حياك! أقترح نحجز فندق في دبي مارينا عشان قريب من البحر، ونستأجر سيارة للتنقل طول الأسبوع."
+      },
+      {
+        "role": "user",
+        "text": "الفندق تمام، بس السيارة لا ما نحتاجها، بنستخدم تاكسي وكريم"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حجز فندق في دبي مارينا واستئجار سيارة طوال الأسبوع",
+            "source": "assistant-approved",
+            "quote": "الفندق تمام"
+          },
+          {
+            "text": "التنقل بالتاكسي وكريم بدل استئجار سيارة",
+            "source": "user",
+            "quote": "السيارة لا ما نحتاجها، بنستخدم تاكسي وكريم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User approved only the hotel and explicitly rejected the car rental.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "User clearly chose taxi/Careem over a rental car.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "gulf-wedding-hall-defer",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أدور قاعة لعرس أخوي في الرياض، تقريباً ٣٠٠ معزوم"
+      },
+      {
+        "role": "assistant",
+        "text": "قاعة الريم تستوعب ٣٥٠ وسعرها مناسب، أنصحك فيها. أحجزها لك مبدئياً؟"
+      },
+      {
+        "role": "user",
+        "text": "والله شكلها حلوة، بس خلني أشاور الوالد وأرد عليك"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حجز قاعة الريم للعرس",
+            "source": "assistant-approved",
+            "quote": "والله شكلها حلوة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "A compliment followed by deferral to the father; no booking approval.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "gulf-majlis-budget-before-ramadan",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نبي نجدد المجلس، الميزانية ما تتعدى ٥٠ ألف، وأبي الشغل يخلص قبل رمضان"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بحط لك خطة على هالأساس."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "ميزانية تجديد المجلس لا تتجاوز ٥٠ ألف",
+            "quote": "الميزانية ما تتعدى ٥٠ ألف"
+          },
+          {
+            "text": "ينتهي شغل التجديد بعد رمضان",
+            "quote": "وأبي الشغل يخلص قبل رمضان"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "User set a 50k ceiling.",
+        "cat": "constraint-add-valid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "hold",
+        "why": "User said before Ramadan; the draft says after.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "gulf-patrol-replace-valid",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "قررت آخذ لاندكروزر ٢٠٢٤ للعائلة"
+      },
+      {
+        "role": "assistant",
+        "text": "اختيار ممتاز، تبيني أقارن لك الفئات؟"
+      },
+      {
+        "role": "user",
+        "text": "لا خلاص غيرت رايي، بناخذ باترول بدال اللاندكروزر، الوكيل عطاني عرض أحسن"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "شراء لاندكروزر ٢٠٢٤ للعائلة",
+          "source": "user",
+          "quote": "قررت آخذ لاندكروزر ٢٠٢٤ للعائلة",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "شراء باترول بدل اللاندكروزر لأن الوكيل قدّم عرضاً أفضل",
+            "source": "user",
+            "quote": "بناخذ باترول بدال اللاندكروزر",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Explicit change of mind: Patrol instead of Land Cruiser.",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-meeting-monday-hypothetical",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خل اجتماع الشركاء يوم الأحد الساعة ١٠ الصبح"
+      },
+      {
+        "role": "assistant",
+        "text": "تم، الأحد ١٠ صباحاً."
+      },
+      {
+        "role": "user",
+        "text": "طيب لو نخليه الاثنين، تتوقع بيكون أنسب للكل ولا لا؟"
+      },
+      {
+        "role": "assistant",
+        "text": "الاثنين عادة أزحم، بس ممكن."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "اجتماع الشركاء يوم الأحد الساعة ١٠ صباحاً",
+          "source": "user",
+          "quote": "خل اجتماع الشركاء يوم الأحد الساعة ١٠ الصبح",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "نقل اجتماع الشركاء إلى الاثنين الساعة ١٠ صباحاً",
+            "source": "user",
+            "quote": "لو نخليه الاثنين",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User only asked hypothetically whether Monday would suit; no change made.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-gym-4am-sarcasm",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أبي أرجع للنادي بس دوامي من ٧ الصبح"
+      },
+      {
+        "role": "assistant",
+        "text": "شو رايك تصحى الساعة ٤ الفجر وتتمرن قبل الدوام؟"
+      },
+      {
+        "role": "user",
+        "text": "إيه أكيد، وبعدين أنام على المكتب 😂 عطني حل واقعي"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الاستيقاظ الساعة ٤ فجراً والتمرين قبل الدوام",
+            "source": "assistant-approved",
+            "quote": "إيه أكيد"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Sarcastic \"sure\"; user asks for a realistic alternative.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "gulf-kabsa-no-onion-today",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عطني وصفة كبسة دجاج للغدا اليوم، بس لا تحط بصل لأنه خالص عندي"
+      },
+      {
+        "role": "assistant",
+        "text": "أكيد، هذي وصفة كبسة بدون بصل، وعوضته بشوية فلفل رومي."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "غداء اليوم كبسة دجاج بدون بصل لأن البصل خالص في البيت",
+            "source": "user",
+            "quote": "عطني وصفة كبسة دجاج للغدا اليوم، بس لا تحط بصل"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "عدم استخدام البصل في أي وصفة أبداً",
+            "quote": "لا تحط بصل"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Faithful rewording with the stated reason.",
+        "cat": "paraphrase"
+      },
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "One-off (onions ran out today) turned into a standing rule.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "gulf-camping-roles-swap",
+    "lang": "ar-gulf",
+    "turns": [
+      {
+        "role": "user",
+        "text": "رحلة البر يوم الخميس: خل أحمد يسوق الجمس، وسالم يتكفل بالأكل والفحم"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، سجلت التوزيع."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "سالم يسوق الجمس، وأحمد يتكفل بالأكل والفحم",
+            "source": "user",
+            "quote": "خل أحمد يسوق الجمس، وسالم يتكفل بالأكل والفحم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Roles of Ahmed and Salem are swapped.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "egy-birthday-ok-but-9",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايزة أعمل عيد ميلاد لبنتي، ساعدني أنظم"
+      },
+      {
+        "role": "assistant",
+        "text": "إيه رأيك نعمل الحفلة يوم الخميس الساعة ٨ بالليل في البيت؟"
+      },
+      {
+        "role": "user",
+        "text": "ماشي بس خليها ٩، جوزي بيرجع متأخر"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حفلة عيد الميلاد يوم الخميس الساعة ٨ مساءً في البيت",
+            "source": "assistant-approved",
+            "quote": "ماشي"
+          },
+          {
+            "text": "حفلة عيد الميلاد يوم الخميس الساعة ٩ مساءً في البيت لأن الزوج يرجع متأخراً",
+            "source": "assistant-approved",
+            "quote": "ماشي بس خليها ٩"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Approval came with a change to 9; draft keeps 8.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "Accepted plan with the user's own time change applied.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "egy-maadi-flat-asks-options",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدور على شقة إيجار قريبة من شغلي في التجمع"
+      },
+      {
+        "role": "assistant",
+        "text": "أنصحك بالشقة اللي في المعادي، ٨ آلاف في الشهر وقريبة من المترو."
+      },
+      {
+        "role": "user",
+        "text": "طيب، وإيه الاختيارات التانية اللي عندك؟"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "استئجار شقة المعادي بـ٨ آلاف في الشهر",
+            "source": "assistant-approved",
+            "quote": "طيب"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "\"طيب\" just introduces a request for other options.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "egy-vegetarian-meal-plan",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايز خطة أكل للأسبوع، ومش عايز أي حاجة فيها لحمة خالص، أنا نباتي"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، هعملك خطة نباتية كاملة."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "ممنوع أي أكل فيه لحمة نهائياً (المستخدم نباتي)",
+            "quote": "مش عايز أي حاجة فيها لحمة خالص، أنا نباتي"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "Clear standing dietary rule from the user.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "egy-diet-cake-little-sugar",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بعمل كيكة دايت، ممكن نحط سكر بس قليل جداً"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، هقلل السكر لربع كوباية."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "بدون سكر في الوصفة",
+            "quote": "ممكن نحط سكر بس قليل جداً"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Polarity flipped: user allowed a little sugar.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "egy-alex-car-replace-and-undecided-day",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "هنسافر إسكندرية بالقطر، ونتحرك الجمعة الصبح"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، أحجزلكم تذاكر قطر الجمعة؟"
+      },
+      {
+        "role": "user",
+        "text": "لأ بقولك إيه، هنروح بالعربية أحسن بدل القطر. ولسه مش عارف هنتحرك الجمعة ولا السبت"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "السفر إلى إسكندرية بالقطر",
+          "source": "user",
+          "quote": "هنسافر إسكندرية بالقطر",
+          "msg": 0
+        },
+        {
+          "id": "d2",
+          "text": "التحرك يوم الجمعة الصبح",
+          "source": "user",
+          "quote": "نتحرك الجمعة الصبح",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "السفر إلى إسكندرية بالعربية بدل القطر",
+            "source": "user",
+            "quote": "هنروح بالعربية أحسن بدل القطر",
+            "replaces": "d1"
+          },
+          {
+            "text": "التحرك يوم السبت",
+            "source": "user",
+            "quote": "هنتحرك الجمعة ولا السبت",
+            "replaces": "d2"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Clear switch from train to car.",
+        "cat": "replace-valid"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "User is undecided between Friday and Saturday; nothing changed.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "egy-transfer-savings-to-current",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايز أحول ١٠ آلاف من حساب التوفير للحساب الجاري عشان أدفع القسط"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، تقدر تعملها من الأبلكيشن في دقيقة."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "تحويل ١٠ آلاف من الحساب الجاري إلى حساب التوفير",
+            "source": "user",
+            "quote": "عايز أحول ١٠ آلاف من حساب التوفير للحساب الجاري"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "From/to direction reversed.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "egy-postpone-budget-meeting",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خلينا نأجل اجتماع الميزانية للأسبوع الجاي، المدير مسافر"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، هبعت إيميل بالتأجيل للفريق."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "تأجيل اجتماع الميزانية للأسبوع القادم لأن المدير مسافر",
+            "source": "user",
+            "quote": "خلينا نأجل اجتماع الميزانية للأسبوع الجاي"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Faithful restatement with the user's reason.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "egy-cake-delivery-wrong-target",
+    "lang": "ar-egy",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اطلب تورتة شوكولاتة من محل حلواني البلد"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، والتوصيل إمتى؟"
+      },
+      {
+        "role": "user",
+        "text": "خليهم يوصلوها الساعة ٣"
+      },
+      {
+        "role": "assistant",
+        "text": "اتفقنا."
+      },
+      {
+        "role": "user",
+        "text": "معلش خليهم يوصلوها الساعة ٥ بدل ٣"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "طلب تورتة شوكولاتة من حلواني البلد",
+          "source": "user",
+          "quote": "اطلب تورتة شوكولاتة من محل حلواني البلد",
+          "msg": 0
+        },
+        {
+          "id": "d2",
+          "text": "توصيل التورتة الساعة ٣",
+          "source": "user",
+          "quote": "خليهم يوصلوها الساعة ٣",
+          "msg": 2
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "توصيل التورتة الساعة ٥ بدل ٣",
+            "source": "user",
+            "quote": "خليهم يوصلوها الساعة ٥ بدل ٣",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User changed the delivery time (d2), but the draft replaces the cake order (d1).",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "lev-paint-salon-only",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي غيّر ألوان البيت، شو بتقترح؟"
+      },
+      {
+        "role": "assistant",
+        "text": "منقترح ندهن الصالون أبيض والمطبخ رمادي فاتح."
+      },
+      {
+        "role": "user",
+        "text": "الصالون أبيض ماشي، المطبخ بعدني محتار فيه"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "دهان الصالون أبيض والمطبخ رمادي فاتح",
+            "source": "assistant-approved",
+            "quote": "الصالون أبيض ماشي"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Only the living room was approved; kitchen still undecided.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "lev-gift-list-not-restaurant",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عيد ميلاد مرتي الجمعة وبدي فاجئها"
+      },
+      {
+        "role": "assistant",
+        "text": "بتحب احجزلك طاولة بمطعم بالأشرفية؟ وكمان فيني ابعتلك قائمة أفكار هدايا."
+      },
+      {
+        "role": "user",
+        "text": "إيه ابعتلي القائمة، المطعم منشوف بعدين"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "حجز طاولة بمطعم في الأشرفية",
+            "source": "assistant-approved",
+            "quote": "إيه"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "The \"yes\" was for the gift list; the restaurant was deferred.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "lev-driving-hours-number",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "رايحين رحلة عالأردن بالسيارة، وما بدي أكتر من ٣ ساعات سواقة باليوم"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، رح قسّم الطريق على مراحل قصيرة."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "ألا تتجاوز السواقة ٥ ساعات في اليوم",
+            "quote": "ما بدي أكتر من ٣ ساعات سواقة باليوم"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "User set 3 hours, draft says 5.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "lev-kids-bedtime-ma-lazem",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي برنامج يومي للولاد بالصيفية، بس الولاد ما لازم يناموا بعد الساعة ٩"
+      },
+      {
+        "role": "assistant",
+        "text": "أكيد، رح خلي آخر نشاط ينتهي قبل التمانة ونص."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "يجب أن ينام الأولاد قبل الساعة ٩ مساءً",
+            "quote": "الولاد ما لازم يناموا بعد الساعة ٩"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "Levantine \"ما لازم\" = must not; kids must not sleep later than 9.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "lev-petra-instead-wadi-rum",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نهار الجمعة منروح عوادي رم"
+      },
+      {
+        "role": "assistant",
+        "text": "حلو، بتحب ننام بمخيم هونيك؟"
+      },
+      {
+        "role": "user",
+        "text": "يا زلمة خلص، بلاها وادي رم، منروح عالبترا بدالها"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "الذهاب إلى وادي رم يوم الجمعة",
+          "source": "user",
+          "quote": "نهار الجمعة منروح عوادي رم",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الذهاب إلى البترا يوم الجمعة بدل وادي رم",
+            "source": "user",
+            "quote": "بلاها وادي رم، منروح عالبترا بدالها",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Colloquial but explicit swap of destination.",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "lev-piano-tuesday-not-wednesday",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "درس البيانو صار الساعة ٤ يوم التلاتا، مش الأربعا متل قبل"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، سجلتها."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "درس البيانو يوم الأربعاء الساعة ٤",
+            "source": "user",
+            "quote": "درس البيانو صار الساعة ٤ يوم التلاتا"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Day wrong: Tuesday now, Wednesday was the old day.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "lev-coffee-caution-not-rule",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عم بعاني من أرق من فترة"
+      },
+      {
+        "role": "assistant",
+        "text": "انتبه، الأفضل ما تشرب قهوة بعد العصر إذا عندك أرق."
+      },
+      {
+        "role": "user",
+        "text": "طيب، وشو بتنصحني آكل عالعشا؟"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "ممنوع شرب القهوة بعد العصر",
+            "quote": "طيب"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Assistant's advice turned into a user rule; user moved on.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "lev-hosting-basic-plan",
+    "lang": "ar-lev",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بدي اشترك بخدمة استضافة لموقعي الصغير"
+      },
+      {
+        "role": "assistant",
+        "text": "شو رأيك نبلش بالخطة الأساسية بـ٢٠ دولار بالشهر؟ بتكفي لموقعك."
+      },
+      {
+        "role": "user",
+        "text": "تمام، اعتمد هيدي"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "البدء بخطة الاستضافة الأساسية بـ٢٠ دولاراً شهرياً",
+            "source": "assistant-approved",
+            "quote": "تمام، اعتمد هيدي"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Explicit adoption of the suggested plan.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "mag-laptop-ask-brother",
+    "lang": "ar-mag",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بغيت نشري بيسي للقراية، الميزانية تقريباً 6000 درهم"
+      },
+      {
+        "role": "assistant",
+        "text": "كننصحك بـ Lenovo IdeaPad، فيه 16 جيگا رام وثمنو 5800 درهم."
+      },
+      {
+        "role": "user",
+        "text": "زوين، ولكن غادي نسول خويا ونرجع ليك"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "شراء حاسوب Lenovo IdeaPad بـ5800 درهم",
+            "source": "assistant-approved",
+            "quote": "زوين"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Deferral: user will ask his brother first.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "mag-marrakech-train-replace",
+    "lang": "ar-mag",
+    "turns": [
+      {
+        "role": "user",
+        "text": "غادي نمشي لمراكش فالكار نهار السبت"
+      },
+      {
+        "role": "assistant",
+        "text": "مزيان، بغيتي نشوف ليك الأوقات ديال الكيران؟"
+      },
+      {
+        "role": "user",
+        "text": "لا، بدلت الرأي، غادي نمشي فالتران حسن"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "السفر إلى مراكش بالحافلة يوم السبت",
+          "source": "user",
+          "quote": "غادي نمشي لمراكش فالكار نهار السبت",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "السفر إلى مراكش بالقطار بدل الحافلة",
+            "source": "user",
+            "quote": "بدلت الرأي، غادي نمشي فالتران حسن",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Darija \"بدلت الرأي\" = changed my mind; bus to train.",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "mag-aqiqa-roles-swap",
+    "lang": "ar-mag",
+    "turns": [
+      {
+        "role": "user",
+        "text": "فالعقيقة، ماما غادي تجيب الحلوى، وأختي هي اللي غادي تصيفط الدعوات"
+      },
+      {
+        "role": "assistant",
+        "text": "واخا، سجلت شكون غادي يدير شنو."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الأخت تجيب الحلوى، والأم ترسل الدعوات",
+            "source": "user",
+            "quote": "ماما غادي تجيب الحلوى، وأختي هي اللي غادي تصيفط الدعوات"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Mom and sister tasks swapped.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "mag-morning-jobs-paraphrase",
+    "lang": "ar-mag",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بغيت نخدم غير فالصباح، حيت العشية عندي القراية فالكلية"
+      },
+      {
+        "role": "assistant",
+        "text": "مفهوم، غادي نقلب ليك على خدمة صباحية."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "البحث عن عمل صباحي فقط، لأن المساء مخصص للدراسة في الكلية",
+            "source": "user",
+            "quote": "بغيت نخدم غير فالصباح"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Faithful rewording plus the user's own reason.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "mag-tajine-no-pepper-scope",
+    "lang": "ar-mag",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عطيني وصفة ديال الطاجين بالدجاج، وفهاد الوصفة ما تحطش الحرور حيت الدراري غادي ياكلو"
+      },
+      {
+        "role": "assistant",
+        "text": "واخا، ها هي الوصفة بلا حرور."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "عدم استخدام الحرور في أي وصفة أبداً",
+            "quote": "ما تحطش الحرور"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Scope widened: only this recipe, because the kids will eat it.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "mag-wedding-hall-200-guests",
+    "lang": "ar-mag",
+    "turns": [
+      {
+        "role": "user",
+        "text": "كنوجدو للعرس ديال ختي فالصيف"
+      },
+      {
+        "role": "assistant",
+        "text": "نقترح نديرو العرس فقاعة النخيل، مع 300 ضيف."
+      },
+      {
+        "role": "user",
+        "text": "واخا القاعة، ولكن 200 ضيف كافيين"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "إقامة العرس في قاعة النخيل مع 300 ضيف",
+            "source": "assistant-approved",
+            "quote": "واخا"
+          },
+          {
+            "text": "إقامة العرس في قاعة النخيل",
+            "source": "assistant-approved",
+            "quote": "واخا القاعة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User approved the hall but changed guests to 200.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "Hall explicitly approved.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "iraq-basra-drive-sarcasm",
+    "lang": "ar-iraq",
+    "turns": [
+      {
+        "role": "user",
+        "text": "لازم أوصل البصرة الخميس الصبح ومعي غراض هواية"
+      },
+      {
+        "role": "assistant",
+        "text": "شنو رأيك تسوق من بغداد للبصرة بليلة وحدة بدون ما توقف؟"
+      },
+      {
+        "role": "user",
+        "text": "إي والله فكرة حلوة، حتى أوصل ميت من النعاس"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "السياقة من بغداد إلى البصرة بليلة وحدة بدون توقف",
+            "source": "assistant-approved",
+            "quote": "إي والله فكرة حلوة"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Sarcasm: \"great idea, so I arrive dead from sleepiness\".",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "iraq-shop-karrada-doubt",
+    "lang": "ar-iraq",
+    "turns": [
+      {
+        "role": "user",
+        "text": "قررت أفتح المحل بالكرادة"
+      },
+      {
+        "role": "assistant",
+        "text": "الكرادة حلوة، والمنصور هم خيار زين إذا تريد زبائن أكثر."
+      },
+      {
+        "role": "user",
+        "text": "متأكد الكرادة أحسن؟ سمعت الإيجارات صارت غالية هناك"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "فتح المحل في الكرادة",
+          "source": "user",
+          "quote": "قررت أفتح المحل بالكرادة",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "فتح المحل في المنصور بدل الكرادة",
+            "source": "assistant-approved",
+            "quote": "متأكد الكرادة أحسن؟",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User only doubted Karrada; never chose Mansour.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "iraq-istanbul-no-transit",
+    "lang": "ar-iraq",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أريد أسافر لإسطنبول الشهر الجاي، بس لا تحجزلي أي رحلة بيها ترانزيت، ما أتحمل الانتظار بالمطارات"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، راح أدورلك رحلات مباشرة بس."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "رحلات مباشرة فقط، بدون أي ترانزيت",
+            "quote": "لا تحجزلي أي رحلة بيها ترانزيت"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "Clear rule against transit flights.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "iraq-paint-before-tiles",
+    "lang": "ar-iraq",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بالترميم، نخلص الصبغ قبل لا نركب الكاشي حتى ما يتوسخ"
+      },
+      {
+        "role": "assistant",
+        "text": "منطقي، راح أرتب الجدول هيج."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "تركيب الكاشي قبل الصبغ",
+            "source": "user",
+            "quote": "نخلص الصبغ قبل لا نركب الكاشي"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Order reversed: painting comes first, then tiles.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "iraq-school-enroll-approval",
+    "lang": "ar-iraq",
+    "turns": [
+      {
+        "role": "user",
+        "text": "دا أدور مدرسة لابني بالصف الأول"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح مدرسة النخبة الأهلية بالمنصور، قريبة عليكم ومستواها زين."
+      },
+      {
+        "role": "user",
+        "text": "زين، خلص نسجله بيها"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "تسجيل الابن في مدرسة النخبة الأهلية بالمنصور",
+            "source": "assistant-approved",
+            "quote": "زين، خلص نسجله بيها"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "\"خلص نسجله بيها\" is a firm decision to enroll.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "iraq-dinner-at-home",
+    "lang": "ar-iraq",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خلي العزومة بالبيت مو بالمطعم، أريح للكبار"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، أسويلك قائمة أكل تكفي."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "إقامة العزومة في البيت بدل المطعم لأنه أريح لكبار السن",
+            "source": "user",
+            "quote": "خلي العزومة بالبيت مو بالمطعم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Faithful restatement with the user's reason.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "msa-curriculum-partial",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نحتاج إلى خطة لتحسين نتائج الصف التاسع."
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح اعتماد المنهج (أ) وزيادة حصص الرياضيات إلى ست حصص أسبوعيًا."
+      },
+      {
+        "role": "user",
+        "text": "أوافق على المنهج (أ)، أما زيادة الحصص فسأناقشها مع الإدارة أولًا."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "اعتماد المنهج (أ) وزيادة حصص الرياضيات إلى ست حصص أسبوعيًا",
+            "source": "assistant-approved",
+            "quote": "أوافق على المنهج (أ)"
+          },
+          {
+            "text": "اعتماد المنهج (أ)",
+            "source": "assistant-approved",
+            "quote": "أوافق على المنهج (أ)"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Partial approval: period increase deferred to the administration.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "Curriculum A explicitly approved.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "msa-article-word-limit",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اكتب لي مقالًا عن الطاقة المتجددة، ويجب ألا يتجاوز طوله ألف كلمة."
+      },
+      {
+        "role": "assistant",
+        "text": "حسنًا، سأكتب مقالًا في حدود ألف كلمة."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "ألا يتجاوز طول المقال ألف كلمة",
+            "quote": "يجب ألا يتجاوز طوله ألف كلمة"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "Explicit length limit.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "msa-novel-legal-caution",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أكتب رواية مستوحاة من أحداث حقيقية."
+      },
+      {
+        "role": "assistant",
+        "text": "يُفضَّل ألا تنشرها قبل مراجعة قانونية، لأن بعض الشخصيات قد تكون معروفة."
+      },
+      {
+        "role": "user",
+        "text": "حسنًا، لنكمل كتابة الفصل الثاني."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "عدم نشر الرواية قبل مراجعة قانونية",
+            "quote": "حسنًا"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Assistant caution; \"حسنًا\" only moves on to chapter two.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-conference-jeddah-and-date-question",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "سيُعقد المؤتمر في الرياض يوم ١٥ مارس."
+      },
+      {
+        "role": "assistant",
+        "text": "ممتاز، سأبدأ بإعداد جدول الأعمال."
+      },
+      {
+        "role": "user",
+        "text": "عدلتُ عن رأيي، سيُعقد المؤتمر في جدة بدلًا من الرياض. وهل يمكن تقديم الموعد أسبوعًا؟"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "عقد المؤتمر في الرياض",
+          "source": "user",
+          "quote": "سيُعقد المؤتمر في الرياض",
+          "msg": 0
+        },
+        {
+          "id": "d2",
+          "text": "موعد المؤتمر ١٥ مارس",
+          "source": "user",
+          "quote": "يوم ١٥ مارس",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "عقد المؤتمر في جدة بدلًا من الرياض",
+            "source": "user",
+            "quote": "سيُعقد المؤتمر في جدة بدلًا من الرياض",
+            "replaces": "d1"
+          },
+          {
+            "text": "تقديم موعد المؤتمر إلى ٨ مارس",
+            "source": "user",
+            "quote": "هل يمكن تقديم الموعد أسبوعًا؟",
+            "replaces": "d2"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "\"عدلتُ عن رأيي\" plus explicit new city.",
+        "cat": "replace-valid"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "User only asked whether the date could move.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-committee-roles-swap",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "سيكون الدكتور خالد رئيسًا للجنة، والدكتورة منى مقررةً لها."
+      },
+      {
+        "role": "assistant",
+        "text": "تم التسجيل."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الدكتورة منى رئيسة اللجنة والدكتور خالد مقررها",
+            "source": "user",
+            "quote": "سيكون الدكتور خالد رئيسًا للجنة، والدكتورة منى مقررةً لها"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Chair and rapporteur roles swapped.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "msa-furniture-supplier-defer",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نحتاج مورّدًا للأثاث المكتبي."
+      },
+      {
+        "role": "assistant",
+        "text": "شركة الأفق تقدم أفضل سعر مع ضمان خمس سنوات؛ أقترح التعاقد معها."
+      },
+      {
+        "role": "user",
+        "text": "عرض جيد، سأراجعه مع المحاسب أولًا."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "التعاقد مع شركة الأفق موردًا للأثاث المكتبي",
+            "source": "assistant-approved",
+            "quote": "عرض جيد"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Praise plus deferral to the accountant.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "msa-app-launch-q1",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "قررنا إطلاق التطبيق في الربع الأول من العام القادم."
+      },
+      {
+        "role": "assistant",
+        "text": "رائع، سأضع خطة تسويق تتناسب مع هذا الموعد."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "موعد إطلاق التطبيق: الربع الأول من العام المقبل",
+            "source": "user",
+            "quote": "قررنا إطلاق التطبيق في الربع الأول من العام القادم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Direct translation of the user decision.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "msa-print-1000-question",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "اطبع خمسمئة نسخة من الكتيّب."
+      },
+      {
+        "role": "assistant",
+        "text": "حسنًا، خمسمئة نسخة."
+      },
+      {
+        "role": "user",
+        "text": "كم ستكون التكلفة لو طبعنا ألف نسخة؟"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "طباعة خمسمئة نسخة من الكتيب",
+          "source": "user",
+          "quote": "اطبع خمسمئة نسخة من الكتيّب",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "طباعة ألف نسخة من الكتيب",
+            "source": "user",
+            "quote": "لو طبعنا ألف نسخة",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User asked a cost question; quantity not changed.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-shipping-second-option",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "نريد شحن البضاعة إلى الدمام."
+      },
+      {
+        "role": "assistant",
+        "text": "الخيار الأول: الشحن البحري (أرخص، ٣٠ يومًا). الخيار الثاني: الشحن الجوي (أسرع، ٥ أيام)."
+      },
+      {
+        "role": "user",
+        "text": "نختار الخيار الثاني، فالعميل مستعجل."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الشحن البحري (الخيار الأرخص)",
+            "source": "assistant-approved",
+            "quote": "نختار الخيار الثاني"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "User picked option two (air), not sea.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "msa-no-tables-this-reply",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "لخّص هذا البحث، ولا تستخدم الجداول في هذا الرد."
+      },
+      {
+        "role": "assistant",
+        "text": "إليك ملخصًا نصيًا من غير جداول."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "عدم استخدام الجداول في الردود مطلقًا",
+            "quote": "لا تستخدم الجداول في هذا الرد"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Scoped to this reply only; draft makes it permanent.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "msa-report-sections-approval",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "أريد كتابة التقرير السنوي للجمعية."
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح تقسيم التقرير إلى خمسة أقسام: المقدمة، والإنجازات، والمالية، والتحديات، والخطة القادمة."
+      },
+      {
+        "role": "user",
+        "text": "موافق، اعتمد هذا التقسيم."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "تقسيم التقرير السنوي إلى خمسة أقسام: المقدمة، والإنجازات، والمالية، والتحديات، والخطة القادمة",
+            "source": "assistant-approved",
+            "quote": "موافق، اعتمد هذا التقسيم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Explicit approval of the full structure.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "msa-hire-one-developer",
+    "lang": "ar-msa",
+    "turns": [
+      {
+        "role": "user",
+        "text": "سنوظف مطورين اثنين للمشروع."
+      },
+      {
+        "role": "assistant",
+        "text": "حسنًا، سأعد الوصف الوظيفي."
+      },
+      {
+        "role": "user",
+        "text": "ألغ قرار توظيف مطورين اثنين؛ سنكتفي بمطور واحد بسبب الميزانية."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "توظيف مطورين اثنين للمشروع",
+          "source": "user",
+          "quote": "سنوظف مطورين اثنين للمشروع",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "توظيف مطور واحد بدلًا من اثنين بسبب الميزانية",
+            "source": "user",
+            "quote": "سنكتفي بمطور واحد بسبب الميزانية",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Explicit cancellation and new number.",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-paris-days-1-and-3",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Planning 3 days in Paris with my parents, help me lay it out."
+      },
+      {
+        "role": "assistant",
+        "text": "Day 1: Louvre. Day 2: a day trip to Versailles. Day 3: Montmartre and Sacré-Cœur."
+      },
+      {
+        "role": "user",
+        "text": "Love day 1 and 3. Versailles feels like too much travel for my dad's knees though."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Itinerary: Day 1 Louvre, Day 2 Versailles, Day 3 Montmartre",
+            "source": "assistant-approved",
+            "quote": "Love day 1 and 3"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Only days 1 and 3 approved; Versailles pushed back on.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "en-sprint-ok-but-3",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "We're setting up the new team's process."
+      },
+      {
+        "role": "assistant",
+        "text": "Let's set the sprint length to 2 weeks."
+      },
+      {
+        "role": "user",
+        "text": "ok but make it 3, we have a lot of cross-team dependencies"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Sprint length: 2 weeks",
+            "source": "assistant-approved",
+            "quote": "ok"
+          },
+          {
+            "text": "Sprint length: 3 weeks, because of cross-team dependencies",
+            "source": "user",
+            "quote": "make it 3, we have a lot of cross-team dependencies"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "\"ok but make it 3\" changes the value; draft keeps 2.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "User's own amended value with reason.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "en-sorento-run-by-wife",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Need a family car, 3 kids, mostly city driving."
+      },
+      {
+        "role": "assistant",
+        "text": "The Kia Sorento hybrid fits well: 7 seats, good city mileage. Want me to lock that in as the pick?"
+      },
+      {
+        "role": "user",
+        "text": "Sounds good in principle, I'll run it by my wife tonight."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Buy the Kia Sorento hybrid",
+            "source": "assistant-approved",
+            "quote": "Sounds good in principle"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Deferral to spouse; \"in principle\" is not a decision.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "en-skip-lunch-sarcasm",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "I never have time for anything during the workday."
+      },
+      {
+        "role": "assistant",
+        "text": "You could just skip lunch to free up an hour."
+      },
+      {
+        "role": "user",
+        "text": "Oh great idea, and pass out at my desk by 3. Something else?"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Skip lunch to free up an hour",
+            "source": "assistant-approved",
+            "quote": "Oh great idea"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Sarcasm, followed by a request for alternatives.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "en-ssg-sure-what-options",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Our WordPress blog is slow and a pain to maintain."
+      },
+      {
+        "role": "assistant",
+        "text": "We could migrate the blog to a static site generator."
+      },
+      {
+        "role": "user",
+        "text": "Sure, what are the options?"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Migrate the blog to a static site generator",
+            "source": "assistant-approved",
+            "quote": "Sure"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "\"Sure\" opens a question about options, not an approval.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "en-stripe-approval",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "We need to take card payments on the new store."
+      },
+      {
+        "role": "assistant",
+        "text": "I'd suggest Stripe: quick to integrate and it handles subscriptions too."
+      },
+      {
+        "role": "user",
+        "text": "Yep, go with Stripe."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Use Stripe for card payments",
+            "source": "assistant-approved",
+            "quote": "Yep, go with Stripe."
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Explicit approval naming the option.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "en-font-thumbs-up",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "The body text on the landing page looks off."
+      },
+      {
+        "role": "assistant",
+        "text": "Should I set it to Inter, 16px, with 1.6 line height?"
+      },
+      {
+        "role": "user",
+        "text": "👍 do it"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Landing page body text: Inter, 16px, 1.6 line height",
+            "source": "assistant-approved",
+            "quote": "do it"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Terse but unambiguous approval of a yes/no proposal.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "en-bike-budget",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Looking for a used road bike. Whatever we pick, it has to be under $1,200 total, including any fitting."
+      },
+      {
+        "role": "assistant",
+        "text": "Got it, I'll keep everything under that."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "Bike must cost under $1,200 in total, fitting included",
+            "quote": "it has to be under $1,200 total, including any fitting"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "Clear budget ceiling.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-slide-bullets-number",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Build me a deck for the board meeting. Keep each slide to 5 bullets max."
+      },
+      {
+        "role": "assistant",
+        "text": "Will do."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "Maximum 3 bullets per slide",
+            "quote": "Keep each slide to 5 bullets max."
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Number changed from 5 to 3.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-cover-letter-one-page-scope",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Can you help with my application? For the cover letter, keep it under one page."
+      },
+      {
+        "role": "assistant",
+        "text": "Of course. Send me the job post and your resume."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "All application documents must be under one page",
+            "quote": "keep it under one page"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Scope widened from the cover letter to all documents.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-migration-caution-got-it",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "The migration script is ready."
+      },
+      {
+        "role": "assistant",
+        "text": "Nice. One note: I'd avoid running it during business hours since it locks the orders table."
+      },
+      {
+        "role": "user",
+        "text": "Got it. What's next on the list?"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "Never run migrations during business hours",
+            "quote": "Got it"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Assistant caution turned into a user rule; \"Got it\" is acknowledgement.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-gluten-fine-dairy-not",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Plan me some dinners. Gluten is fine for me, it's dairy I can't do."
+      },
+      {
+        "role": "assistant",
+        "text": "Dairy-free dinners coming up."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "No gluten",
+            "quote": "Gluten is fine for me"
+          },
+          {
+            "text": "No dairy",
+            "quote": "it's dairy I can't do"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Polarity flipped: gluten is explicitly fine.",
+        "cat": "constraint-add-invalid"
+      },
+      {
+        "item": "cadd:1",
+        "verdict": "trust",
+        "why": "User cannot have dairy.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-svelte-replaces-react",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Let's use React for the frontend."
+      },
+      {
+        "role": "assistant",
+        "text": "Sounds good, I'll scaffold it with Vite."
+      },
+      {
+        "role": "user",
+        "text": "Actually scrap React — let's go with Svelte, the team prefers it."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Use React for the frontend",
+          "source": "user",
+          "quote": "Let's use React for the frontend.",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Use Svelte instead of React for the frontend (team preference)",
+            "source": "user",
+            "quote": "scrap React — let's go with Svelte",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Explicit change of mind.",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "en-flight-16th-hotel-untouched",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Book me the flight on the 14th, and the hotel from the 14th to the 18th."
+      },
+      {
+        "role": "assistant",
+        "text": "Done, both are reserved."
+      },
+      {
+        "role": "user",
+        "text": "ugh, change of plans, the 16th works better for the flight now"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Flight on the 14th",
+          "source": "user",
+          "quote": "Book me the flight on the 14th",
+          "msg": 0
+        },
+        {
+          "id": "d2",
+          "text": "Hotel from the 14th to the 18th",
+          "source": "user",
+          "quote": "the hotel from the 14th to the 18th",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Flight on the 16th instead of the 14th",
+            "source": "user",
+            "quote": "the 16th works better for the flight now",
+            "replaces": "d1"
+          },
+          {
+            "text": "Hotel from the 16th to the 18th",
+            "source": "user",
+            "quote": "change of plans",
+            "replaces": "d2"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Casual but clear change of flight date.",
+        "cat": "replace-valid"
+      },
+      {
+        "item": "add:1",
+        "verdict": "hold",
+        "why": "User changed only the flight; hotel dates were not discussed.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-contractor-second-guessing",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Let's hire Bob for the kitchen remodel."
+      },
+      {
+        "role": "assistant",
+        "text": "Great. Dana was the other quote, a bit cheaper but slower."
+      },
+      {
+        "role": "user",
+        "text": "Hmm, I'm second-guessing Bob. Is his license even current?"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Hire Bob for the kitchen remodel",
+          "source": "user",
+          "quote": "Let's hire Bob for the kitchen remodel.",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Hire Dana instead of Bob for the kitchen remodel",
+            "source": "assistant-approved",
+            "quote": "I'm second-guessing Bob",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Doubt plus a question; Dana was never chosen.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-caterer-replaces-venue",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Venue is Rosewood Hall, and Lula's is doing the catering."
+      },
+      {
+        "role": "assistant",
+        "text": "Perfect, both locked in."
+      },
+      {
+        "role": "user",
+        "text": "Let's swap the caterer to Mesa Grill, Lula's can't do the date."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Venue: Rosewood Hall",
+          "source": "user",
+          "quote": "Venue is Rosewood Hall",
+          "msg": 0
+        },
+        {
+          "id": "d2",
+          "text": "Catering: Lula's",
+          "source": "user",
+          "quote": "Lula's is doing the catering",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Catering by Mesa Grill (Lula's unavailable on the date)",
+            "source": "user",
+            "quote": "Let's swap the caterer to Mesa Grill",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Replaces the venue (d1) when the user changed the caterer (d2).",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-standup-retro-days-swap",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Standup moves to Tuesdays, retro stays on Friday."
+      },
+      {
+        "role": "assistant",
+        "text": "Updated the calendar invites."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Standup stays on Fridays; retro moves to Tuesdays",
+            "source": "user",
+            "quote": "Standup moves to Tuesdays, retro stays on Friday."
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Days of standup and retro swapped.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "en-savings-amounts-swap",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Starting next month, put $300 in the emergency fund and $500 into the index fund."
+      },
+      {
+        "role": "assistant",
+        "text": "I'll set up both automatic transfers."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Monthly: $500 to the emergency fund and $300 to the index fund",
+            "source": "user",
+            "quote": "put $300 in the emergency fund and $500 into the index fund"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Amounts assigned to the wrong funds.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "en-notion-to-confluence-direction",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "We're consolidating docs. Migrate everything from Notion into Confluence by end of Q3."
+      },
+      {
+        "role": "assistant",
+        "text": "Okay, I'll draft a migration checklist."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Migrate all docs from Confluence into Notion by end of Q3",
+            "source": "user",
+            "quote": "Migrate everything from Notion into Confluence by end of Q3"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Migration direction reversed.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "en-13-inch-portability",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Comparing the 13 and 15 inch versions."
+      },
+      {
+        "role": "assistant",
+        "text": "The 15 has a bigger screen and battery; the 13 is lighter."
+      },
+      {
+        "role": "user",
+        "text": "Let's go with the 13-inch, I carry it everywhere and the 15 is just too heavy."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Choose the 13-inch model for portability",
+            "source": "user",
+            "quote": "Let's go with the 13-inch"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Correct decision, reason condensed to \"portability\".",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "en-decline-austin-offer",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "I've thought about it all weekend. I'm gonna say no to the Austin offer and stay put."
+      },
+      {
+        "role": "assistant",
+        "text": "That sounds like a considered choice. Want help wording the reply?"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Decline the Austin job offer and stay in the current role",
+            "source": "user",
+            "quote": "I'm gonna say no to the Austin offer and stay put"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "\"say no ... stay put\" = decline and stay.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "en-kill-newsletter-revoke",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "Let's send a weekly newsletter every Monday."
+      },
+      {
+        "role": "assistant",
+        "text": "Great, I'll draft the template."
+      },
+      {
+        "role": "user",
+        "text": "Let's kill the newsletter entirely, open rates are under 5%."
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Send a weekly newsletter every Monday",
+          "source": "user",
+          "quote": "Let's send a weekly newsletter every Monday.",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "Let's kill the newsletter entirely"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "trust",
+        "why": "User explicitly cancels the newsletter.",
+        "cat": "decision-correct"
+      }
+    ]
+  },
+  {
+    "id": "en-6am-runs-doubt-revoke",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "I'm committing to a 6am run every day."
+      },
+      {
+        "role": "assistant",
+        "text": "Love it. Want a training plan?"
+      },
+      {
+        "role": "user",
+        "text": "Not sure the 6am runs are sustainable honestly. Thoughts?"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "Run at 6am every day",
+          "source": "user",
+          "quote": "I'm committing to a 6am run every day.",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": [
+          {
+            "id": "d1",
+            "quote": "Not sure the 6am runs are sustainable"
+          }
+        ]
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "revoke:0",
+        "verdict": "hold",
+        "why": "Doubt and a request for thoughts, not a cancellation.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "en-toast-yes-dinner-no",
+    "lang": "en",
+    "turns": [
+      {
+        "role": "user",
+        "text": "My brother's wedding is Saturday and I'm the best man."
+      },
+      {
+        "role": "assistant",
+        "text": "Two things I can do: book the 7pm table at Nopa for the rehearsal dinner, and draft your toast. Want both?"
+      },
+      {
+        "role": "user",
+        "text": "Yes please draft the toast, I'll handle dinner myself."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "Book the 7pm table at Nopa for the rehearsal dinner",
+            "source": "assistant-approved",
+            "quote": "Yes please"
+          },
+          {
+            "text": "Assistant drafts the best man's toast",
+            "source": "assistant-approved",
+            "quote": "Yes please draft the toast"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "The \"yes\" covered only the toast; user will handle dinner.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "Toast explicitly approved.",
+        "cat": "approval-clean"
+      }
+    ]
+  },
+  {
+    "id": "mixed-gcp-instead-of-aws",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "بنستضيف الموقع على AWS"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، أجهز لك الإعدادات على EC2؟"
+      },
+      {
+        "role": "user",
+        "text": "لا خلاص، بنروح على GCP بدال AWS، الـ pricing عندهم أحسن لنا"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "استضافة الموقع على AWS",
+          "source": "user",
+          "quote": "بنستضيف الموقع على AWS",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "استضافة الموقع على GCP بدل AWS لأن الـ pricing أفضل",
+            "source": "user",
+            "quote": "بنروح على GCP بدال AWS",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "Clear switch with reason.",
+        "cat": "replace-valid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-nextjs-ssr-partial",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "عايزين نبني الموقع الجديد للشركة"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح نستخدم Next.js مع Tailwind، ونعمل SSR لكل الصفحات."
+      },
+      {
+        "role": "user",
+        "text": "Next.js و Tailwind تمام، بس الـ SSR مش لكل الصفحات، بس للـ landing page"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "استخدام Next.js مع Tailwind، وSSR لكل الصفحات",
+            "source": "assistant-approved",
+            "quote": "Next.js و Tailwind تمام"
+          },
+          {
+            "text": "استخدام SSR للـ landing page فقط",
+            "source": "user",
+            "quote": "الـ SSR مش لكل الصفحات، بس للـ landing page"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "SSR-for-all was rejected; only the stack was approved.",
+        "cat": "approval-bad"
+      },
+      {
+        "item": "add:1",
+        "verdict": "trust",
+        "why": "User limited SSR to the landing page.",
+        "cat": "paraphrase"
+      }
+    ]
+  },
+  {
+    "id": "mixed-api-latency",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "في الـ API الجديد، الـ response time لازم يكون أقل من 200ms"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، هحط caching على الـ endpoints التقيلة."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "الـ response time للـ API يجب أن يكون أقل من 200ms",
+            "quote": "الـ response time لازم يكون أقل من 200ms"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "trust",
+        "why": "Explicit performance requirement.",
+        "cat": "constraint-add-valid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-coverage-80-not-90",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "قبل أي merge، الـ test coverage ما يقل عن 80%"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بضيف check في الـ CI."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [
+          {
+            "text": "الـ test coverage لا يقل عن 90% قبل أي merge",
+            "quote": "الـ test coverage ما يقل عن 80%"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "cadd:0",
+        "verdict": "hold",
+        "why": "Threshold changed from 80% to 90%.",
+        "cat": "constraint-add-invalid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-branches-swap",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "خلي الـ staging يسحب من branch develop، والـ production من main"
+      },
+      {
+        "role": "assistant",
+        "text": "تمام، بعدل الـ pipeline."
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "الـ staging يسحب من branch main، والـ production من develop",
+            "source": "user",
+            "quote": "خلي الـ staging يسحب من branch develop، والـ production من main"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Branches swapped between staging and production.",
+        "cat": "swapped-detail"
+      }
+    ]
+  },
+  {
+    "id": "mixed-datadog-check-finance",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "محتاجين أداة monitoring للـ servers"
+      },
+      {
+        "role": "assistant",
+        "text": "أنصح نشتري license الـ Enterprise من Datadog، فيها كل الـ features اللي تحتاجونها."
+      },
+      {
+        "role": "user",
+        "text": "حلو، بس خليني أشيك مع الـ finance team الأول"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "شراء license الـ Enterprise من Datadog",
+            "source": "assistant-approved",
+            "quote": "حلو"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Deferral to finance team.",
+        "cat": "approval-bad"
+      }
+    ]
+  },
+  {
+    "id": "mixed-mongo-transactions-question",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "هنستخدم PostgreSQL للـ database"
+      },
+      {
+        "role": "assistant",
+        "text": "اختيار ممتاز."
+      },
+      {
+        "role": "user",
+        "text": "طب لو استخدمنا MongoDB بداله، هيبقى في مشكلة في الـ transactions؟"
+      }
+    ],
+    "memory": {
+      "decisions": [
+        {
+          "id": "d1",
+          "text": "استخدام PostgreSQL للـ database",
+          "source": "user",
+          "quote": "هنستخدم PostgreSQL للـ database",
+          "msg": 0
+        }
+      ],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "استخدام MongoDB بدل PostgreSQL",
+            "source": "user",
+            "quote": "لو استخدمنا MongoDB بداله",
+            "replaces": "d1"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "hold",
+        "why": "Hypothetical question about MongoDB, no decision.",
+        "cat": "replace-invalid"
+      }
+    ]
+  },
+  {
+    "id": "mixed-standup-deal",
+    "lang": "mixed",
+    "turns": [
+      {
+        "role": "user",
+        "text": "الفريق محتاج ينظم التواصل اليومي"
+      },
+      {
+        "role": "assistant",
+        "text": "أقترح نعمل daily standup الساعة 9:30 الصبح، ١٥ دقيقة."
+      },
+      {
+        "role": "user",
+        "text": "deal، خليه 9:30 كل يوم"
+      }
+    ],
+    "memory": {
+      "decisions": [],
+      "constraints": []
+    },
+    "draft": {
+      "decisions": {
+        "add": [
+          {
+            "text": "daily standup كل يوم الساعة 9:30 صباحًا لمدة ١٥ دقيقة",
+            "source": "assistant-approved",
+            "quote": "deal، خليه 9:30 كل يوم"
+          }
+        ],
+        "revoke": []
+      },
+      "constraints": {
+        "add": [],
+        "remove": []
+      }
+    },
+    "expect": [
+      {
+        "item": "add:0",
+        "verdict": "trust",
+        "why": "\"deal\" accepts the whole proposal.",
+        "cat": "approval-clean"
+      }
+    ]
+  }
+]

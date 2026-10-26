@@ -221,8 +221,6 @@
       '- decisions.add: new ones only. source: "user" for what I decided, "assistant-approved" for your suggestion that I agreed to, and "assistant" for what I haven\'t approved.\n',
     "- quote: اقتباس حرفي قصير من كلامي أنا يذكر الموضوع: ما قررتُ به، أو موافقتي على اقتراحك. وكذلك لكل قيد: كلامي الذي طلبته به، ولكل إلغاء (revoke): كلامي اللاحق الذي ألغيتُه به («ألغِ»، «بدّل»، «ما عاد»…). اكتب القرار بمعناه كما قلتُه، ومع النفي إن نفيتُ. ما لا اقتباس له لا يُطبَّق حتى أراجعه.\n":
       "- quote: a short verbatim quote of my own words that mentions the topic: the words I decided with, or my agreement to your suggestion. Likewise for every constraint: the words I asked for it with, and for every revoke: my later words that cancelled it (“cancel”, “replace”, “no longer”…). Write the decision with the meaning I gave it, including the negation if I negated it. Anything without a quote is not applied until I review it.\n",
-    "- احفظ الأرقام والأسماء كما هي، ولا تكتب كلمات مرور أو مفاتيح.":
-      "- Keep numbers and names as they are, and don't write passwords or keys.",
     "…(اقتُطع أوله لطوله)\n": "…(the beginning was cut off because it was too long)\n",
     "أُعيد توليد الرد على الرسالة {0}": "The reply to message {0} was regenerated",
     "عُدّلت الرسالة {0}": "Message {0} was edited",
@@ -295,8 +293,8 @@
     "؛ في هذه المحادثة {0} تلخيصات ≈ {1} توكن": "; in this chat {0} summaries ≈ {1} tokens",
     "يُحتسب على مفتاحك، لا على رسائلك في الموقع.": "Charged to your API key, not to your messages on the site.",
     "ويبقى الطلب ورده في سياق المحادثة.": "The request and its reply stay in the chat's context.",
-    '<br><span class="muted">كلفة آخر تلخيص: الطلب {0} حرفاً والرد {1} ≈ {2} توكن{3} (تقدير). {4}</span>':
-      '<br><span class="muted">Last summary cost: request {0} characters and reply {1} ≈ {2} tokens{3} (estimate). {4}</span>',
+    '<span class="muted">كلفة آخر تلخيص: الطلب {0} حرفاً والرد {1} ≈ {2} توكن{3} (تقدير). {4}</span>':
+      '<span class="muted">Last summary cost: request {0} characters and reply {1} ≈ {2} tokens{3} (estimate). {4}</span>',
     "رسالتك رقم {0}": "Your message #{0}",
     "رسائلك رقم {0}": "Your messages #{0}",
     '<br><span class="muted">{0} بلا نص مقروء (صورة أو ملف)؛ لا يُحفظ منها إلا ما يذكره الرد عنها.</span>':
@@ -455,8 +453,6 @@
     "constraints — القيود": "constraints — constraints",
     " (اقتراح لم يُعتمد)": " (suggestion not approved)",
     "pin:{0} — نص معتمد": "pin:{0} — pinned text",
-    "[conversation-memory] ما يمكن نقله إلى محادثة أخرى (اعرض القائمة للمستخدم كما هي، ثم يكتب الأمر مع ما يختاره، مثل: /conversation-memory:share summary d1 d3 L2):\n":
-      "[conversation-memory] What can be moved to another chat (show the list to the user as is; they then type the command with what they choose, e.g.: /conversation-memory:share summary d1 d3 L2):\n",
     " (غير معروف: {0})": " (unknown: {0})",
     "[conversation-memory] لم يُختر شيء صالح{0}. اعرض على المستخدم القائمة بالأمر /conversation-memory:share بلا إضافات.":
       "[conversation-memory] Nothing valid was chosen{0}. Show the user the list by running /conversation-memory:share with nothing added.",
@@ -929,6 +925,42 @@
     "عدّلتَ رسالتك رقم {0}: {1}": "You edited your message {0}: {1}",
     "قرار عُدّلت رسالته فيحتاج نظرة جديدة": "decision whose message was edited, needs a new look",
     "قرار عُدّلت رسالته": "decision whose message was edited",
+    "عمّ ستتكلم؟ اكتب كلمات المهمة فأختار لك ما يخصها": "What will you talk about? Type the task and I will pick what is about it",
+    "اختيار ما يخص مهمة": "Pick what is about a task",
+    "[conversation-memory] ما يمكن نقله إلى محادثة أخرى (اعرض القائمة للمستخدم كما هي، ثم يكتب الأمر مع ما يختاره، مثل: /conversation-memory:share summary d1 d3 L2، أو يصف مهمته: /conversation-memory:share about دعوة الافتتاح):\n":
+      "[conversation-memory] What can be moved to another chat (show the list to the user as is; they then type the command with what they choose, e.g.: /conversation-memory:share summary d1 d3 L2, or describe the task: /conversation-memory:share about the opening invitation):\n",
+    "اقتباسك سؤال، لا قرار": "Your quote is a question, not a decision",
+    "يوم في القرار ليس في كلامك": "A day in the decision isn't in your words",
+    "الاقتباس ليس موافقة": "The quote is not an approval",
+    "وافقتَ مع تعديل على هذا نفسه؛ القرار لا يعكس تعديلك":
+      "You agreed with a change to this very thing; the decision doesn't reflect your change",
+    "رقم ليس في كلامك الذي بُني عليه: {0}": "A number isn't in the words it rests on: {0}",
+    ابدأ: "Start",
+    التالي: "Next",
+    التفاصيل: "Details",
+    "🧠 تعمل وحدها": "🧠 It works on its own",
+    "افتح أي محادثة في ChatGPT أو Claude وتكلّم كعادتك. كل 10 رسائل تلخّص الإضافة ما طُرح وتقرّر، وتحفظه في ذاكرة المشروع داخل متصفحك. لا حساب ولا إعداد.":
+      "Open any chat in ChatGPT or Claude and talk as usual. Every 10 messages the extension summarizes what was raised and decided and keeps it in the project’s memory inside your browser. No account, no setup.",
+    "الشارة أسفل الصفحة": "The badge at the bottom of the page",
+    "📝 حُفظ نص المحادثة · ✓ حُدّث الملخص · 🔎 شيء ينتظر رأيك · ⚠️ تعثّر، ومعه السبب. اضغطها لترى التفاصيل والأزرار.":
+      "📝 the chat text is saved · ✓ the summary was updated · 🔎 something waits for your say · ⚠️ something failed, with the reason. Click it for details and actions.",
+    "أنت صاحب القرار": "You decide",
+    "لا يُحفظ قرار باسمك إلا ومعه كلامك. ما لا يثبت ينتظرك في «🔎 راجع القرارات»، وكل تغيير في «🕘 سجل التغييرات» هنا، ويمكنك التراجع عن أي تغيير وحده.":
+      "No decision is saved as yours without your own words. What isn’t backed waits for you in “🔎 Review decisions”, and every change is in “🕘 History” here, where you can undo any single change.",
+    "في محادثة جديدة": "In a new chat",
+    "«📥 أدرج الذاكرة» تضعها في خانة الرسالة، أو «📤 انقل معلومات» واكتب مهمتك فأختار ما يخصها. لا يُرسل شيء دون أن تضغط أنت.":
+      "“📥 Insert memory” puts it in the message box, or “📤 Move information” and type your task to pick what is about it. Nothing is sent until you press send.",
+    السابق: "Back",
+    "تخطَّ الجولة": "Skip the tour",
+    "🧭 جولة التعريف من جديد": "🧭 Take the tour again",
+    "- اكتب كل قرار وقيد بلغة الكلام الذي يقتبسه، واحفظ الأرقام والأسماء كما هي، ولا تكتب كلمات مرور أو مفاتيح.":
+      "- Write each decision and constraint in the language of the words it quotes, keep numbers and names as they are, and don’t write passwords or keys.",
+    "تفصيلان تبادلا مكانيهما مقارنة بكلامك": "Two details swapped places compared with your words",
+    "الاتجاه معكوس مقارنة بكلامك (من/إلى)": "The direction is reversed compared with your words (from/to)",
+    "في القرار عكس ما في كلامك (قبل/بعد، أكثر/أقل…)": "The decision says the opposite of your words (before/after, more/less…)",
+    "في ردك تأجيل أو تحفّظ، لا موافقة بعد": "Your reply defers or holds back; it is not an agreement yet",
+    "قلتَه لهذه المرة فقط، لا قيداً دائماً": "You said it for this one time, not as a standing rule",
+    "كلامك يخص قراراً آخر ({0})، لا {1}": "Your words are about another decision ({0}), not {1}",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

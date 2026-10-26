@@ -18,6 +18,10 @@
     .panel input{box-sizing:border-box;width:100%;font:inherit;padding:6px 8px;border:1px solid #d0d7de;border-radius:6px;margin:4px 0}
     .preview{max-height:90px;overflow:auto;white-space:pre-wrap;background:#f6f8fa;border-radius:6px;padding:6px;font-size:12px;margin:0 0 6px}
     .panel.wide{width:340px;max-height:72vh;overflow:auto}
+    .panel .sec{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:6px;padding-top:6px;border-top:1px solid #eaeef2}
+    .panel .sec button{width:auto;background:none;border:none;padding:2px 0;margin:0;color:#57606a;font-size:11.5px;text-decoration:underline;cursor:pointer}
+    .panel details.tech{margin-top:4px}.panel details.tech summary{cursor:pointer;color:#57606a;font-size:11.5px}
+    .panel input.find{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:6px 8px;border:1px solid #d0d7de;border-radius:6px;font:inherit}
     .panel .opt{display:flex;gap:6px;align-items:flex-start;margin:3px 0;font-size:12px;cursor:pointer}.panel .opt input{width:auto;margin:2px 0 0}
     .panel .opt .tag{color:#9a6700;font-size:11px}
     .panel h4{margin:8px 0 2px;font-size:12px;color:#57606a}
@@ -137,8 +141,10 @@
         text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "") + (s.lastSave && cost ? T` · ${approx(cost)} توكن` : "");
         info = s.lastSave ? T`✓ حُدّث الملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : T("لم يُحفظ ملخص بعد.");
       }
+      // what only a curious or technical reader needs (cost, where the text was read from) waits behind «Details»
+      let tech = "";
       if (s.lastCost && !v.unreadable)
-        info += T`<br><span class="muted">كلفة آخر تلخيص: الطلب ${fmt(s.lastCost.req)} حرفاً والرد ${fmt(s.lastCost.rep)} ≈ ${fmt(cost)} توكن${s.costTotal && s.costTotal.n > 1 ? T`؛ في هذه المحادثة ${s.costTotal.n} تلخيصات ≈ ${fmt(tokens(s.costTotal.chars))} توكن` : ""} (تقدير). ${v.byok ? T("يُحتسب على مفتاحك، لا على رسائلك في الموقع.") : T("ويبقى الطلب ورده في سياق المحادثة.")}</span>`;
+        tech += T`<span class="muted">كلفة آخر تلخيص: الطلب ${fmt(s.lastCost.req)} حرفاً والرد ${fmt(s.lastCost.rep)} ≈ ${fmt(cost)} توكن${s.costTotal && s.costTotal.n > 1 ? T`؛ في هذه المحادثة ${s.costTotal.n} تلخيصات ≈ ${fmt(tokens(s.costTotal.chars))} توكن` : ""} (تقدير). ${v.byok ? T("يُحتسب على مفتاحك، لا على رسائلك في الموقع.") : T("ويبقى الطلب ورده في سياق المحادثة.")}</span>`;
       if (s.note && !v.unreadable) info += `<br><span class="muted">${esc(s.note)}</span>`;
       if (v.empty && v.empty.length && !v.unreadable)
         info += T`<br><span class="muted">${v.empty.length === 1 ? T`رسالتك رقم ${v.empty[0]}` : T`رسائلك رقم ${v.empty.join(T("، "))}`} بلا نص مقروء (صورة أو ملف)؛ لا يُحفظ منها إلا ما يذكره الرد عنها.</span>`;
@@ -149,13 +155,14 @@
           `${!manual && settings.paused ? T(" (التلخيص التلقائي متوقف)") : ""}${v.noComposer ? T(" لا أجد خانة الكتابة.") : ""}</span>`;
         if (v.userCount > s.summarizedUpTo && !s.pending) btns.push([T("💾 لخّص واحفظ الآن"), "summarize"]);
         if (settings.mode === "auto")
-          btns.push([settings.paused ? T("▶️ تشغيل التلخيص التلقائي") : T("⏸️ إيقاف التلخيص التلقائي"), "pause"]);
+          btns.push([settings.paused ? T("▶️ تشغيل التلخيص التلقائي") : T("⏸️ إيقاف التلخيص التلقائي"), "pause", "sec"]);
       }
-      if (v.src === "data" && !v.unreadable) info += `<br><span class="muted">${VIA_DATA()}</span>`;
+      if (v.src === "data" && !v.unreadable) tech += `${tech ? "<br>" : ""}<span class="muted">${VIA_DATA()}</span>`;
+      if (tech) info += `<details class="tech"><summary>${T("التفاصيل")}</summary>${tech}</details>`;
       btns.push([T("📥 أدرج الذاكرة في الرسالة"), "insert"], SHARE());
-      if (v.unreadable || v.src === "data") btns.push(REPORT());
-      btns.push([T("↩️ تراجع عن آخر تغيير في الذاكرة"), "undo"]);
-      btns.push([T("⛓️ فك ربط المحادثة بالمشروع"), "unlink"]);
+      if (v.unreadable || v.src === "data") btns.push([...REPORT(), "sec"]);
+      btns.push([T("↩️ تراجع عن آخر تغيير في الذاكرة"), "undo", "sec"]);
+      btns.push([T("⛓️ فك ربط المحادثة بالمشروع"), "unlink", "sec"]);
     }
     // decisions saved without evidence in the conversation wait for the user: said once, with one button
     const rv = (v.phase === "chat" || v.phase === "new") && v.review ? v.review.length : 0;
@@ -168,7 +175,7 @@
       cls = "err";
       info = T("خطأ داخلي: ") + esc(v.crash);
     }
-    btns.push([T("⚙️ الإعدادات"), "options"]);
+    btns.push([T("⚙️ الإعدادات"), "options", "sec"]);
     return { cls, text, info, btns };
   }
 
@@ -210,7 +217,10 @@
       pill.className = "pill " + d.cls;
       pill.textContent = d.text;
       pill.setAttribute("aria-expanded", String(panel.classList.contains("open")));
-      panel.innerHTML = `<p>${d.info}</p>` + d.btns.map(([t, a]) => `<button type="button" data-a="${a}">${t}</button>`).join("");
+      const b = ([t, a]) => `<button type="button" data-a="${a}">${t}</button>`;
+      const main = d.btns.filter((x) => x[2] !== "sec"),
+        sec = d.btns.filter((x) => x[2] === "sec");
+      panel.innerHTML = `<p>${d.info}</p>` + main.map(b).join("") + (sec.length ? `<div class="sec">${sec.map(b).join("")}</div>` : "");
     }
     function closePin() {
       pinDraft = null;
@@ -300,6 +310,8 @@
       const act = m.decisions.filter((d) => d.status === "active");
       const cut = (t, n = 90) => esc(t.length > n ? t.slice(0, n) + "…" : t);
       let h = T`<p><b>📤 انقل معلومات مختارة</b><br><span class="muted">اختر ما تريد، وراجع المعاينة، ثم تُدرج في خانة الرسالة دون إرسال.</span></p>`;
+      if (o.relevant)
+        h += `<input type="search" class="find" data-a="share-find" placeholder="${esc(T("عمّ ستتكلم؟ اكتب كلمات المهمة فأختار لك ما يخصها"))}" aria-label="${esc(T("اختيار ما يخص مهمة"))}">`;
       h +=
         opt("summary", "1", T("الخلاصة الحالية")) +
         (m.constraints.length ? opt("constraints", "1", T`القيود (${m.constraints.length})`) : "");
@@ -348,6 +360,16 @@
     }
     panel.addEventListener("change", (e) => {
       if (real(e) && share && e.target && e.target.type === "checkbox") update();
+    });
+    // typing the task picks what is about it (the user can still tick and untick)
+    panel.addEventListener("input", (e) => {
+      if (!real(e) || !share || !share.o || !share.o.relevant || !e.target || e.target.dataset.a !== "share-find") return;
+      const sel = share.o.relevant(e.target.value);
+      for (const c of panel.querySelectorAll("input[type=checkbox]")) {
+        const k = c.dataset.k;
+        c.checked = k === "summary" || k === "constraints" ? !!sel[k] : (sel[k] || []).includes(c.dataset.v);
+      }
+      update();
     });
     const setOpen = (on) => {
       panel.classList.toggle("open", on);

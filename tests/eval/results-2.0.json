@@ -1,0 +1,58 @@
+{
+ "dev": {
+  "1.5": {
+   "falseTrust": 16,
+   "holds": 77,
+   "falseHold": 58,
+   "trusts": 101
+  },
+  "2.0": {
+   "falseTrust": 6,
+   "holds": 77,
+   "falseHold": 14,
+   "trusts": 101
+  }
+ },
+ "dev2": {
+  "1.5": {
+   "falseTrust": 29,
+   "holds": 55,
+   "falseHold": 20,
+   "trusts": 38
+  },
+  "2.0": {
+   "falseTrust": 3,
+   "holds": 55,
+   "falseHold": 5,
+   "trusts": 38
+  }
+ },
+ "heldout1": {
+  "1.5": {
+   "falseTrust": 6,
+   "holds": 68,
+   "falseHold": 22,
+   "trusts": 72
+  },
+  "2.0": {
+   "falseTrust": 11,
+   "holds": 68,
+   "falseHold": 11,
+   "trusts": 72
+  }
+ },
+ "heldout2": {
+  "1.5": {
+   "falseTrust": 22,
+   "holds": 68,
+   "falseHold": 25,
+   "trusts": 73
+  },
+  "2.0": {
+   "falseTrust": 19,
+   "holds": 68,
+   "falseHold": 15,
+   "trusts": 73
+  }
+ }
+}

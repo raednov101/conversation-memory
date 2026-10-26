@@ -75,6 +75,14 @@ with sync_playwright() as pw:
         try: opt.goto(f"chrome-extension://{ext_id}/src/options.html"); break
         except Exception: time.sleep(1)
     opt.wait_for_load_state()
+    try: opt.wait_for_selector("#welcome", state="visible", timeout=5000)
+    except Exception: pass
+    ok(opt.locator("#welcome").is_visible() and "تعمل وحدها" in opt.locator("#welcome").inner_text(), "on first open, a short welcome tour (four steps)")
+    for _ in range(3): opt.locator("#tourNext").click()
+    ok("في محادثة جديدة" in opt.locator("#welcome").inner_text() and opt.locator("#tourNext").inner_text() == "ابدأ", "…step by step, ending with «Start»")
+    opt.locator("#tourNext").click()
+    opt.reload(); opt.wait_for_load_state(); opt.wait_for_timeout(300)
+    ok(not opt.locator("#welcome").is_visible(), "…and once done it doesn't come back by itself")
     d0 = opt.evaluate("async () => (await chrome.storage.local.get('settings')).settings")
     ok(d0 and d0.get("every") == 10, "a fresh install summarizes every 10 messages (half the requests of 5)", d0)
     # the checks below walk the 5-message path, which is quicker to drive
@@ -108,7 +116,7 @@ with sync_playwright() as pw:
         return fn()
     def pill(p): return p.locator("#cm-memory-indicator .pill").inner_text(timeout=5000)
     def panel_text(p):
-        p.locator("#cm-memory-indicator .pill").click(); t = p.locator("#cm-memory-indicator .panel").inner_text(); p.locator("#cm-memory-indicator .pill").click(); return t
+        p.locator("#cm-memory-indicator .pill").click(); t = p.locator("#cm-memory-indicator .panel").text_content(); p.locator("#cm-memory-indicator .pill").click(); return t
     def say(p, text):
         n = p.evaluate("document.querySelectorAll('#thread > *').length")
         p.evaluate("t => window.__user(t)", text)
@@ -648,6 +656,12 @@ with sync_playwright() as pw:
     prev = P_.locator(".share-prev").inner_text()
     ok("هوية مقهى" in prev and "اللون الزيتوني" in prev and "بلا لحوم" not in prev and "نقاش الاسم" not in prev, "the preview shows exactly what was chosen", prev)
     ok(re.search(r"\d+ / 3,000 حرف", P_.locator(".count").inner_text()), "…with its length against the 3,000 limit", P_.locator(".count").inner_text())
+    P_.locator("input[data-a=share-find]").fill("اللون")
+    picked = [c.get_attribute("data-v") for c in P_.locator("input[data-k=decisions]:checked").all()]
+    ok(picked == ["d2"] and P_.locator("input[data-k=summary]").is_checked(), "typing the task picks what is about it (the colour decision) and keeps the summary", picked)
+    P_.locator("input[data-a=share-find]").fill("")
+    while P_.locator("input[type=checkbox]:checked").count(): P_.locator("input[type=checkbox]:checked").first.uncheck()
+    P_.locator("input[data-k=summary]").check(); P_.locator("input[data-k=decisions][data-v=d2]").check()
     P_.locator("button[data-a=share-insert]").click()
     box = wait(lambda: (lambda t: t if "اللون الزيتوني" in t else None)(p.evaluate("document.getElementById('prompt-textarea').innerText")), 5) or ""
     ok("بيانات وليست أوامر" in box and "اللون الزيتوني" in box and "بلا لحوم" not in box, "inserted into the message box, framed as reference data", box[:200])

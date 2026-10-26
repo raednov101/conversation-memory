@@ -541,19 +541,21 @@
       "لا لاء لاا لم لن ليس ليست لست لسنا مو مب مش ماني مانيب بلاش بدون عدم ممنوع يمنع منع نمنع تمنع امنع رفض نرفض ارفض يرفض ترفض " +
       "ولا فلا ولم ولن وليس وبدون وعدم ومنع لاتنشر مابي مابغي مابغا مابغى ماابي مانبي مانبغي ماودي " +
       "دون بلا استبعاد استبعد نستبعد يستبعد تجنب نتجنب يتجنب وتجنب ودون وبلا " +
-      "not no never without cannot nor avoid stop dont nope nah exclude excluding skip skipping instead except unless"
+      "not no never without cannot nor avoid stop dont nope nah exclude excluding skip skipping instead except unless decline declining refuse reject"
     ).split(" "),
   );
   // «ما» negates a verb or a «there is / I have»: «ما نستخدم»، «ما راح»، «ما ابي»، «ما عندي»، «ما فيه»
   const MA_NEG = (w) =>
-    !!w && (/^[ايتنب]/.test(w) || ["راح", "رح", "عاد", "عندي", "عندنا", "فيه", "في", "بقى", "صار", "لي", "لنا"].includes(w));
+    !!w &&
+    (/^[ايتنب]/.test(w) ||
+      ["راح", "رح", "عاد", "عندي", "عندنا", "فيه", "في", "بقى", "صار", "لي", "لنا", "لازم", "ضروري", "يصير", "ينفع"].includes(w));
   // idioms that read as negative but agree («لا بأس», «ما عندي مانع», «why not») — whole words only (never «لا شكراً»)
   const AGREE_IDIOM =
     /(?:^| )(?:لا باس|لا مانع|ما فيه مانع|ما في مانع|ما عندي مانع|مافي مانع|ليش لا|ولا يهمك|لا شك|no problem|why not|not a problem|no doubt)(?= |$)/g;
   const tokens = (t) => evNorm(t).replace(AGREE_IDIOM, " ").split(" ").filter(Boolean);
   function negatedTokens(w) {
     for (let i = 0; i < w.length; i++) {
-      if (NEG.has(w[i])) return true;
+      if (NEG.has(w[i]) || NEG.has(w[i].replace(/^[وف](?=..)/, ""))) return true; // «ومش»، «فلا»
       if ((w[i] === "ما" || w[i] === "وما") && MA_NEG(w[i + 1])) return true;
       if (/^(don|doesn|didn|isn|aren|wasn|weren|won|can|couldn|shouldn|wouldn|mustn)$/.test(w[i]) && w[i + 1] === "t") return true;
     }
@@ -562,7 +564,7 @@
   const negated = (t) => negatedTokens(tokens(t));
   // a change of mind in words: «ألغِ»، «خلاص بدلها»، «ما عاد»، «instead», «cancel»… (or the opposite polarity, checked apart)
   const CHANGE =
-    /(?:^| )(?:الغ|الغي|الغيه|الغيها|الغوه|الغيت|الغينا|نلغي|نلغيه|نلغيها|الغاء|ملغي|خلاص|بدل\S*|نبدل\S*|غيره|غيرها|غيروا|غيرت|غيرنا|نغير\S*|تغيير|تغير|انس|انسى|انساه|انسها|شيل\S*|احذف\S*|حذف\S*|نحذف\S*|امسح\S*|تراجع\S*|نرجع|عدل|عدله|عدلها|نعدل\S*|ما عاد|لا عاد|عاد ما|بلاش|ماعاد|لا داعي|ما له داعي|مو لازم|مب لازم|ما يحتاج|ما نحتاج|no need|not needed|cancel\S*|revok\S*|drop\S*|remov\S*|instead|chang\S*|switch\S*|replac\S*|no longer|forget|scrap\S*|undo|delete\S*|خلنا من|خلينا من|خلونا من|دعنا من|دعك من|سيبك من|سيبنا من|انسوا|ننسى|ننساه|نساو|نسيو|لنلغ\S*|فلنلغ\S*|بلاها|بلاه|بلاهم|تخل\S*|نتخلى|اتخلى|بطل\S*|كنسل\S*|never ?mind|nevermind|ditch\S*|skip\S*|abandon\S*|no more|not anymore)(?= |$)/;
+    /(?:^| )(?:الغ|الغي|الغيه|الغيها|الغوه|الغيت|الغينا|نلغي|نلغيه|نلغيها|الغاء|ملغي|خلاص|بدل\S*|نبدل\S*|غيره|غيرها|غيروا|غيرت|غيرنا|نغير\S*|تغيير|تغير|انس|انسى|انساه|انسها|شيل\S*|احذف\S*|حذف\S*|نحذف\S*|امسح\S*|تراجع\S*|نرجع|عدل|عدله|عدلها|نعدل\S*|ما عاد|لا عاد|عاد ما|بلاش|ماعاد|لا داعي|ما له داعي|مو لازم|مب لازم|ما يحتاج|ما نحتاج|no need|not needed|cancel\S*|revok\S*|drop\S*|remov\S*|instead|chang\S*|switch\S*|replac\S*|no longer|forget|scrap\S*|undo|delete\S*|خلنا من|خلينا من|خلونا من|دعنا من|دعك من|سيبك من|سيبنا من|انسوا|ننسى|ننساه|نساو|نسيو|لنلغ\S*|فلنلغ\S*|بلاها|بلاه|بلاهم|تخل\S*|نتخلى|اتخلى|بطل\S*|كنسل\S*|never ?mind|nevermind|ditch\S*|skip\S*|abandon\S*|no more|not anymore|kill\S*|axe|nix)(?= |$)/;
   const changeWords = (t) => CHANGE.test(evNorm(t));
   // small numbers spelled out, so «three stools» and «3 stools», «تلات مرات» and «ثلاث مرات» share their number
   const NUM_WORDS = {
@@ -746,9 +748,128 @@
       i = w.findIndex((x, k) => k > 0 && NEG.has(x));
     return i > 0 && !negatedTokens(w.slice(0, i));
   };
+  // a text in clauses: at punctuation, «and», and a word joined by «و» (Arabic «and») — the units a detail belongs to
+  const clausesOf = (t) =>
+    String(t)
+      .split(/[.!?؟،,؛;:\n]+|\s+(?:and|while|but)\s+|\s+(?=و[^\s]{3,})/i)
+      .map(evNorm)
+      .filter(Boolean);
+  // Two details swapped between their owners («أحمد يسوق وسالم يطبخ» → «سالم يسوق وأحمد يطبخ», «$300 here and $500
+  // there» → the other way): two clauses of the decision each take one word from two different clauses of your words,
+  // crosswise. A merged or reordered paraphrase never crosses.
+  function swapped(text, source) {
+    const Q = clausesOf(source).map(content),
+      D = clausesOf(text).map(content);
+    if (Q.length < 2 || D.length < 2) return false;
+    // each decision word → the one clause of your words it belongs to (words found in several clauses tell nothing)
+    const home = (w) => {
+      const hits = Q.map((c, i) => (c.some((y) => near(w, y)) ? i : -1)).filter((i) => i >= 0);
+      return hits.length === 1 ? hits[0] : -1;
+    };
+    const homes = D.map((c) => [...new Set(c.map(home).filter((i) => i >= 0))]);
+    for (let a = 0; a < homes.length; a++)
+      for (let b = a + 1; b < homes.length; b++)
+        for (const x of homes[a]) for (const y of homes[a]) if (x !== y && homes[b].includes(x) && homes[b].includes(y)) return true;
+    // «الأخت تجيب الحلوى، والأم ترسل الدعوات» against «ماما تجيب الحلوى، وأختي ترسل الدعوات»: the first clause's owner
+    // comes from the clause the other one belongs to
+    const owner = D.map((c) => c.map(home).find((i) => i >= 0));
+    for (let a = 0; a < homes.length; a++)
+      for (let b = 0; b < homes.length; b++)
+        if (
+          a !== b &&
+          homes[a].length >= 2 &&
+          homes[b].length &&
+          homes[b].every((i) => homes[a].includes(i)) &&
+          homes[b].includes(owner[a])
+        )
+          return true;
+    return false;
+  }
+  // «from X to Y» read the other way: a word that comes after «from» in one and after «to» in the other
+  const FROM = new Set(["من", "from"]),
+    TO = new Set(["الى", "لل", "into", "to", "onto", "ل"]);
+  function directions(t) {
+    const out = new Map();
+    let role = "";
+    for (const raw of tokens(t)) {
+      let w = raw;
+      if (FROM.has(w)) {
+        role = "from";
+        continue;
+      }
+      if (TO.has(w)) {
+        role = "to";
+        continue;
+      }
+      if (/^لل.{2,}/.test(w) && role === "from") (role = "to"), (w = w.slice(2));
+      if (role && !STOP.has(w) && w.length >= 3) out.set(stem(w), role);
+    }
+    return out;
+  }
+  function reversed(text, source) {
+    const a = directions(text),
+      b = directions(source);
+    if (![...a.values()].includes("from") || ![...b.values()].includes("from")) return false;
+    for (const [w, r] of a) for (const [v, s2] of b) if (near(w, v) && r !== s2) return true;
+    return false;
+  }
+  // words that mean the opposite of each other: one in the decision, its opposite (and not itself) in your words
+  const OPPOSITES = [
+    ["قبل", "بعد"],
+    ["before", "after"],
+    ["اكثر", "اقل"],
+    ["more", "less"],
+    ["فوق", "تحت"],
+    ["above", "below"],
+    ["زياده", "تقليل"],
+    ["increase", "decrease"],
+    ["ارفع", "اخفض"],
+    ["اول", "اخر"],
+    ["first", "last"],
+    ["صباح", "مساء"],
+    ["الصبح", "بالليل"],
+    ["morning", "evening"],
+    ["am", "pm"],
+    ["شراء", "بيع"],
+    ["buy", "sell"],
+    ["يمين", "يسار"],
+    ["left", "right"],
+    ["داخل", "خارج"],
+    ["inside", "outside"],
+    ["حد ادنى", "حد اعلى"],
+    ["minimum", "maximum"],
+    ["min", "max"],
+  ];
+  function opposite(text, source) {
+    const a = new Set(tokens(text)),
+      b = new Set(tokens(source));
+    const negAround = (t, w) => clausesOf(t).some((c) => c.split(" ").includes(w) && negated(c));
+    const clash = (x, y) => a.has(x) && b.has(y) && !b.has(x) && negAround(text, x) === negAround(source, y);
+    return OPPOSITES.some(([x, y]) => clash(x, y) || clash(y, x));
+  }
+  function detailGap(text, source) {
+    if (swapped(text, source)) return T("تفصيلان تبادلا مكانيهما مقارنة بكلامك");
+    if (reversed(text, source)) return T("الاتجاه معكوس مقارنة بكلامك (من/إلى)");
+    if (opposite(text, source)) return T("في القرار عكس ما في كلامك (قبل/بعد، أكثر/أقل…)");
+    return "";
+  }
+  // not a yes yet: «let me ask my father», «I'll run it by my wife», «سأناقشها مع الإدارة», «منشوف بعدين», «something else?»
+  const DEFER =
+    /(?:^| )[وف]?(?:اشاور|نشاور|اشيك|نشيك|افكر|نفكر|اسال|نسال|اراجع|نراجع|سأناقش\S*|ساناقش\S*|نناقش\S*|نشوف|منشوف|بنشوف|بشوف|بعدين|لاحقا|محتار|محتاره|مش متاكد|مو متاكد|مب متاكد|ما ادري|مدري|ارد عليك|نرد عليك|مبدئيا|حل واقعي|حل ثاني|غير كذا|شي ثاني|بنفسي|انا اتصرف|later|think about it|run it by|check with|ask my|talk to|not sure|in principle|something else|another option|alternative|myself|get back to you|let me think|let me check)(?= |$)/;
+  // said about this one time («اليوم», «هذا الرد», «فهاد الوصفة», «for the cover letter»): not a standing rule
+  const ONE_OFF =
+    /(?:^| )(?:اليوم|الليله|هالمره|هذي المره|هذه المره|هالوصفه|هذه الوصفه|هذي الوصفه|فهاد الوصفه|هاد المره|في هذا الرد|هذا الرد|هالرد|بهالرد|this time|this reply|this one|today|tonight|for the cover letter|for this)(?= |$)/;
+  const INSTEAD = /^(?:بدل|بدلا|عوضا|instead|rather)(?= |$)/;
   function meaningGap(quote, text, negQuote) {
-    const negText = negated(core(text));
-    const sameChoice = !negQuote && negText && trailingExclusion(text) && (RESTRICT.test(evNorm(quote)) || changeWords(quote));
+    const negText = negated(core(text)),
+      rp = evNorm(reasonPart(text));
+    const restrictedSame =
+      RESTRICT.test(core(text)) &&
+      clausesOf(quote).some((c) => RESTRICT.test(c) && !negated(c) && sharedWeight(c, core(text).replace(RESTRICT, " ")) >= 1);
+    const sameChoice =
+      (!negQuote && negText && trailingExclusion(text) && (RESTRICT.test(evNorm(quote)) || changeWords(quote))) ||
+      (negQuote && !negText && INSTEAD.test(rp) && shares(rp, quote)) ||
+      (negQuote && !negText && restrictedSame);
     if (negQuote !== negText && !sameChoice) return T("المعنى قد يعاكس كلامك (نفي في أحدهما فقط)");
     const n = content(core(text)).length,
       s = sharedWeight(quote, core(text));
@@ -818,16 +939,28 @@
       atRef = at;
       if (asQuestion(q, ev, at)) return { why: T("اقتباسك سؤال، لا قرار"), msg };
       if (ev.turns && at.i >= 0) {
-        const dd = [...daysIn(a.text)].filter((d) => !daysIn(ev.turns[at.i].raw || ev.turns[at.i].t).has(d));
+        const yourDays = new Set(
+          clausesOf(ev.turns[at.i].raw || ev.turns[at.i].t)
+            .filter((c) => !negated(c))
+            .flatMap((c) => [...daysIn(c)]),
+        );
+        const dd = [...daysIn(a.text)].filter((d) => !yourDays.has(d));
         let j = at.i - 1;
         while (j >= 0 && ev.turns[j].role !== "assistant") j--;
         const prevDays = a.source === "assistant-approved" && j >= 0 ? daysIn(ev.turns[j].raw || ev.turns[j].t) : new Set();
-        if (dd.some((d) => !prevDays.has(d))) return { why: T("يوم في القرار ليس في كلامك"), msg };
+        if (dd.some((d) => !prevDays.has(d) && !(known && known.has("day:" + d)))) return { why: T("يوم في القرار ليس في كلامك"), msg };
       }
       if (a.source === "user") {
         const gap = meaningGap(a.quote, a.text, polarityIn(q, ev, at, core(a.text)));
         if (gap) return { why: gap, msg };
+        const dg = at.i >= 0 ? detailGap(a.text, ev.turns[at.i].raw || ev.turns[at.i].t) : detailGap(a.text, a.quote);
+        if (dg) return { why: dg, msg };
       } else {
+        if (ev.turns && at.i >= 0) {
+          let j0 = at.i - 1;
+          while (j0 >= 0 && ev.turns[j0].role !== "assistant") j0--;
+          if (j0 >= 0) prevRaw = ev.turns[j0].raw || ev.turns[j0].t;
+        }
         // an approval is a plain yes: no refusal or reservation anywhere in that message («نعم، لكن لا تحذف…» is not one)
         // «آبل باي ماشي، تابي لا» approves Apple Pay: the «لا» is about something else
         const negClauseAbout = (raw) =>
@@ -840,18 +973,31 @@
           return { why: T("اقتباس الموافقة فيه رفض أو نفي أو تحفّظ"), msg };
         if (!AGREE.test(q) && !shares(q, core(a.text))) return { why: T("الاقتباس ليس موافقة"), msg };
         if (at.i >= 0) {
+          // a deferral in the same message: not agreed yet — unless it is clearly about something else and your yes names this
+          const clauses = clausesOf(ev.turns[at.i].raw || ev.turns[at.i].t);
+          const deferred = clauses.filter((c) => DEFER.test(c));
+          if (deferred.length && (deferred.some((c) => sharedWeight(c, core(a.text)) >= 1) || !shares(q, core(a.text))))
+            return { why: T("في ردك تأجيل أو تحفّظ، لا موافقة بعد"), msg };
+        }
+        if (at.i >= 0) {
           const m = ev.turns[at.i].t,
             r = RESERVATION.exec(m);
           // a reservation about the same thing: the user changed this part («Okay, but make it March 15»)
           if (r && r.index >= Math.max(0, m.indexOf(q))) {
-            const rest = m.slice(r.index + r[0].length);
-            if (content(rest).length >= 1 && sharedWeight(rest, core(a.text)) >= 1)
+            const rest = m.slice(r.index + r[0].length),
+              restNums = digitsIn(rest),
+              reflected = restNums.size > 0 && [...restNums].every((x) => digitsIn(a.text).has(x)) && !swapped(a.text, rest);
+            if (!reflected && content(rest).length >= 1 && sharedWeight(rest, core(a.text)) >= 1)
               return { why: T("وافقتَ مع تعديل على هذا نفسه؛ القرار لا يعكس تعديلك"), msg };
           }
           // numbers the user stated in the approval itself are the ones that count
-          const own = digitsIn(ev.turns[at.i].raw || m);
+          const own = digitsIn(ev.turns[at.i].raw || m),
+            took = [...own].every((x) => digitsIn(a.text).has(x));
           if (own.size) {
-            const off = [...digitsIn(a.text)].filter((n) => !own.has(n) && !(known && known.has(n)));
+            const all = prevRaw ? digitsIn(prevRaw) : new Set(),
+              picked = [...own].every((x) => all.has(x)); // your numbers are some of the suggested ones: you chose those
+            const sugg = took && !picked ? all : new Set();
+            const off = [...digitsIn(a.text)].filter((n) => !own.has(n) && !sugg.has(n) && !(known && known.has(n)));
             if (off.length) return { why: T`رقم ليس في كلامك الذي بُني عليه: ${off.slice(0, 3).join(T("، "))}`, msg };
           }
         }
@@ -902,6 +1048,10 @@
     if (!at) return { why: notYours(q, ev), msg: 0 };
     const neg = polarityIn(q, ev, at, kind === "add" ? core(target.text) : "");
     if (kind === "add") {
+      const src = ev.turns && at.i >= 0 ? ev.turns[at.i].raw || ev.turns[at.i].t : quote;
+      if (ONE_OFF.test(evNorm(src))) return { why: T("قلتَه لهذه المرة فقط، لا قيداً دائماً"), msg: at.n };
+      const dgc = detailGap(target.text, src);
+      if (dgc) return { why: dgc, msg: at.n };
       const off = ev.turns && at.i >= 0 ? numbersMissing(target.text, localNumbers(ev, at, ""), null) : [];
       if (off.length) return { why: T`رقم ليس في كلامك الذي بُني عليه: ${off.slice(0, 3).join(T("، "))}`, msg: at.n };
       const gap = meaningGap(quote, target.text, neg);
@@ -1013,6 +1163,9 @@
           true,
         )
       : null;
+    // the days already established, like the numbers («… يوم الجمعة بدل وادي رم» keeps Friday from the decision it replaces)
+    if (known)
+      for (const d of m.decisions) if (d.status === "active" && !d.unverified) for (const i of daysIn(d.text)) known.add("day:" + i);
     const yours = (d) => d.source !== "assistant"; // a decision you made or approved (not the model's own suggestion)
     // revoke d, or (when the words for it are missing) leave it in force with the revocation waiting for you
     const revokeOrHold = (d, quote, why) => {
@@ -1061,7 +1214,12 @@
             revokeOrHold(old, a.quote, "");
             replaced = old.id;
           } else if (old && a.source !== "assistant") {
-            const ch = checkChange(a.quote, { ...old, next: core(a.text) }, ev, "replace").why;
+            // your words for the change fit another decision of yours better: that is the one you changed, not this one
+            const fit = (x) => sharedWeight(a.quote, x.text + " " + x.quote);
+            const other = m.decisions.find((x) => x.status === "active" && x !== old && yours(x) && fit(x) > fit(old));
+            const ch = other
+              ? T`كلامك يخص قراراً آخر (${other.id})، لا ${old.id}`
+              : checkChange(a.quote, { ...old, next: core(a.text) }, ev, "replace").why;
             revokeOrHold(old, a.quote, ch);
             if (!ch) replaced = old.id;
           }
@@ -1515,6 +1673,35 @@
   }
 
   // → { memory, changes: [human-readable lines], missing: [ids not found], redacted } — never mutates its input
+  // ---------- relevance: what in the memory is about a task ----------
+  // «I'm writing the invitation» → the date, the place, the approved wording. A plain word match (same roots, numbers,
+  // names), no index and no model: decisions in force, pinned texts and recent log entries that share words with the
+  // query, best first. The summary and the constraints (standing rules) always come along. Isolation between projects
+  // is not affected: this only ever looks inside the one memory it is given.
+  function relevant(memory, query, limits) {
+    const m = normalizeMemory(memory),
+      L = { decisions: 12, log: 4, pins: 3, ...(limits || {}) };
+    const sel = { summary: true, constraints: m.constraints.length > 0, decisions: [], pins: [], log: [] };
+    if (!content(query).length) return sel;
+    const score = (t) => sharedWeight(query, t);
+    const top = (items, key, text, n) =>
+      items
+        .map((x) => ({ k: x[key], s: score(text(x)) }))
+        .filter((x) => x.s > 0)
+        .sort((a, b) => b.s - a.s)
+        .slice(0, n)
+        .map((x) => x.k);
+    sel.decisions = top(
+      m.decisions.filter((d) => d.status === "active"),
+      "id",
+      (d) => d.text + " " + d.quote,
+      L.decisions,
+    );
+    sel.pins = top(m.pins, "name", (p) => p.name, L.pins);
+    sel.log = top(m.log.slice(-60), "id", (e) => [e.chat, ...e.raised, ...e.decided, ...e.changed].join(" "), L.log);
+    return sel;
+  }
+
   // ---------- history: every change, why it happened, and undoing one change ----------
   // Each write is compared with what it replaced; every difference that matters to the user becomes an event: a decision
   // added, cancelled, brought back, reworded, approved; a constraint added or removed; the summary rewritten. An event
@@ -2035,5 +2222,6 @@
     undoEvent,
     describeEvent,
     recheckDecisions,
+    relevant,
   };
 });

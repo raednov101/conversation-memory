@@ -207,10 +207,47 @@ $("lang").addEventListener("change", async () => {
   await chrome.storage.local.set({ settings: { ...settings, lang: $("lang").value } });
   location.reload(); // every text on the page is drawn again in the new language
 });
+// ---------- the welcome tour: four short steps on first open, again from the footer ----------
+let tourAt = 1;
+function showTour(on) {
+  $("welcome").hidden = !on;
+  if (!on) return;
+  const steps = [...document.querySelectorAll("#welcome .step")];
+  steps.forEach((x) => (x.hidden = +x.dataset.step !== tourAt));
+  $("tourBack").hidden = tourAt === 1;
+  $("tourNext").textContent = tourAt === steps.length ? T("ابدأ") : T("التالي");
+  $("tourDots").textContent = `${tourAt} / ${steps.length}`;
+}
+async function endTour() {
+  showTour(false);
+  try {
+    await chrome.storage.local.set({ welcomeSeen: true });
+  } catch {}
+}
+$("tourNext").addEventListener("click", () => {
+  if (tourAt >= document.querySelectorAll("#welcome .step").length) return endTour();
+  tourAt++;
+  showTour(true);
+});
+$("tourBack").addEventListener("click", () => {
+  tourAt = Math.max(1, tourAt - 1);
+  showTour(true);
+});
+$("tourSkip").addEventListener("click", endTour);
+$("tourAgain").addEventListener("click", () => {
+  tourAt = 1;
+  showTour(true);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
 // the language first, so everything drawn after it (and every request to the writer) speaks it
 chrome.storage.local.get("settings").then(({ settings = {} }) => {
   self.MemoryCore.setLang(settings.lang || "auto");
   translatePage();
+  chrome.storage.local.get("welcomeSeen").then(
+    ({ welcomeSeen }) => !welcomeSeen && !inPopup && showTour(true),
+    () => {},
+  );
   loadSettings();
   refresh();
 });

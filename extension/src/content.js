@@ -866,6 +866,7 @@
     ui.openShare(m, {
       budget: SHARE_BUDGET,
       preview: (sel) => C.renderSelection(m, sel, SHARE_BUDGET, { pinTexts: r.pinTexts || {}, plain: true }),
+      relevant: (q) => C.relevant(m, q),
       onInsert: async (text) => {
         const c = A.composer();
         if (!c) {

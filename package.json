@@ -3,7 +3,7 @@
   "private": true,
   "description": "Development scripts for the conversation-memory plugin and browser extension. Not published; each package under plugin/ and extension/ is self-contained.",
   "scripts": {
-    "test": "node --no-warnings --test tests/*.test.js tests/plugin/*.test.js extension/tests/*.test.js",
+    "test": "node scripts/i18n.js keys --check && node --no-warnings --test tests/*.test.js tests/plugin/*.test.js extension/tests/*.test.js",
     "lint": "eslint plugin extension tests",
     "check-core": "node scripts/check-core.js",
     "sync-core": "node scripts/check-core.js --write",
