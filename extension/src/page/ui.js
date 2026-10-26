@@ -31,6 +31,7 @@
     .rv{border-top:1px solid #d0d7de;padding-top:6px;margin-top:6px}.rv button{display:inline-block;width:auto;margin:0 0 0 6px}
     .share-prev{max-height:150px}.count{font-size:11px;color:#57606a;text-align:left}
     :host(.side-left) .pill,:host(.side-left) .panel,:host(.side-left) .toast{right:auto;left:16px}
+    .toast.beside{right:372px;bottom:132px}:host(.side-left) .toast.beside{right:auto;left:372px}
     .toast{position:fixed;right:16px;bottom:136px;z-index:2147483647;direction:var(--cm-dir,rtl);font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
   const T = root.MemoryCore.T;
   const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
@@ -164,7 +165,7 @@
       if (!v.unreadable) {
         const left = Math.max(0, settings.every - since);
         info +=
-          T`<br><span class="muted">${manual ? T("الوضع اليدوي: لا يُطلب ملخص إلا بالزر.") : `${left ? T`التلخيص القادم بعد ${n(left, "msgGen")}.` : T("حان وقت التلخيص.")}`} النص الكامل يُحفظ بعد كل رد.` +
+          T`<br><span class="muted">${manual ? T("الوضع اليدوي: لا يُطلب ملخص إلا بالزر.") : s.status === "error" ? "" : `${left ? T`التلخيص القادم بعد ${n(left, "msgGen")}.` : T("حان وقت التلخيص.")}`} النص الكامل يُحفظ بعد كل رد.` +
           `${!manual && settings.paused ? T(" (التلخيص التلقائي متوقف)") : ""}${v.noComposer ? T(" لا أجد خانة الكتابة.") : ""}</span>`;
         if (v.userCount > s.summarizedUpTo && !s.pending)
           btns[s.status === "error" ? "unshift" : "push"]([T("💾 لخّص واحفظ الآن"), "summarize"]);
@@ -211,8 +212,11 @@
       share = null,
       last = { view: {}, settings: {} };
 
+    // above the pill, or below it while the panel is open, so it never covers the panel's buttons
+    const placeToast = () => toastEl.classList.toggle("beside", panel.classList.contains("open"));
     function toast(msg, ms) {
       toastEl.textContent = msg;
+      placeToast();
       toastEl.style.display = "block";
       clearTimeout(toast.t);
       toast.t = setTimeout(() => (toastEl.style.display = "none"), ms || 6000);
@@ -244,6 +248,7 @@
       pinDraft = null;
       share = null;
       panel.classList.remove("open", "wide");
+      placeToast();
       render();
     }
     function openPin(text) {
@@ -255,6 +260,7 @@
         T`<button type="button" data-a="pin-save">حفظ</button><button type="button" data-a="pin-cancel">إلغاء</button>`;
       panel.querySelector(".preview").textContent = text.length > 400 ? text.slice(0, 400) + "…" : text;
       panel.classList.add("open");
+      placeToast();
       const input = panel.querySelector("input");
       input.addEventListener("keydown", (e) => {
         if (!real(e)) return;
@@ -304,6 +310,7 @@
         list.map(item).join("") +
         T`<button type="button" class="link" data-a="pin-cancel">إغلاق</button>`;
       panel.classList.add("open", "wide");
+      placeToast();
     }
     // which saved memory to bring into a new chat outside any project (each such chat has its own)
     function openPick(list, onPick) {
@@ -320,6 +327,7 @@
           .join("") +
         T`<button type="button" data-a="pin-cancel">إلغاء</button>`;
       panel.classList.add("open", "wide");
+      placeToast();
     }
     // choose parts of the project's memory, see exactly what will be inserted (and its length), then insert — never sent
     // m: the memory; o: { preview(sel) → text, budget, onInsert(text) }
@@ -359,6 +367,7 @@
         T`<button type="button" class="primary" data-a="share-insert">📥 ضعه في خانة الكتابة</button><button type="button" data-a="pin-cancel">إلغاء</button>`;
       panel.innerHTML = h;
       panel.classList.add("open", "wide");
+      placeToast();
       update();
     }
     function selection() {
@@ -393,6 +402,7 @@
     const setOpen = (on) => {
       panel.classList.toggle("open", on);
       pill.setAttribute("aria-expanded", String(on));
+      placeToast();
       if (on) {
         const f = panel.querySelector("button, input");
         if (f) setTimeout(() => f.focus(), 0);

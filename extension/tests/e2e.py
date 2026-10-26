@@ -301,7 +301,7 @@ with sync_playwright() as pw:
         ok(wait(lambda: "⚠️" in pill(p), 20), f"{name}: reply without the summary → ⚠️ shown", pill(p))
         req2 = requests(p)[-1] if len(requests(p)) > 1 else ""
         ok("d1 [user] اعتماد اللون الأزرق الداكن للمشروع" in req2 and "الميزانية 40 ألف ريال" in req2, f"{name}: the request carries the current memory (decision ids) so the model can update it", req2[:300])
-        ok("لم أجد الملخص" in panel_text(p), f"{name}: the reason is shown in the panel")
+        ok("لم يأتِ رد النموذج بالصيغة المطلوبة" in panel_text(p), f"{name}: the reason is shown in the panel")
         rawf2 = f".conversation-memory/chats/{platform}-chat-one.md"
         ok(wait(lambda: "رسالة 10" in (read(proj, rawf2) or ""), 8), f"{name}: the summary failed, but the full text of message 10 is saved")
         p.wait_for_timeout(5000)
