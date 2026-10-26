@@ -1,471 +1,49 @@
-// The only code that reads or writes the memory: inside the browser's private storage by default, or in a folder the
-// user linked. Uses the shared core (memory-core.js, byte-identical to the plugin's).
-// Every memory write: read → (migrate / keep hand edits) → apply → re-read to detect a concurrent writer → backup → write → read back.
+// The writer, part 3 of 3 — the operations the pages may ask for, one at a time. The only code that reads or writes the
+// memory: inside the browser's private storage by default, or in a folder the user linked (writer/storage.js), through
+// writer/memory.js. Uses the shared core (memory-core.js, byte-identical to the plugin's).
 "use strict";
 const C = self.MemoryCore;
 const T = C.T;
-// file names, backup naming, sizes and the shared lock come from the core: the plugin follows the same definition
 const {
-  json: JSON_FILE,
-  md: MD_FILE,
-  pins: PINS,
-  data: DATA,
-  maxJson: MAX_JSON,
-  trimAt: TRIM_AT,
-  maxBackups: MAX_BACKUPS,
-  writeLockStale: WLOCK_STALE,
-  futureSkew: FUTURE_SKEW,
-} = C.PROTOCOL;
-const STATE_BUDGET = 1800,
-  COMPACT_BUDGET = 5000;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const nonce = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
-const today = () => new Date().toLocaleString("sv-SE").slice(0, 16);
-const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(".", "-").slice(0, 19);
-
-// ---------- where the memory lives ----------
-// By default inside the browser (the extension's private file system: no folder to choose, no permission to grant),
-// one folder per project of the site (a Claude or ChatGPT project; "general" for chats outside any project).
-// If the user links a folder on their computer (to share the memory with Claude Code), everything goes there instead.
-function idb() {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open("cm", 1);
-    r.onupgradeneeded = () => r.result.createObjectStore("kv");
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-async function kvSet(k, v) {
-  const db = await idb();
-  return new Promise((res, rej) => {
-    const tx = db.transaction("kv", "readwrite");
-    const q = tx.objectStore("kv").put(v, k);
-    q.onsuccess = () => res(true);
-    q.onerror = () => rej(q.error);
-  });
-}
-async function kvGet(k) {
-  const db = await idb();
-  return new Promise((res, rej) => {
-    const q = db.transaction("kv").objectStore("kv").get(k);
-    q.onsuccess = () => res(q.result);
-    q.onerror = () => rej(q.error);
-  });
-}
-let SCOPE = "general",
-  SCOPE_NAME = ""; // set for each request (requests run one at a time, under the "cm-write" lock)
-const cleanScope = (s) => (/^[a-z0-9-]{1,80}$/.test(String(s || "")) ? String(s) : "general");
-// the browser's own storage: no other program can reach it, and navigator.locks("cm-write") already runs one request at a time,
-// so the file lock shared with the Claude Code plugin is not needed there
-const IN_BROWSER = new WeakSet();
-async function browserRoot(scope = SCOPE) {
-  const d = await dir(await navigator.storage.getDirectory(), ["projects", scope]);
-  IN_BROWSER.add(d);
-  return d;
-}
-async function root() {
-  const h = await kvGet("root");
-  if (!h) return { h: await browserRoot(), inBrowser: true };
-  if ((await h.queryPermission({ mode: "readwrite" })) !== "granted") return { err: "needPermission" };
-  return { h };
-}
-async function scopeNames() {
-  return (await kvGet("scopeNames")) || {};
-}
-async function rememberScopeName() {
-  if (!SCOPE_NAME) return;
-  const n = await scopeNames();
-  if (n[SCOPE] === SCOPE_NAME) return;
-  n[SCOPE] = SCOPE_NAME.slice(0, 80);
-  await kvSet("scopeNames", n);
-}
-const GENERAL_NAMES = {
-  // translated where shown: T(GENERAL_NAMES[x])
-
-  general: "محادثات خارج المشاريع (إصدار سابق)",
-  "chatgpt-general": "ChatGPT: محادثات خارج المشاريع (قبل 1.5)",
-  "claude-general": "Claude: محادثات خارج المشاريع (قبل 1.5)",
-};
-const scopeLabel = async (scope) => (GENERAL_NAMES[scope] && T(GENERAL_NAMES[scope])) || (await scopeNames())[scope] || scope;
-
-// ---------- fs helpers ----------
-async function dir(base, parts, create = true) {
-  let d = base;
-  for (const p of parts) d = await d.getDirectoryHandle(p, { create });
-  return d;
-}
-async function readText(d, name) {
-  try {
-    const f = await (await d.getFileHandle(name)).getFile();
-    if (f.size > MAX_JSON) throw new Error(T`${name} أكبر من 4 ميجا`);
-    return await f.text();
-  } catch (e) {
-    if (e.name === "NotFoundError" || e.name === "TypeMismatchError") return null;
-    throw e;
-  }
-}
-async function writeVerified(d, name, text) {
-  const fh = await d.getFileHandle(name, { create: true });
-  const w = await fh.createWritable(); // a swap file; the original is replaced only on close()
-  await w.write(text);
-  await w.close();
-  if ((await (await fh.getFile()).text()) !== text) throw new Error(T("فشل التحقق بعد الكتابة: ") + name);
-}
-async function sha256(t) {
-  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
-  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
-}
-async function dataDir(r) {
-  const d = await dir(r, [DATA]);
-  if ((await readText(d, ".gitignore")) === null) await writeVerified(d, ".gitignore", "*\n");
-  return d;
-}
-// Backups in .conversation-memory/backups/, shared with the Claude Code plugin (same names, same folder), so "undo"
-// reverts the last change whoever made it. A version is never replaced without its backup.
-const BACKUP_RE = C.PROTOCOL.backupRe;
-async function backupNames(r) {
-  const b = await dir(await dataDir(r), ["backups"]);
-  const names = [];
-  for await (const [n, h] of b.entries()) if (h.kind === "file" && BACKUP_RE.test(n)) names.push(n);
-  return { b, names: names.sort().reverse() }; // newest first
-}
-async function backupJson(r, text) {
-  if (!text) return;
-  const { b, names } = await backupNames(r);
-  if (names.length && (await readText(b, names[0])) === text) return;
-  let name = `${stamp()}.json`;
-  while (names.includes(name)) name = `${stamp()}-${nonce().slice(0, 4)}.json`;
-  await writeVerified(b, name, text); // throws if it can't be written: then nothing else is written either
-  names.unshift(name);
-  for (const n of names.slice(MAX_BACKUPS)) await b.removeEntry(n).catch(() => {});
-}
-// The .md is a view of the current memory or of an earlier version (writes cut off between the two files can leave it
-// several versions behind): then it is not a hand edit and is simply regenerated. Only real edits are kept aside.
-async function isSomeGeneratedView(r, mdText, current) {
-  if (C.isGeneratedView(mdText, current, null)) return true;
-  const h = C.hash(String(mdText)),
-    { b, names } = await backupNames(r);
-  for (const n of names) {
-    const p = C.parseMemory(await readText(b, n));
-    if (p.ok && (p.memory.mdHash === h || C.isGeneratedView(mdText, p.memory, null))) return true;
-  }
-  return false;
-}
-// backup names carry the time in UTC (shared with the plugin); people read it in their own time
-const localWhen = (n) =>
-  new Date(Date.UTC(+n.slice(0, 4), +n.slice(4, 6) - 1, +n.slice(6, 8), +n.slice(9, 11), +n.slice(11, 13), +n.slice(13, 15)))
-    .toLocaleString("sv-SE")
-    .slice(0, 16);
-async function describeBackups(r, currentText) {
-  const { b, names } = await backupNames(r),
-    out = [];
-  for (const n of names) {
-    const text = await readText(b, n),
-      p = C.parseMemory(text);
-    if (!p.ok || text === currentText) continue;
-    const m = p.memory;
-    out.push({
-      name: n,
-      when: localWhen(n),
-      text,
-      memory: m,
-      log: m.log.length,
-      decisions: m.decisions.filter((d) => d.status === "active").length,
-      goal: m.summary.goal.slice(0, 60),
-    });
-  }
-  return out;
-}
-
-// ---------- the memory (the only writer in the extension) ----------
-async function readMemory(r) {
-  let jsonText = await readText(r, JSON_FILE),
-    p = C.parseMemory(jsonText);
-  // a file being replaced by another writer at this very moment can read as cut off: look once more before calling it broken
-  if (!p.ok) {
-    await sleep(150);
-    jsonText = await readText(r, JSON_FILE);
-    p = C.parseMemory(jsonText);
-  }
-  const mdText = await readText(r, MD_FILE);
-  if (!p.ok) return { bad: p.error, brokenText: jsonText };
-  return { memory: p.memory, jsonText, mdText, token: C.token(jsonText || ""), exists: jsonText != null, newer: !!p.newer };
-}
-// Inside the browser nobody edits the file by hand: a cut-off file can only come from a write that was killed (the
-// browser closing the writer at the worst moment, seen about once in a few hundred forced closes under heavy load).
-// It is healed from the newest backup and kept aside. In a linked folder it may be someone's edit: reported, left alone.
-async function healCut(r, cur) {
-  if (!cur.bad || !IN_BROWSER.has(r) || typeof cur.brokenText !== "string") return null;
-  const b = (await describeBackups(r, null))[0];
-  if (!b) return null;
-  await writeVerified(r, `CONVERSATION_MEMORY.broken-${stamp()}.json`, cur.brokenText);
-  const m = b.memory,
-    md = C.render(m);
-  m.mdHash = C.hash(md);
-  await writeVerified(r, JSON_FILE, C.serialize(m));
-  await writeVerified(r, MD_FILE, md);
-  return T`وُجد ملف الذاكرة مقطوعاً (كتابة قُطعت)، فاستُرجعت آخر نسخة سليمة (${b.when}) وحُفظ المقطوع جانباً.`;
-}
-// the approved version of each pinned text, verified against its fingerprint (for inserting it verbatim into a chat)
-async function pinTextsOf(r, m) {
-  const out = {};
-  for (const p of m.pins) {
-    try {
-      const parts = p.path.split("/"),
-        t = await readText(await dir(r, parts.slice(0, -1), false), parts[parts.length - 1]);
-      if (t != null && (await sha256(t)) === p.sha) out[p.name] = t;
-    } catch {}
-  }
-  return out;
-}
-async function readHealed(r) {
-  let cur = await readMemory(r);
-  if (cur.bad && (await healCut(r, cur))) cur = await readMemory(r);
-  return cur;
-}
-// Shared with the Claude Code plugin (same protocol in hook.js): an advisory lock file ".conversation-memory/write.lock",
-// "<owner> <epoch-ms>", stale after 15 s; taken by writing it and confirming it still holds our owner a moment later.
-async function takeWriteLock(r) {
-  if (IN_BROWSER.has(r)) return { browser: true };
-  const d = await dataDir(r),
-    me = nonce(),
-    until = Date.now() + 3000;
-  while (Date.now() < until) {
-    // the other writer may be replacing the lock file while we read it: that read fails, which only means "busy, look again"
-    let held = false;
-    try {
-      const f = await (await d.getFileHandle(C.PROTOCOL.writeLock)).getFile(),
-        at =
-          +String(await f.text())
-            .trim()
-            .split(" ")[1] || f.lastModified;
-      held = at <= Date.now() + FUTURE_SKEW && Date.now() - at < WLOCK_STALE; // a future time can't hold the lock forever
-    } catch (e) {
-      if (e && e.name !== "NotFoundError") {
-        await sleep(50);
-        continue;
-      }
-    }
-    if (held) {
-      await sleep(50);
-      continue;
-    }
-    try {
-      await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`);
-    } catch {
-      await sleep(50);
-      continue;
-    }
-    await sleep(40);
-    let mine = false;
-    try {
-      mine = String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " ");
-    } catch {}
-    if (mine) {
-      // while held, the time in the lock is refreshed: a slow write is never taken for an abandoned one
-      // a refresh in flight when the lock is released must not write it back: each one checks «done» right before
-      // writing, and the release waits for it to finish (lk.beating)
-      const lk = { d, me, done: false, beating: null };
-      lk.beat = setInterval(
-        () => {
-          if (lk.done || lk.beating) return;
-          lk.beating = (async () => {
-            try {
-              if (!lk.done && String(await readText(d, C.PROTOCOL.writeLock)).startsWith(me + " ") && !lk.done)
-                await writeVerified(d, C.PROTOCOL.writeLock, `${me} ${Date.now()}`);
-            } catch {
-            } finally {
-              lk.beating = null;
-            }
-          })();
-        },
-        Math.floor(WLOCK_STALE / 3),
-      );
-      return lk;
-    }
-  }
-  return null;
-}
-async function dropWriteLock(lk) {
-  if (!lk || lk.browser) return;
-  lk.done = true;
-  clearInterval(lk.beat);
-  if (lk.beating) await lk.beating;
-  try {
-    if (String(await readText(lk.d, C.PROTOCOL.writeLock)).startsWith(lk.me + " ")) await lk.d.removeEntry(C.PROTOCOL.writeLock);
-  } catch {}
-}
-async function archive(r, entries) {
-  if (!entries.length) return;
-  await writeVerified(await dir(await dataDir(r), ["archive"]), `${stamp()}-${nonce().slice(0, 4)}.json`, JSON.stringify(entries, null, 1));
-}
-// mutate(memory, token) → { memory, extra } | { err }; it may run more than once, so it must depend only on its input.
-// confirm(memoryReadBackFromFile) → true when our change is really in the file (not just in our copy).
-// Without the lock nothing is written: { err, busy: true } and the caller tries again later.
-async function writeMemory(r, mutate, confirm, held) {
-  const notes = [];
-  let keptEdit = false,
-    healed = false;
-  const lk = held || (await takeWriteLock(r));
-  if (!lk) return { err: T("برنامج آخر يكتب في الذاكرة الآن"), busy: true };
-  try {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const cur = await readMemory(r);
-      if (cur.bad) {
-        const note = healed ? null : await healCut(r, cur);
-        if (!note) return { err: cur.bad + T(" — لم أكتب فوقه؛ أصلحه أو انقله ثم أعد المحاولة") };
-        notes.push(note);
-        healed = true;
-        attempt--;
-        continue;
-      }
-      if (cur.newer) return { err: T("ملف الذاكرة كتبه إصدار أحدث من هذه الإضافة؛ لم أكتب فوقه حتى لا يضيع ما أضافه. حدّث الإضافة") };
-      let m = cur.memory;
-      if (!cur.exists && cur.mdText) {
-        m = C.importLegacy(m, cur.mdText, today());
-        if (!attempt) notes.push(T("نُقل محتوى CONVERSATION_MEMORY.md القديم كما هو تحت «من الإصدار السابق»."));
-      } else if (!keptEdit && cur.exists && cur.mdText != null && m.mdHash && !(await isSomeGeneratedView(r, cur.mdText, m))) {
-        const name = `CONVERSATION_MEMORY.edited-${stamp()}.md`;
-        await writeVerified(r, name, cur.mdText);
-        keptEdit = true;
-        notes.push(T`عُدّل CONVERSATION_MEMORY.md يدوياً، فحُفظت نسختك في ${name} قبل إعادة توليده.`);
-      }
-      const out = mutate(m, cur.token);
-      if (out.err) return { err: out.err };
-      const t = C.trimForSize(out.memory, TRIM_AT);
-      const next = t.memory;
-      const md = C.render(next);
-      next.mdHash = C.hash(md);
-      const json = C.serialize(next);
-      if (new Blob([json]).size > MAX_JSON) return { err: T("ملف الذاكرة سيتجاوز 4 ميجا") };
-      try {
-        await backupJson(r, cur.jsonText);
-      } catch {
-        return { err: T("تعذّر حفظ نسخة احتياطية من الذاكرة الحالية، فلم أكتب فوقها") };
-      }
-      // checked as late as possible: someone else wrote meanwhile → start over on their version (nothing archived twice)
-      if ((await readText(r, JSON_FILE)) !== cur.jsonText) continue;
-      if (t.archived.length) {
-        await archive(r, t.archived);
-        notes.push(T`نُقلت ${t.archived.length} دفعة قديمة إلى الأرشيف (.conversation-memory/archive/) للحفاظ على حجم الملف.`);
-      }
-      await writeVerified(r, JSON_FILE, json);
-      await writeVerified(r, MD_FILE, md);
-      const after = C.parseMemory(await readText(r, JSON_FILE)); // confirm from the file itself
-      if (!after.ok || (confirm && !confirm(after.memory))) continue;
-      return { memory: after.memory, notes, extra: out.extra };
-    }
-    return { err: T("الملف يتغيّر باستمرار من برنامج آخر؛ أعد المحاولة بعد قليل") };
-  } finally {
-    if (!held) await dropWriteLock(lk);
-  }
-}
-
-// the current state the model needs to write a correct draft: summary, active decisions with ids, constraints
-// Only what the model cannot see in the chat itself, kept short (it is sent with every summary request and stays in the
-// chat): the project's goal and state (other chats feed them too), the decisions in force with their ids (to revoke one)
-// and the constraints (not to repeat them). Next steps and open questions are rewritten from the chat anyway.
-// the conversation text a commit is checked against (from the page; strings only, bounded)
-const EVIDENCE_MAX = 4 * 1024 * 1024;
-const evidenceArg = (e) => {
-  if (!e || typeof e.all !== "string" || typeof e.user !== "string") return null;
-  // the turns, newest kept, within the same bound
-  let size = 0;
-  const turns = [];
-  for (const x of Array.isArray(e.turns) ? e.turns.slice().reverse() : []) {
-    if (!x || (x.role !== "user" && x.role !== "assistant") || typeof x.text !== "string" || (size += x.text.length) > EVIDENCE_MAX) break;
-    // a user message's number as on the page; without it (and once older turns are cut off) it is unknown, never guessed
-    turns.unshift({ role: x.role, text: x.text, n: Number.isInteger(x.n) && x.n > 0 ? x.n : null });
-  }
-  return { user: e.user.slice(-EVIDENCE_MAX), all: e.all.slice(-EVIDENCE_MAX), ...(turns.length ? { turns } : {}) };
-};
-function stateForPrompt(m) {
-  const s = m.summary,
-    L = [];
-  if (s.goal) L.push(T`الهدف: ${s.goal}`);
-  if (s.status) L.push(T`الوضع: ${s.status}`);
-  const act = m.decisions.filter((d) => d.status === "active");
-  if (act.length) L.push(T("القرارات السارية:"), ...act.slice(-30).map((d) => `${d.id} [${d.source}] ${d.text}`));
-  if (m.constraints.length) L.push(T("القيود: ") + m.constraints.slice(-20).join(T("؛ ")));
-  const t = L.join("\n") || T("(لا توجد ذاكرة محفوظة بعد)");
-  return t.length > STATE_BUDGET ? t.slice(0, STATE_BUDGET) + "\n…" : t;
-}
-
-// the project's id lives inside the folder (.conversation-memory/project-id): chat links and progress are kept per project,
-// and a request made for one folder is refused if the folder has changed since
-async function projectId(r) {
-  const d = await dataDir(r);
-  const t = (await readText(d, "project-id")) || "";
-  if (/^[a-f0-9]{16}$/.test(t.trim())) return t.trim();
-  const id = nonce();
-  await writeVerified(d, "project-id", id);
-  return id;
-}
-async function rootFor(project) {
-  const { h, err } = await root();
-  if (err) return { err };
-  if (project !== undefined && project !== (await projectId(h)))
-    return { err: T("تغيّر مجلد المشروع منذ طُلب الملخص؛ لم يُحفظ في المجلد الجديد") };
-  return { h };
-}
-
-// ---------- pinned texts ----------
-async function withLock(h, fn) {
-  const lk = await takeWriteLock(h); // before writing anything
-  if (!lk) return { ok: false, busy: true, error: T("برنامج آخر يكتب في الذاكرة الآن؛ أعد المحاولة بعد لحظات") };
-  try {
-    return await fn(lk);
-  } finally {
-    await dropWriteLock(lk);
-  }
-}
-async function versionsOf(h, name) {
-  let d;
-  try {
-    d = await dir(h, [PINS, name], false);
-  } catch {
-    return [];
-  }
-  const out = [];
-  for await (const [n, fh] of d.entries()) {
-    const m = n.match(/^v(\d+)\.md$/);
-    if (!m || fh.kind !== "file") continue;
-    const f = await fh.getFile();
-    if (f.size > 400000) continue;
-    const text = await f.text();
-    out.push({ v: +m[1], text, sha: await sha256(text), date: new Date(f.lastModified).toLocaleString("sv-SE").slice(0, 16) });
-  }
-  return out.sort((a, b) => a.v - b.v);
-}
-// write text as the next version of a pin (or report it unchanged) and index it; the caller holds the lock
-async function pinWrite(h, name, text, lk) {
-  const d = await dir(h, [PINS, name]);
-  let last = 0;
-  for await (const [n, fh] of d.entries()) {
-    const m = n.match(/^v(\d+)\.md$/);
-    if (m && fh.kind === "file") last = Math.max(last, +m[1]);
-  }
-  const sha = await sha256(text);
-  let v = last,
-    unchanged = false;
-  if (last && (await readText(d, `v${last}.md`)) === text) unchanged = true;
-  else {
-    v = last + 1;
-    await writeVerified(d, `v${v}.md`, text);
-    if ((await sha256(await readText(d, `v${v}.md`))) !== sha) {
-      await d.removeEntry(`v${v}.md`).catch(() => {});
-      return { ok: false, error: T("فشل التحقق من البصمة") };
-    }
-  }
-  const w = await writeMemory(
-    h,
-    (m) => ({ memory: C.upsertPin(m, { name, version: v, path: C.pinPath(name, v), sha, date: today() }) }),
-    (mm) => mm.pins.some((x) => x.name === name && x.version === v),
-    lk,
-  );
-  if (w.err) return { ok: false, error: T("حُفظ النص لكن لم يُحدَّث فهرسه: ") + w.err };
-  return { ok: true, name, v, unchanged, hash: sha.slice(0, 12), notes: w.notes };
-}
+  COMPACT_BUDGET,
+  GENERAL_NAMES,
+  JSON_FILE,
+  MD_FILE,
+  backupJson,
+  browserRoot,
+  cleanScope,
+  ctx,
+  dataDir,
+  describeBackups,
+  dir,
+  isSomeGeneratedView,
+  kvGet,
+  kvSet,
+  readText,
+  rememberScopeName,
+  root,
+  scopeLabel,
+  scopeNames,
+  sha256,
+  stamp,
+  today,
+  writeVerified,
+} = self.CMW.storage;
+const {
+  readMemory,
+  pinTextsOf,
+  readHealed,
+  takeWriteLock,
+  dropWriteLock,
+  writeMemory,
+  evidenceArg,
+  stateForPrompt,
+  projectId,
+  rootFor,
+  withLock,
+  versionsOf,
+  pinWrite,
+} = self.CMW.memory;
 
 // ---------- operations ----------
 const ops = {
@@ -477,9 +55,9 @@ const ops = {
         const b = await browserRoot();
         return {
           ok: true,
-          folder: await scopeLabel(SCOPE),
+          folder: await scopeLabel(ctx.scope),
           inBrowser: true,
-          scope: SCOPE,
+          scope: ctx.scope,
           permission: "granted",
           projectId: await projectId(b),
         };
@@ -806,7 +384,7 @@ const ops = {
     const cur = await readMemory(h);
     if (cur.bad) return { ok: false, error: cur.bad };
     if (!cur.exists) return { ok: false, error: T("لا توجد ذاكرة محفوظة لهذا المشروع بعد") };
-    return { ok: true, text: C.render(cur.memory), name: await scopeLabel(SCOPE) };
+    return { ok: true, text: C.render(cur.memory), name: await scopeLabel(ctx.scope) };
   },
   // bring back version v of a pinned text: saved as a new version, the older ones stay
   async pinRestore({ name, v }) {
@@ -834,8 +412,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   navigator.locks
     .request("cm-write", () => {
       C.setLang(args.lang || "auto"); // write in the language of the page that asked
-      SCOPE = cleanScope(args.scope);
-      SCOPE_NAME = String(args.scopeName || "");
+      ctx.scope = cleanScope(args.scope);
+      ctx.name = String(args.scopeName || "");
       return ops[msg.op](args);
     })
     .then(reply, (e) => reply({ ok: false, error: e && e.name === "NotAllowedError" ? "needPermission" : String((e && e.message) || e) }));
