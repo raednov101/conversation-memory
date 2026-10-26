@@ -200,8 +200,8 @@
     "خطأ داخلي في الإضافة؛ حدّث الصفحة، وإن تكرر فأبلغنا":
       "Internal extension error; refresh the page, and if it happens again, let us know",
     "خطأ غير متوقع: ": "Unexpected error: ",
-    '- إن كانت هذه المحادثة عن موضوع آخر لا علاقة له بالذاكرة المحفوظة أعلاه، فلا تلخّص شيئاً: اكتب بين العلامتين {"different": true} فقط، حتى {0} قبل أن تختلط الذاكرة.\n':
-      '- If this chat is about a different topic unrelated to the saved memory above, don\'t summarize anything: write only {"different": true} between the two markers, so that {0} before the memory gets mixed up.\n',
+    '- إن كانت هذه الرسائل عن موضوع آخر لا علاقة له بالذاكرة المحفوظة أعلاه، فلا تلخّص شيئاً: اكتب بين العلامتين {"different": true} فقط، حتى {0} قبل أن تختلط الذاكرة.\n':
+      '- If these messages are about a different topic unrelated to the saved memory above, don\'t summarize anything: write only {"different": true} between the two markers, so that {0} before the memory gets mixed up.\n',
     " (أولها رسالتي التي تبدأ بـ «{0}»)": " (the first is my message that starts with “{0}”)",
     "أعدتُ توليد ردك على رسالتي رقم {0}": "I regenerated your reply to my message no. {0}",
     "عدّلتُ رسالتي رقم {0}": "I edited my message no. {0}",
@@ -866,6 +866,10 @@
     اللغة: "Language",
     "تلقائي (لغة المتصفح)": "Automatic (browser language)",
     العربية: "العربية",
+    "لم يُطلب هذا الملخص من هنا (أو مضى عليه أكثر من أسبوع)؛ لم يُحفظ شيء":
+      "This summary was not requested from here (or is more than a week old); nothing was saved",
+    "طُلب هذا الملخص لذاكرة أخرى؛ لم يُحفظ في هذه": "This summary was requested for another memory; it was not saved in this one",
+    "طُلب هذا الملخص لمحادثة أخرى؛ لم يُحفظ هنا": "This summary was requested for another chat; it was not saved here",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

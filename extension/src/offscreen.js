@@ -45,6 +45,34 @@ const {
   pinWrite,
 } = self.CMW.memory;
 
+// ---------- tickets: a summary is saved only into the memory and chat it was asked for ----------
+// When a request is prepared the writer notes which memory (scope), project folder and chat it is for; the reply is
+// written only if it comes back for the same three. Switching tabs, a chat moved to its own memory meanwhile, or a page
+// sending a batch it never asked for: nothing is written. Kept in the extension's own storage, newest 300, for a week.
+const TICKET_MAX = 300,
+  TICKET_TTL = 7 * 24 * 3600 * 1000;
+const okBatch = (b) => typeof b === "string" && /^[A-Za-z0-9-]{1,120}$/.test(b);
+async function issueTicket(batch, project, chat) {
+  if (!okBatch(batch)) return;
+  const all = (await kvGet("tickets")) || {},
+    now = Date.now();
+  all[batch] = { scope: ctx.scope, project: String(project || ""), chat: String(chat || "").slice(0, 200), at: now };
+  const keep = Object.entries(all)
+    .filter(([, t]) => now - t.at < TICKET_TTL)
+    .sort((a, b) => b[1].at - a[1].at)
+    .slice(0, TICKET_MAX);
+  await kvSet("tickets", Object.fromEntries(keep));
+}
+// → "" when the reply may be written; otherwise why not
+async function ticketFor(batch, project, chat) {
+  const t = okBatch(batch) && ((await kvGet("tickets")) || {})[batch];
+  if (!t) return T("لم يُطلب هذا الملخص من هنا (أو مضى عليه أكثر من أسبوع)؛ لم يُحفظ شيء");
+  if (t.scope !== ctx.scope) return T("طُلب هذا الملخص لذاكرة أخرى؛ لم يُحفظ في هذه");
+  if (t.project !== String(project || "")) return T("تغيّر مجلد المشروع منذ طُلب الملخص؛ لم يُحفظ في المجلد الجديد");
+  if (t.chat && chat !== undefined && t.chat !== String(chat).slice(0, 200)) return T("طُلب هذا الملخص لمحادثة أخرى؛ لم يُحفظ هنا");
+  return "";
+}
+
 // ---------- operations ----------
 const ops = {
   async status() {
@@ -73,11 +101,12 @@ const ops = {
       return { ok: true, folder: h.name, permission, error: String((e && e.message) || e) };
     }
   },
-  async prepare({ project }) {
+  async prepare({ project, batch, chat }) {
     const { h, err } = await rootFor(project);
     if (err) return { ok: false, error: err };
     const cur = await readHealed(h);
     if (cur.bad) return { ok: false, error: cur.bad };
+    if (batch !== undefined) await issueTicket(batch, project, chat);
     const m = cur.memory,
       has = !!(m.summary.goal || m.summary.status || m.decisions.length || m.constraints.length);
     return { ok: true, base: cur.token, state: stateForPrompt(m), hasMemory: has };
@@ -102,9 +131,12 @@ const ops = {
     return { ok: true, text: C.renderSelection(m, sel, COMPACT_BUDGET, { pinTexts: await pinTextsOf(h, m), plain: true }) };
   },
   // the model's reply → validated draft → applied by the core
-  async commit({ project, reply, batch, base, platform, chat, range, evidence }) {
+  async commit({ project, reply, batch, base, platform, chat, chatKey, range, evidence }) {
     const { h, err } = await rootFor(project);
     if (err) return { ok: false, error: err };
+    // checked here, by the writer, not by the page: the reply goes only where its request was meant to go
+    const tk = await ticketFor(batch, project, chatKey);
+    if (tk) return { ok: false, misplaced: true, error: tk };
     const p = C.parseModelReply(String(reply || ""));
     if (!p.ok) return { ok: false, error: p.error };
     const fields = p.fields && typeof p.fields === "object" && !Array.isArray(p.fields) ? p.fields : null;

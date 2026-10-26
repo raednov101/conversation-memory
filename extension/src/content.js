@@ -120,8 +120,7 @@
       prep &&
       prep.hasMemory &&
       st &&
-      !st.topicOk &&
-      !st.summarizedUpTo &&
+      !(st.topicOk && !st.summarizedUpTo) &&
       !(B.scope.startsWith(`${P}-c-`) && folder.v && folder.v.inBrowser)
     );
   const reviewNote = (r) => {
@@ -363,6 +362,8 @@
           if (e.to > st.summarizedUpTo) {
             const r = await B.fs("commit", {
               project: e.project,
+              ...(e.scope ? { scope: e.scope, scopeName: e.scopeName || "" } : {}),
+              chatKey: key,
               reply: late.reply,
               batch: e.batch,
               base: e.base,
@@ -391,6 +392,8 @@
             const p = st.pending;
             const r = await B.fs("commit", {
               project: p.project,
+              ...(p.scope ? { scope: p.scope, scopeName: p.scopeName || "" } : {}),
+              chatKey: key,
               reply: mine.reply,
               batch: p.batch,
               base: p.base,
@@ -495,15 +498,15 @@
           });
       } else if (want && !settings.byok && c && !CP.text(c)) {
         const claim = await B.call({ cmd: "claim", key: PID + ":" + key, ttl: TIMEOUT + 20000 });
-        const prep = claim.ok ? await B.fs("prepare", { project: PID }) : { ok: false };
+        const from = st.summarizedUpTo + 1,
+          to = userCount,
+          batch = `ext-${key.slice(0, 24)}-${from}-${to}-${nonce()}`;
+        const prep = claim.ok ? await B.fs("prepare", { project: PID, batch, chat: key }) : { ok: false };
         if (!claim.ok) {
           /* another tab on this chat is sending it */
         } else if (!prep.ok) fail(st, B.why(prep.error), userCount);
         else {
           let reqText = "";
-          const from = st.summarizedUpTo + 1,
-            to = userCount,
-            batch = `ext-${key.slice(0, 24)}-${from}-${to}-${nonce()}`;
           const first = turns.find((t) => t.role === "user" && t.n === from);
           const c2 = A.composer(); // you may have started typing while the files were read: then don't touch the box
           if (!c2 || CP.text(c2) || A.generating()) {
@@ -521,6 +524,7 @@
                 base: prep.base,
                 project: PID,
                 scope: B.scope,
+                scopeName: B.scopeName,
                 asked: askTopic(st, prep),
                 from,
                 to,
@@ -587,12 +591,12 @@
         done({ ok: false, later: 15000 });
         return;
       } // another tab on this chat is doing it: look again later
-      const prep = await B.fs("prepare", at);
+      const batch = `api-${o.key.slice(0, 24)}-${o.from}-${o.to}-${nonce()}`;
+      const prep = await B.fs("prepare", { ...at, batch, chat: o.key });
       if (!prep.ok) {
         done({ ok: false, error: B.why(prep.error) });
         return;
       }
-      const batch = `api-${o.key.slice(0, 24)}-${o.from}-${o.to}-${nonce()}`;
       const asked = askTopic(o.st, prep);
       const req = M.summarizer.apiPrompt(batch, o.from, o.to, M.summarizer.convoText(o.turns, o.from, o.to), prep.state, o.rewound, asked);
       const r = await B.call({ cmd: "byok", text: req });
@@ -605,6 +609,7 @@
       for (let i = 0; i < 6; i++) {
         c = await B.fs("commit", {
           ...at,
+          chatKey: o.key,
           reply: r.text,
           batch,
           base: prep.base,

@@ -14,7 +14,7 @@
   // rewound: { n, kind: "edit" | "reply" } when the conversation branched at message n
   // askTopic: the chat's first summary into a memory that already holds something — say so if it is about something else
   const TOPIC = (who) =>
-    T`- إن كانت هذه المحادثة عن موضوع آخر لا علاقة له بالذاكرة المحفوظة أعلاه، فلا تلخّص شيئاً: اكتب بين العلامتين {"different": true} فقط، حتى ${who} قبل أن تختلط الذاكرة.\n`;
+    T`- إن كانت هذه الرسائل عن موضوع آخر لا علاقة له بالذاكرة المحفوظة أعلاه، فلا تلخّص شيئاً: اكتب بين العلامتين {"different": true} فقط، حتى ${who} قبل أن تختلط الذاكرة.\n`;
   function prompt(batch, from, to, firstText, state, rewound, askTopic) {
     const hint = firstText ? T` (أولها رسالتي التي تبدأ بـ «${firstText.replace(/\s+/g, " ").slice(0, 50)}»)` : "";
     const edit =
