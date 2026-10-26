@@ -182,6 +182,23 @@ const ops = {
       notes: w.notes,
     };
   },
+  // you edited a message: the decisions this chat gave from it on are checked again against the conversation as it is now
+  async recheck({ project, chatKey, from, evidence }) {
+    const { h, err } = await rootFor(project);
+    if (err) return { ok: false, error: err };
+    let flagged = [];
+    const w = await writeMemory(
+      h,
+      (m) => {
+        const r = C.recheckDecisions(m, { chatKey: String(chatKey || ""), from, evidence: evidenceArg(evidence), date: today() });
+        flagged = r.flagged;
+        return { memory: r.memory };
+      },
+      null,
+    );
+    if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
+    return { ok: true, flagged };
+  },
   // the history, newest first, in words (C.describeEvent)
   async history() {
     const { h, err } = await root();

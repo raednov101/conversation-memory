@@ -82,6 +82,8 @@ The machine-readable schema is [`schema/conversation-memory-1.schema.json`](sche
 | `claimed`, `pendingReplaces` | On an unverified decision: what the model claimed (`user` / `assistant-approved`) and which decision it claimed to replace. Applied only if the user approves. |
 | `confirmed` | `true` once the user approved it in a review. Editing the text removes it. |
 | `pendingRevoke` | `{date, reason, quote}`: a cancellation suggested without the user's words. The decision stays in force until the user answers. |
+| `batch` | The summary batch that added it. Its id carries the chat (`ext-<chat>-…`, `api-<chat>-…`), so a decision can be traced to the chat it came from. |
+| `recheck` | `{date, from, reason}`: the user edited message `from` of that chat and the decision's words are no longer there. In force, waiting for the user's look. |
 
 A reader that only wants *what is in force* takes `decisions` with `status: "active"` and `unverified: false`, plus
 `constraints`.

@@ -291,6 +291,34 @@
             }
           },
           "description": "A revocation suggested without the user's words: the decision stays in force until the user decides."
+        },
+        "batch": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]{1,120}$",
+          "description": "The summary batch that added it; its id carries the chat (ext-<chat>-… / api-<chat>-…)."
+        },
+        "recheck": {
+          "type": "object",
+          "required": [
+            "date",
+            "from",
+            "reason"
+          ],
+          "properties": {
+            "date": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "from": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 300
+            }
+          },
+          "description": "You edited a message this decision rested on and its words are no longer there: in force, waiting for your look."
         }
       },
       "allOf": [

@@ -920,6 +920,15 @@
     "🕘 سجل التغييرات": "🕘 History",
     "كل تغيير في الذاكرة: متى، وما الذي غيّره، ولماذا. «تراجع» يلغي هذا التغيير وحده ويبقي غيره، ويُرفض إن تغيّر الشيء نفسه بعده.":
       "Every change to the memory: when, what made it, and why. “Undo” cancels that change alone and keeps the rest; it is refused if the same thing changed again later.",
+    "وقرار بُني على ما عدّلته لم يعد كلامك يثبته؛ راجعه من «🔎 راجع القرارات».":
+      "A decision built on what you edited is no longer backed by your words; review it from “🔎 Review decisions”.",
+    "و{0} بُنيت على ما عدّلته لم يعد كلامك يثبتها؛ راجعها من «🔎 راجع القرارات».":
+      "{0} built on what you edited are no longer backed by your words; review them from “🔎 Review decisions”.",
+    "قرار عدّلتَ رسالته": "A decision whose message you edited",
+    "✓ ما زال صحيحاً": "✓ Still holds",
+    "عدّلتَ رسالتك رقم {0}: {1}": "You edited your message {0}: {1}",
+    "قرار عُدّلت رسالته فيحتاج نظرة جديدة": "decision whose message was edited, needs a new look",
+    "قرار عُدّلت رسالته": "decision whose message was edited",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

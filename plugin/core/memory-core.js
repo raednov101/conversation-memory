@@ -74,6 +74,7 @@
   // ---------- small helpers ----------
   const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
   const isId = (v) => typeof v === "string" && /^d\d{1,6}$/.test(v);
+  const isBatchId = (v) => typeof v === "string" && /^[A-Za-z0-9-]{1,120}$/.test(v);
   // strip control characters (keep \n and \t), system markers, and wrapper look-alikes; clamp length
   // The on-disk protocol both writers follow (the plugin and the extension on a linked folder): names, backup naming,
   // sizes and the shared lock. One definition, so the two can never drift apart.
@@ -241,6 +242,8 @@
     "msg",
     "confirmed",
     "pendingRevoke",
+    "batch",
+    "recheck",
   ]);
   function extras(o, known, max) {
     const out = {};
@@ -312,6 +315,16 @@
         ...(d.unverified === true && isId(d.pendingReplaces) ? { pendingReplaces: d.pendingReplaces } : {}),
         ...(Number.isInteger(d.msg) && d.msg > 0 && d.msg < 1e7 ? { msg: d.msg } : {}),
         ...(d.confirmed === true && d.unverified !== true ? { confirmed: true } : {}),
+        ...(isBatchId(d.batch) ? { batch: d.batch } : {}),
+        ...(d.status !== "revoked" && d.unverified !== true && isObj(d.recheck)
+          ? {
+              recheck: {
+                date: cleanStr(d.recheck.date, 40),
+                from: Math.max(0, Math.floor(+d.recheck.from) || 0),
+                reason: cleanStr(d.recheck.reason, 300),
+              },
+            }
+          : {}),
         ...(d.status !== "revoked" && isObj(d.pendingRevoke)
           ? {
               pendingRevoke: {
@@ -826,6 +839,7 @@
           quote: R(a.quote || ""),
           unverified: !!why,
           ...(c.msg > 0 ? { msg: c.msg } : {}),
+          ...(isBatchId(draft.batch) ? { batch: draft.batch } : {}),
           ...(why && a.source !== "assistant" ? { claimed: a.source } : {}),
           ...(why && a.replaces ? { pendingReplaces: a.replaces } : {}),
         });
@@ -1129,14 +1143,55 @@
   // ---------- what waits for you, and your answer to it ----------
   // keys: "d3" a decision not backed by your words · "x-d3" revoking d3 was proposed without your words ·
   // "c+<8>" / "c-<8>" adding / removing a constraint was proposed without your words (<8> = the constraint's fingerprint)
-  const isReviewKey = (k) => typeof k === "string" && /^(d\d{1,6}|x-d\d{1,6}|c[+-][0-9a-f]{8})$/.test(k);
+  const isReviewKey = (k) => typeof k === "string" && /^(d\d{1,6}|[xr]-d\d{1,6}|c[+-][0-9a-f]{8})$/.test(k);
   const ckey = (sign, text) => "c" + sign + hash(text).slice(-8); // the low 32 bits (the hash's first digits carry fewer)
+  // You edited message n of a chat: every decision this chat gave from message n on is checked again, with the same
+  // rules, against the conversation as it is now. One whose words are no longer there (or now say otherwise) stays in
+  // force but is marked for you to look at again («🔎 Review decisions»); one still backed just gets its message number.
+  // chatKey: the chat's id as in its batch ids (ext-<key>-… / api-<key>-…); evidence: the conversation now.
+  function recheckDecisions(memory, { chatKey, from, evidence, date }) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
+    const ev = prepareEvidence(evidence),
+      k = String(chatKey || "").slice(0, 24),
+      n0 = Math.max(1, Math.floor(+from) || 1),
+      flagged = [];
+    if (!ev || !k) return { memory: m, flagged };
+    const mine = (d) => typeof d.batch === "string" && (d.batch.startsWith(`ext-${k}-`) || d.batch.startsWith(`api-${k}-`));
+    const known = numbersIn(
+      [
+        ...m.decisions.filter((d) => d.status === "active" && !d.unverified && !mine(d)).map((d) => d.text + " " + d.quote),
+        ...m.constraints,
+        String(date || "").slice(0, 4),
+      ].join(" "),
+      true,
+    );
+    for (const d of m.decisions) {
+      if (d.status !== "active" || d.unverified || !mine(d) || (d.msg && d.msg < n0)) continue;
+      const c = checkDecision({ text: d.text, source: d.source, quote: d.quote }, ev, known);
+      if (c.why) {
+        d.recheck = { date: cleanStr(date, 40), from: n0, reason: T`عدّلتَ رسالتك رقم ${n0}: ${c.why}` };
+        flagged.push(d.id);
+      } else if (c.msg) d.msg = c.msg;
+    }
+    return { memory: m, flagged };
+  }
   function reviewItems(memory) {
     const m = normalizeMemory(memory),
       out = [];
     for (const d of m.decisions) {
       if (d.status !== "active") continue;
       if (d.unverified) out.push({ key: d.id, kind: "decision", id: d.id, text: d.text, quote: d.quote, date: d.date, msg: d.msg || 0 });
+      if (d.recheck)
+        out.push({
+          key: "r-" + d.id,
+          kind: "recheck",
+          id: d.id,
+          text: d.text,
+          quote: d.quote,
+          reason: d.recheck.reason,
+          date: d.recheck.date,
+          msg: d.msg || 0,
+        });
       if (d.pendingRevoke)
         out.push({
           key: "x-" + d.id,
@@ -1183,6 +1238,17 @@
       delete d.claimed;
       delete d.pendingReplaces;
       return changes.push(T`اعتُمد ${key}`);
+    }
+    // a decision whose message you edited: approve = it still holds (the mark goes), reject = cancel it
+    if (key.startsWith("r-")) {
+      const d = m.decisions.find((x) => x.id === key.slice(2) && x.status === "active" && x.recheck);
+      if (!d) return missing.push(key);
+      delete d.recheck;
+      if (approve) return changes.push(T`بقي ${d.id} سارياً`);
+      d.status = "revoked";
+      d.revokedOn = date || "";
+      delete d.pendingRevoke;
+      return changes.push(T`أُلغي ${d.id}`);
     }
     if (key.startsWith("x-")) {
       const d = m.decisions.find((x) => x.id === key.slice(2) && x.status === "active" && x.pendingRevoke);
@@ -1729,5 +1795,6 @@
     withHistory,
     undoEvent,
     describeEvent,
+    recheckDecisions,
   };
 });

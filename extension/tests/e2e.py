@@ -441,6 +441,29 @@ with sync_playwright() as pw:
     ok(j and j["log"][-1]["range"] == "7–11" and "أعدتُ توليد ردك على رسالتي رقم 7" in requests(p)[-1], "messages 7–11 are summarized again, and the model is told why", [x["range"] for x in j.get("log", [])])
     p.close()
 
+    print("— an edited message: the decisions built on it are checked again —")
+    proj = "proj-recheck"; use_folder(proj)
+    pk = ctx.new_page(); pk.goto(BASE + new_chat("claude", "/chat/chat-recheck/", "إعادة تحقق - Claude"))
+    wait(lambda: "🧠" in pill(pk), 10)
+    for t in ["نبدأ هوية المقهى", "نعتمد الخط الكوفي للشعار", "والألوان نناقشها لاحقاً", "نكمل غداً"]: say(pk, t)
+    pk.evaluate("""() => { window.__summaryOverride = () => { window.__summaryOverride = null; return '⟦ذاكرة:بداية⟧ ' + JSON.stringify({
+      decisions: { add: [{ text: "الخط الكوفي للشعار", source: "user", quote: "نعتمد الخط الكوفي للشعار" }], revoke: [] },
+      entry: { raised: ["نقاش هوية المقهى واختيار خط الشعار في هذه الرسائل"] } }) + ' ⟦ذاكرة:نهاية⟧'; }; }""")
+    say(pk, "شكراً")
+    jr = wait(lambda: (lambda m: m if m and m.get("decisions") else None)(mem(proj)), 20) or {}
+    ok(jr.get("decisions") and not jr["decisions"][0].get("unverified") and jr["decisions"][0].get("msg") == 2, "a decision backed by your message 2 is saved as yours", jr.get("decisions"))
+    pk.evaluate("() => { const u = document.querySelectorAll('[data-testid=user-message]'); u[1].innerText = 'نفكر في خط آخر غير الذي ذكرته'; }")
+    jr = wait(lambda: (lambda m: m if m and m["decisions"][0].get("recheck") else None)(mem(proj)), 15) or mem(proj) or {}
+    ok(jr["decisions"][0].get("recheck") and jr["decisions"][0]["status"] == "active", "after you edit message 2, the decision is marked for a new look (still in force)", jr.get("decisions"))
+    ok(wait(lambda: "🔎1" in pill(pk), 10) and "لم يعد كلامك يثبته" in panel_text(pk), "the indicator asks for review and says why", panel_text(pk)[:300])
+    pk.locator("#cm-memory-indicator .pill").click(); pk.locator("#cm-memory-indicator .panel button[data-a=review]").click()
+    rv = wait(lambda: (lambda t: t if "عدّلتَ رسالته" in t else None)(pk.locator("#cm-memory-indicator .panel").inner_text()), 8) or ""
+    ok("ما زال صحيحاً" in rv and "عدّلتَ رسالتك رقم 2" in rv, "the review offers «still holds» or «cancel it», with the reason", rv[:300])
+    pk.locator("#cm-memory-indicator .panel button[data-a=rv-revoke]").first.click()
+    jr = wait(lambda: (lambda m: m if m and m["decisions"][0]["status"] == "revoked" else None)(mem(proj)), 10) or mem(proj) or {}
+    ok(jr["decisions"][0]["status"] == "revoked" and not jr["decisions"][0].get("recheck"), "cancelling it revokes the decision", jr.get("decisions"))
+    pk.close()
+
     print("— a slow reply (the site still writing past the timeout) is waited for, never reported as failed —")
     proj = "proj-late"; use_folder(proj)
     p = ctx.new_page(); p.goto(BASE + new_chat("chatgpt", "/c/chat-late/", "متأخر - ChatGPT", timeout=3000))

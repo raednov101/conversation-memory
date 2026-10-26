@@ -99,7 +99,13 @@ function ccLine(s) {
       : T` (جُرّب عليها البلقن حياً حتى ${TESTED_CC})`)
   );
 }
-const REVIEW_KIND = { decision: "قرار", revoke: "إلغاء قرار", "constraint-add": "إضافة قيد", "constraint-remove": "حذف قيد" };
+const REVIEW_KIND = {
+  decision: "قرار",
+  recheck: "قرار عُدّلت رسالته",
+  revoke: "إلغاء قرار",
+  "constraint-add": "إضافة قيد",
+  "constraint-remove": "حذف قيد",
+};
 const reviewLine = (x) => `${x.key} ${T(REVIEW_KIND[x.kind])} «${x.text.slice(0, 60)}»${x.reason ? ` (${x.reason})` : ""}`;
 function statusText(s, mem, backups, cfg) {
   const by = (st) =>

@@ -48,6 +48,7 @@ function trustCommand() {
 // ---------- fix ----------
 const REVIEW_KIND = {
   decision: "قرار لم يثبت من كلامه",
+  recheck: "قرار عُدّلت رسالته فيحتاج نظرة جديدة",
   revoke: "إلغاء قرار له اقتُرح دون دليل",
   "constraint-add": "إضافة قيد اقتُرحت دون دليل",
   "constraint-remove": "حذف قيد اقتُرح دون دليل",

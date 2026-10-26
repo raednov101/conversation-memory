@@ -338,6 +338,17 @@
             st.note = T("تغيّر نص الصفحة مراراً؛ أُوقفت إعادة التلخيص التلقائية لهذه المحادثة نصف ساعة.");
         }
         if (r.action === "rewind") {
+          // an edited message: what this chat decided from it on is checked again now, against the edited conversation
+          let recheckNote = "";
+          if (r.kind === "edit") {
+            const rc = await B.fs("recheck", { project: PID, chatKey: key, from: r.k + 1, evidence: evidenceOf(turns) });
+            const n = rc.ok ? rc.flagged.length : 0;
+            if (n)
+              recheckNote =
+                n === 1
+                  ? T("وقرار بُني على ما عدّلته لم يعد كلامك يثبته؛ راجعه من «🔎 راجع القرارات».")
+                  : T`و${C.count(n, C.W.decision)} بُنيت على ما عدّلته لم يعد كلامك يثبتها؛ راجعها من «🔎 راجع القرارات».`;
+          }
           Object.assign(st, {
             summarizedUpTo: r.k,
             hashes: st.hashes.slice(0, r.k),
@@ -346,7 +357,7 @@
             rewinds: r.rewinds,
             note:
               r.kind === "edit"
-                ? T`عُدّلت رسالتك رقم ${r.k + 1}؛ سيُعاد تلخيص المحادثة من عندها.`
+                ? T`عُدّلت رسالتك رقم ${r.k + 1}؛ سيُعاد تلخيص المحادثة من عندها.` + (recheckNote ? " " + recheckNote : "")
                 : T`أُعيد توليد الرد على رسالتك رقم ${r.k + 1}؛ سيُعاد تلخيص المحادثة من عندها.`,
           });
         }

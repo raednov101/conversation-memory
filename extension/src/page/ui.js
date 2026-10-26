@@ -252,6 +252,7 @@
     // what waits for review: each with the words it came from and why it was not trusted; approve or reject one at a time
     const RV = {
       decision: [T("قرار نُسب إليك"), T("✓ اعتمده قراراً"), T("✕ ألغِه")],
+      recheck: [T("قرار عدّلتَ رسالته"), T("✓ ما زال صحيحاً"), T("✕ ألغِه")],
       revoke: [T("اقتُرح إلغاء قرارك"), T("✓ ألغِه"), T("✕ أبقِه")],
       "constraint-add": [T("اقتُرح قيد جديد"), T("✓ أضفه"), T("✕ لا تضفه")],
       "constraint-remove": [T("اقتُرح حذف قيد"), T("✓ احذفه"), T("✕ أبقِه")],
@@ -262,7 +263,7 @@
       const item = (d) => {
         const k = RV[d.kind] || RV.decision;
         return (
-          `<div class="rv"><p><span class="muted">${k[0]}${d.reason ? ` — ${esc(d.reason)}` : ""}</span><br>${d.kind === "decision" || d.kind === "revoke" ? `<b><bdi>${esc(d.key.replace(/^x-/, ""))}</bdi></b> ` : ""}${esc(d.text)}` +
+          `<div class="rv"><p><span class="muted">${k[0]}${d.reason ? ` — ${esc(d.reason)}` : ""}</span><br>${d.kind === "decision" || d.kind === "revoke" || d.kind === "recheck" ? `<b><bdi>${esc(d.key.replace(/^[xr]-/, ""))}</bdi></b> ` : ""}${esc(d.text)}` +
           `${d.quote ? T`<br><span class="muted">الاقتباس${d.msg ? T` (رسالتك ${esc(String(d.msg))})` : ""}: ${q(d.quote)}</span>` : T`<br><span class="muted">بلا اقتباس</span>`}</p>` +
           `<button type="button" data-a="rv-approve" data-id="${esc(d.key)}">${k[1]}</button><button type="button" data-a="rv-revoke" data-id="${esc(d.key)}">${k[2]}</button></div>`
         );
