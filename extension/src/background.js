@@ -204,7 +204,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       const scope = String((msg.args && msg.args.scope) || "");
       if (
         !site ||
-        ["exportAll", "importAll", "listScopes"].includes(msg.op) ||
+        ["exportAll", "importAll", "listScopes", "splitPlan", "splitMove", "sweepEmpty", "undoEvent", "history"].includes(msg.op) ||
         !/^[a-z0-9-]{1,80}$/.test(scope) ||
         (site !== "*" && !scope.startsWith(site + "-"))
       ) {

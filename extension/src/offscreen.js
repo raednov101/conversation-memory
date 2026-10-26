@@ -52,7 +52,15 @@ async function transcriptsOf(r) {
   try {
     const d = await dir(await dataDir(r), ["chats"], false);
     for await (const [n, h] of d.entries())
-      if (h.kind === "file" && n.endsWith(".md")) out[n.slice(0, -3)] = await (await h.getFile()).text();
+      if (h.kind === "file" && n.endsWith(".md")) {
+        // only your own messages (### أنت (n) / ### You (n)): a decision is yours by your words, not the assistant's
+        const text = await (await h.getFile()).text();
+        out[n.slice(0, -3)] = text
+          .split(/^### /m)
+          .filter((x) => /^(أنت|You) \(/.test(x))
+          .map((x) => x.replace(/^[^\n]*\n/, ""))
+          .join("\n");
+      }
   } catch {}
   return out;
 }
@@ -419,6 +427,8 @@ const ops = {
   async splitMove({ from, key }) {
     if (!/^(chatgpt|claude|gemini)?-?general$/.test(String(from)) || !/^[a-z0-9-]{3,80}$/.test(String(key)))
       return { ok: false, error: T("طلب فصل غير صالح") };
+    // a batch keeps only the first 24 characters of a chat's key: without the whole key the chat would never find its memory
+    if (String(key).length <= 24) return { ok: false, error: T("لم أتعرّف على هذه المحادثة كاملة؛ افتحها مرة في الموقع ثم أعد المحاولة") };
     const site = String(key).split("-")[0],
       to = String(key).replace(`${site}-`, `${site}-c-`);
     const src = await browserRoot(String(from)),
@@ -437,8 +447,21 @@ const ops = {
         const have = new Set(m.log.map((e) => e.id));
         const next = JSON.parse(JSON.stringify(m));
         let n = 1 + Math.max(0, ...next.decisions.map((d) => +d.id.slice(1) || 0));
-        for (const d of plan.moved.decisions)
-          if (!next.decisions.some((x) => x.text === d.text)) next.decisions.push({ ...d, id: "d" + n++ });
+        // new ids here; a link to another moved decision follows it, a link to one left behind is dropped (it would name
+        // a different decision in this memory)
+        const ids = new Map();
+        const add = plan.moved.decisions.filter(
+          (d) => !(d.status === "active" && next.decisions.some((x) => x.status === "active" && x.text === d.text)),
+        );
+        for (const d of add) ids.set(d.id, "d" + n++);
+        for (const d of add) {
+          const c = { ...d, id: ids.get(d.id), replaces: ids.get(d.replaces) || "" };
+          if (d.pendingReplaces) {
+            if (ids.has(d.pendingReplaces)) c.pendingReplaces = ids.get(d.pendingReplaces);
+            else delete c.pendingReplaces;
+          }
+          next.decisions.push(c);
+        }
         next.log = next.log.concat(plan.moved.log.filter((e) => !have.has(e.id)));
         for (const c of plan.moved.constraints) if (!next.constraints.includes(c)) next.constraints.push(c);
         if (!next.title || next.title === C.emptyMemory().title) next.title = plan.moved.title;
@@ -455,7 +478,10 @@ const ops = {
     );
     if (w3.err) return { ok: false, error: T("نُسخ إلى ذاكرة المحادثة لكن لم يُحذف من المشتركة: ") + w3.err };
     // the saved conversation text goes with it
-    const t = tx[key];
+    let t = null;
+    try {
+      t = await readText(await dir(await dataDir(src), ["chats"], false), `${key}.md`);
+    } catch {}
     if (typeof t === "string") {
       await writeVerified(await dir(await dataDir(dst), ["chats"]), `${key}.md`, t);
       await (await dir(await dataDir(src), ["chats"])).removeEntry(`${key}.md`).catch(() => {});
@@ -563,7 +589,7 @@ const ops = {
         const parts = pin.path.split("/");
         await writeVerified(await dir(r, parts.slice(0, -1)), parts[parts.length - 1], text);
       }
-      const w = await writeMemory(r, () => ({ memory: parsed.memory, meta: { by: "import", why: T("استيراد من ملف نسخة كاملة") } }), null);
+      const w = await writeMemory(r, () => ({ memory: parsed.memory, meta: { keepHistory: true } }), null);
       if (w.err) {
         skipped.push(scope);
         continue;
@@ -597,8 +623,9 @@ const ops = {
   },
 };
 
-chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || msg.target !== "offscreen" || !Object.prototype.hasOwnProperty.call(ops, msg.op)) return;
+  if (sender.tab || sender.url !== chrome.runtime.getURL("src/background.js")) return; // only through the background's gate
   const args = msg.args || {};
   // a scope that is not a valid name is refused, never turned into another memory (it once fell back to the shared one)
   if (args.scope !== undefined && !/^[a-z0-9-]{1,80}$/.test(String(args.scope))) {

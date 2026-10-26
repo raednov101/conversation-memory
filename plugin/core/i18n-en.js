@@ -876,7 +876,6 @@
     "وافقتَ عليه في المراجعة": "you approved it in the review",
     "رفضتَه في المراجعة": "you rejected it in the review",
     "استرجاع نسخة {0}": "restore of the version from {0}",
-    "استيراد من ملف نسخة كاملة": "import from a full backup file",
     "تعذّرت قراءة السجل: {0}": "Couldn't read the history: {0}",
     "لا تغييرات مسجّلة بعد (السجل يبدأ من الإصدار 2.0).": "No changes recorded yet (the history starts with version 2.0).",
     ملخص: "summary",
@@ -980,6 +979,9 @@
       "Turned on for Gemini; open a chat there (or reload its page). This is experimental: if something looks wrong, tell us.",
     "أُوقفت في Gemini.": "Turned off for Gemini.",
     "لم يُمنح الإذن؛ بقي الوضع كما كان.": "Permission not granted; nothing changed.",
+    "لم أتعرّف على هذه المحادثة كاملة؛ افتحها مرة في الموقع ثم أعد المحاولة":
+      "I couldn’t identify this chat fully; open it once on the site, then try again",
+    "حُذف القرار {0}: {1}": "Decision {0} removed: {1}",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

@@ -244,9 +244,10 @@ function applyLang(cfg, prompt) {
   let l = now || cfg.seen;
   if (!l)
     try {
-      const m = /"lang"\s*:\s*"(ar|en)"/.exec(readSafe(P.json, MAX_JSON).text || "");
+      const t = readSafe(P.json, MAX_JSON).text || "",
+        m = /"lang"\s*:\s*"(ar|en)"/.exec(t);
       // a memory written before 2.0 has no lang field and is Arabic
-      l = m ? m[1] : readSafe(P.json, 64).text ? "ar" : "";
+      l = m ? m[1] : t.trim() ? "ar" : "";
     } catch {}
   return C.setLang(l || "auto");
 }

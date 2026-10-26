@@ -432,6 +432,9 @@
               st.note = T("برنامج آخر (بلقن Claude Code؟) يكتب في الذاكرة الآن؛ سأحفظ بعد لحظات.");
               schedule(4000);
             } // nothing written, nothing counted
+            // a reply the writer refuses for this place (a request from before 2.0 has no ticket): not a failure,
+            // nothing counted — the next request is a fresh one
+            else if (r.misplaced) Object.assign(st, { pending: null, status: "idle", error: "", note: B.why(r.error) });
             else if (r.different && p.asked)
               Object.assign(st, { topicAsk: true, pending: null, status: "idle", error: "" }); // not a failure: the user decides
             else if (r.different)

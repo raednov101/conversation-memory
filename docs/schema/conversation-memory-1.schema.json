@@ -572,6 +572,7 @@
             "decision.unverify",
             "decision.confirm",
             "decision.unconfirm",
+            "decision.remove",
             "constraint.add",
             "constraint.remove",
             "summary"
@@ -595,6 +596,11 @@
         "undoes": {
           "type": "string",
           "pattern": "^e\\d{1,7}$"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "For a decision event: the decision's text at that moment, so an undo never acts on another decision that later got the same id."
         }
       }
     }

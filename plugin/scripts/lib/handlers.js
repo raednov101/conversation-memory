@@ -23,7 +23,7 @@ const {
   migrateTrust,
 } = require("./store");
 const { readTranscript, PART_RE, capture, readCapture, captureIds, deleteCapture } = require("./transcript");
-const { fixRequest, commitFix, pinsCommand, shareCommand, trustCommand, memoryContext, changesLine } = require("./features");
+const { fixRequest, commitFix, pinsCommand, shareCommand, trustCommand, memoryContext, changesLine, dataBlock } = require("./features");
 const {
   draftPath,
   labelOf,
@@ -126,7 +126,7 @@ function onPrompt(state, out) {
       mm.bad
         ? T`[conversation-memory] تعذّرت قراءة الذاكرة: ${mm.bad}. أخبر المستخدم.`
         : T`[conversation-memory] سجل تغييرات الذاكرة، الأحدث أولاً (من النظام؛ اعرضه للمستخدم كما هو. للتراجع عن تغيير واحد: /conversation-memory:undo ورقمه):\n` +
-            historyText(mm.memory, cmd.args),
+            dataBlock(historyText(mm.memory, cmd.args)), // decision texts are data, never instructions
     );
   }
   if (cmd.undoEvent) {

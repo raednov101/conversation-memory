@@ -109,10 +109,12 @@ Each write is compared with the version it replaces, and every difference that m
 | `decision.edit` | decision id | old text → new text |
 | `decision.verify` / `decision.unverify` | decision id | `{source, unverified}` → `{source, unverified}` |
 | `decision.confirm` / `decision.unconfirm` | decision id | `false` ↔ `true` |
+| `decision.remove` | decision id | `{text, source, unverified}` → `null` |
 | `constraint.add` / `constraint.remove` | the constraint's text | `null` ↔ the text |
 | `summary` | `"summary"` | `{goal, status}` → `{goal, status}` |
 
-`by` is what made the change: `summary`, `review`, `fix`, `restore`, `undo`, `pin`, `import` (or `write`). An undo
+Decision events also carry `label`: the decision's text at that moment. An undo is refused if the decision under that
+id no longer has that text (another writer may have reused the id). `by` is what made the change: `summary`, `review`, `fix`, `restore`, `undo`, `pin`, `import` (or `write`). An undo
 records the events it causes with `undoes` set to the event undone. **Undoing one event** applies its inverse, and is
 refused if a later event touched the same `target` or the value is no longer `after` — so it never overwrites a newer
 change. The reference implementation is `undoEvent` in the core. Restoring an older file keeps the current history and

@@ -272,7 +272,7 @@
     KNOWN_SUM = new Set(["goal", "status", "next", "open"]),
     KNOWN_PIN = new Set(["name", "version", "path", "sha", "date"]);
   const KNOWN_LOG = new Set(["id", "platform", "chat", "range", "date", "raised", "decided", "changed"]);
-  const KNOWN_EV = new Set(["id", "at", "by", "ref", "kind", "target", "before", "after", "why", "undoes"]);
+  const KNOWN_EV = new Set(["id", "at", "by", "ref", "kind", "target", "label", "before", "after", "why", "undoes"]);
   const pendingItems = (v) =>
     (Array.isArray(v) ? v : [])
       .filter(isObj)
@@ -491,7 +491,7 @@
     if (expand) {
       const low = evNorm(s);
       MONTHS.forEach((names, i) => {
-        if (names.some((n) => low.includes(evNorm(n)))) {
+        if (names.some((n) => (" " + low + " ").includes(" " + evNorm(n) + " "))) {
           out.add(String(i + 1));
           out.add(String(i + 1).padStart(2, "0"));
         }
@@ -623,9 +623,17 @@
     ["friday", "fri", "الجمعه", "جمعه"],
     ["saturday", "sat", "السبت", "سبت"],
   ];
+  const AMBIG_DAYS = new Set(["احد", "الحد", "اثنين", "ثلاثاء", "اربعاء", "الاربع", "خميس", "جمعه", "سبت", "sun", "mon", "sat", "wed"]);
   const daysIn = (t) => {
-    const w = new Set(tokens(t));
-    return new Set(DAYS.map((names, i) => (names.some((n) => w.has(n)) ? i : -1)).filter((i) => i >= 0));
+    const w = tokens(t),
+      out = new Set();
+    w.forEach((x, k) => {
+      const i = DAYS.findIndex((names) => names.includes(x));
+      if (i < 0) return;
+      if (AMBIG_DAYS.has(x) && !/^(يوم|يومي|كل|ايام|نهار|on|every)$/.test(w[k - 1] || "")) return;
+      out.add(i);
+    });
+    return out;
   };
   // a rough stem: without the conjunction, the article and common suffixes (enough to compare two words, never shown)
   const stem = (w) =>
@@ -749,7 +757,16 @@
     return i > 0 && !negatedTokens(w.slice(0, i));
   };
   // a text in clauses: at punctuation, «and», and a word joined by «و» (Arabic «and») — the units a detail belongs to
-  const clausesOf = (t) =>
+  const CLAUSES = new Map();
+  const clausesOf = (t) => {
+    const k = String(t);
+    if (CLAUSES.has(k)) return CLAUSES.get(k);
+    const v = clausesOf0(k);
+    if (CLAUSES.size > 200) CLAUSES.clear();
+    if (k.length > 200) CLAUSES.set(k, v);
+    return v;
+  };
+  const clausesOf0 = (t) =>
     String(t)
       .split(/[.!?؟،,؛;:\n]+|\s+(?:and|while|but)\s+|\s+(?=و[^\s]{3,})/i)
       .map(evNorm)
@@ -758,8 +775,12 @@
   // there» → the other way): two clauses of the decision each take one word from two different clauses of your words,
   // crosswise. A merged or reordered paraphrase never crosses.
   function swapped(text, source) {
-    const Q = clausesOf(source).map(content),
-      D = clausesOf(text).map(content);
+    const D = clausesOf(text).map(content),
+      words = D.flat(),
+      Q = clausesOf(source)
+        .map(content)
+        .filter((c) => c.some((x) => words.some((y) => near(x, y))))
+        .slice(0, 40);
     if (Q.length < 2 || D.length < 2) return false;
     // each decision word → the one clause of your words it belongs to (words found in several clauses tell nothing)
     const home = (w) => {
@@ -860,15 +881,37 @@
   const ONE_OFF =
     /(?:^| )(?:اليوم|الليله|هالمره|هذي المره|هذه المره|هالوصفه|هذه الوصفه|هذي الوصفه|فهاد الوصفه|هاد المره|في هذا الرد|هذا الرد|هالرد|بهالرد|this time|this reply|this one|today|tonight|for the cover letter|for this)(?= |$)/;
   const INSTEAD = /^(?:بدل|بدلا|عوضا|instead|rather)(?= |$)/;
+  // the words before the first negation («خلي العزومة بالبيت» of «… مو بالمطعم»), and the rest
+  function splitAtNeg(t) {
+    const w = tokens(t);
+    const i = w.findIndex(
+      (x, k) =>
+        NEG.has(x) ||
+        NEG.has(x.replace(/^[وف](?=..)/, "")) ||
+        ((x === "ما" || x === "وما") && MA_NEG(w[k + 1])) ||
+        (x === "don" && w[k + 1] === "t"),
+    );
+    return i < 0 ? [w.join(" "), ""] : [w.slice(0, i).join(" "), w.slice(i).join(" ")];
+  }
+  // what you chose positively: your clauses without a negation or a «drop it» word
+  const chosenIn = (quote) =>
+    clausesOf(quote)
+      .map((c) => splitAtNeg(c)[0])
+      .filter((c) => c && !changeWords(c))
+      .join(" ");
   function meaningGap(quote, text, negQuote) {
     const negText = negated(core(text)),
       rp = evNorm(reasonPart(text));
-    const restrictedSame =
-      RESTRICT.test(core(text)) &&
-      clausesOf(quote).some((c) => RESTRICT.test(c) && !negated(c) && sharedWeight(c, core(text).replace(RESTRICT, " ")) >= 1);
+    const [mainD, exclD] = splitAtNeg(core(text)),
+      chosen = chosenIn(quote),
+      clean = (t) => t.replace(new RegExp(RESTRICT.source, "g"), " ");
+    // «X only, without Y» / «X only» / «drop Y, keep X»: the same choice only if X is what you kept and Y is not
+    const sameThing = sharedWeight(clean(chosen), clean(mainD)) >= 1 && !(exclD && sharedWeight(clean(chosen), exclD) >= 1);
+    const restrictedSame = RESTRICT.test(core(text)) && clausesOf(quote).some((c) => RESTRICT.test(c) && !negated(c)) && sameThing;
     const sameChoice =
-      (!negQuote && negText && trailingExclusion(text) && (RESTRICT.test(evNorm(quote)) || changeWords(quote))) ||
-      (negQuote && !negText && INSTEAD.test(rp) && shares(rp, quote)) ||
+      (!negQuote && negText && trailingExclusion(text) && (RESTRICT.test(evNorm(quote)) || changeWords(quote)) && sameThing) ||
+      // «X بدل Y» against «X، مو Y»: X must be in what you said positively, Y in what you refused
+      (negQuote && !negText && INSTEAD.test(rp) && shares(rp, quote) && sharedWeight(chosen, core(text)) >= 1) ||
       (negQuote && !negText && restrictedSame);
     if (negQuote !== negText && !sameChoice) return T("المعنى قد يعاكس كلامك (نفي في أحدهما فقط)");
     const n = content(core(text)).length,
@@ -881,13 +924,15 @@
   }
   // where your words are: the number of your message that holds q (the newest one; 0 when unknown), and its place among the
   // turns (-1 when only the joined text is known); null when they are not yours at all
+  // a quote of one or two words must be whole words («ok» is not in «look», «اي» is not in «النهائي»)
+  const hasQuote = (t, q) => (q.split(" ").length >= 3 ? t.includes(q) : (" " + t + " ").includes(" " + q + " "));
   function findUserQuote(q, ev) {
     if (ev.turns) {
       for (let i = ev.turns.length - 1; i >= 0; i--)
-        if (ev.turns[i].role === "user" && ev.turns[i].t.includes(q)) return { n: ev.turns[i].n, i };
+        if (ev.turns[i].role === "user" && hasQuote(ev.turns[i].t, q)) return { n: ev.turns[i].n, i };
       return null;
     }
-    return ev.user.includes(q) ? { n: 0, i: -1 } : null;
+    return hasQuote(ev.user, q) ? { n: 0, i: -1 } : null;
   }
   const notYours = (q, ev) => (ev.all.includes(q) ? T("الاقتباس ليس من كلامك في المحادثة") : T("الاقتباس غير موجود في المحادثة"));
   // → { why: "" when backed, else the reason (Arabic, shown to the user), msg: your message's number when known }.
@@ -910,6 +955,20 @@
     return new Set([...numbersIn(raw, true), ...digitsIn(raw)]);
   };
   const numbersMissing = (text, local, known) => [...digitsIn(text)].filter((n) => !local.has(n) && !(known && known.has(n)));
+  // the days you named outside a negated clause («التلاتا، مش الأربعا» names Tuesday), once per message
+  const DAYS_SEEN = new Map();
+  function positiveDays(raw) {
+    const k = String(raw);
+    if (DAYS_SEEN.has(k)) return DAYS_SEEN.get(k);
+    const v = new Set(
+      clausesOf(k)
+        .filter((c) => !negated(c))
+        .flatMap((c) => [...daysIn(c)]),
+    );
+    if (DAYS_SEEN.size > 200) DAYS_SEEN.clear();
+    DAYS_SEEN.set(k, v);
+    return v;
+  }
   // a question is not a decision: «وش رأيك نحط زعيم؟», «What about a raffle?»
   const QUESTION_START =
     /^(?:وش رايك|ايش رايك|شو رايك|شرايك|ما رايك|ايش رايكم|وش رايكم|هل|ممكن|يمكن|ليش ما|ليش لا|تتوقع|تقترح|what about|how about|should we|shall we|could we|can we|would it|do you think|what if)(?= |$)/;
@@ -939,11 +998,7 @@
       atRef = at;
       if (asQuestion(q, ev, at)) return { why: T("اقتباسك سؤال، لا قرار"), msg };
       if (ev.turns && at.i >= 0) {
-        const yourDays = new Set(
-          clausesOf(ev.turns[at.i].raw || ev.turns[at.i].t)
-            .filter((c) => !negated(c))
-            .flatMap((c) => [...daysIn(c)]),
-        );
+        const yourDays = positiveDays(ev.turns[at.i].raw || ev.turns[at.i].t);
         const dd = [...daysIn(a.text)].filter((d) => !yourDays.has(d));
         let j = at.i - 1;
         while (j >= 0 && ev.turns[j].role !== "assistant") j--;
@@ -1686,11 +1741,15 @@
       const x = /^(?:ext|api)-(.+)-\d+-\d+-[a-z0-9]+$/.exec(String(batch || ""));
       return x ? x[1].slice(0, 24) : "";
     };
-    const tx = transcripts || {};
-    const belongs = (d, k) =>
-      d.batch
-        ? chatOf(d.batch) === k.slice(0, 24)
-        : !!(d.quote && evNorm(d.quote).length >= QUOTE_MIN && tx[k] && evNorm(tx[k]).includes(evNorm(d.quote)));
+    const tx = transcripts || {}; // chat key → the user's own messages in it (the writer passes only those)
+    const inChat = (q, k) => !!tx[k] && hasQuote(evNorm(tx[k]), q);
+    const belongs = (d, k) => {
+      if (d.batch) return chatOf(d.batch) === k.slice(0, 24);
+      // a decision saved before decisions recorded their batch: its quote, at least three words, in this chat and no other
+      const q = evNorm(d.quote || "");
+      if (q.split(" ").filter(Boolean).length < 3 || !inChat(q, k)) return false;
+      return Object.keys(tx).filter((o) => inChat(q, o)).length === 1;
+    };
     if (key === undefined) {
       const groups = new Map();
       for (const e of m.log) {
@@ -1765,6 +1824,7 @@
     "decision.unverify",
     "decision.confirm",
     "decision.unconfirm",
+    "decision.remove",
     "constraint.add",
     "constraint.remove",
     "summary",
@@ -1789,6 +1849,7 @@
       ref: cleanStr(e.ref, 100),
       kind: e.kind,
       target: cleanStr(e.target),
+      ...(typeof e.label === "string" && e.label ? { label: cleanStr(e.label) } : {}),
       before: evValue(e.before),
       after: evValue(e.after),
       why: cleanStr(e.why, 300),
@@ -1801,24 +1862,29 @@
   function diffEvents(a, b) {
     a = normalizeMemory(a);
     b = normalizeMemory(b);
+    // each decision event carries the text the decision had (label): an undo then never acts on another decision that
+    // got the same id later (from a version that keeps no history); removals are recorded too
     const out = [],
-      ev = (kind, target, before, after) => out.push({ kind, target, before, after });
-    const old = new Map(a.decisions.map((d) => [d.id, d]));
+      ev = (kind, target, before, after, label) => out.push({ kind, target, before, after, label });
+    const old = new Map(a.decisions.map((d) => [d.id, d])),
+      now = new Set(b.decisions.map((d) => d.id));
+    for (const o of a.decisions) if (!now.has(o.id)) ev("decision.remove", o.id, decSnap(o), null, o.text);
     for (const d of b.decisions) {
-      const o = old.get(d.id);
+      const o = old.get(d.id),
+        L = d.text;
       if (!o) {
-        ev("decision.add", d.id, null, decSnap(d));
-        if (d.status === "revoked") ev("decision.revoke", d.id, "active", "revoked");
+        ev("decision.add", d.id, null, decSnap(d), L);
+        if (d.status === "revoked") ev("decision.revoke", d.id, "active", "revoked", L);
         continue;
       }
-      if (o.text !== d.text) ev("decision.edit", d.id, o.text, d.text);
+      if (o.text !== d.text) ev("decision.edit", d.id, o.text, d.text, L);
       if (o.unverified && !d.unverified)
-        ev("decision.verify", d.id, { source: o.source, unverified: true }, { source: d.source, unverified: false });
+        ev("decision.verify", d.id, { source: o.source, unverified: true }, { source: d.source, unverified: false }, L);
       if (!o.unverified && d.unverified)
-        ev("decision.unverify", d.id, { source: o.source, unverified: false }, { source: d.source, unverified: true });
-      if (!o.confirmed && d.confirmed) ev("decision.confirm", d.id, false, true);
-      if (o.confirmed && !d.confirmed && o.text === d.text) ev("decision.unconfirm", d.id, true, false);
-      if (o.status !== d.status) ev(d.status === "revoked" ? "decision.revoke" : "decision.restore", d.id, o.status, d.status);
+        ev("decision.unverify", d.id, { source: o.source, unverified: false }, { source: d.source, unverified: true }, L);
+      if (!o.confirmed && d.confirmed) ev("decision.confirm", d.id, false, true, L);
+      if (o.confirmed && !d.confirmed && o.text === d.text) ev("decision.unconfirm", d.id, true, false, L);
+      if (o.status !== d.status) ev(d.status === "revoked" ? "decision.revoke" : "decision.restore", d.id, o.status, d.status, L);
     }
     for (const c of b.constraints) if (!a.constraints.includes(c)) ev("constraint.add", c, null, c);
     for (const c of a.constraints) if (!b.constraints.includes(c)) ev("constraint.remove", c, c, null);
@@ -1830,8 +1896,9 @@
   // the history of the version being replaced, so a restore of an older file keeps the full story and adds to it.
   function withHistory(before, after, meta) {
     const b = normalizeMemory(before),
-      next = normalizeMemory(after),
-      evs = diffEvents(b, next);
+      next = normalizeMemory(after);
+    if (meta && meta.keepHistory) return next; // a whole file brought back from a backup keeps the story it had
+    const evs = diffEvents(b, next);
     let n = Math.max(0, ...b.history.map((e) => +e.id.slice(1)));
     const mt = meta || {};
     next.history = b.history
@@ -1860,9 +1927,27 @@
       .slice(m.history.indexOf(e) + 1)
       .find((x) => x.target === e.target && x.kind !== "decision.confirm" && x.kind !== "decision.unconfirm");
     if (later) return { ok: false, error: T`تغيّر هذا مرة أخرى بعده (${later.id})؛ تراجع عن ذلك أولاً` };
+    const stale = () => ({ ok: false, error: T("تغيّرت القيمة منذ ذلك الحين؛ لم أتراجع عنها") });
+    if (e.kind === "decision.remove") {
+      // a removed decision comes back as it was — under its id, or a new one if that id is taken now
+      if (!e.before || !e.before.text) return stale();
+      const taken = m.decisions.some((x) => x.id === e.target);
+      const id = taken ? "d" + (1 + Math.max(0, ...m.decisions.map((x) => +x.id.slice(1) || 0))) : e.target;
+      m.decisions.push({
+        id,
+        text: e.before.text,
+        source: e.before.source || "assistant",
+        status: "active",
+        unverified: !!e.before.unverified,
+        date: date || "",
+      });
+      return { ok: true, memory: normalizeMemory(m), event: e };
+    }
     const d = e.kind.startsWith("decision.") ? m.decisions.find((x) => x.id === e.target) : null;
     if (e.kind.startsWith("decision.") && !d) return { ok: false, error: T`القرار ${e.target} لم يعد في الذاكرة` };
-    const stale = () => ({ ok: false, error: T("تغيّرت القيمة منذ ذلك الحين؛ لم أتراجع عنها") });
+    // the same id may now hold another decision (written by a version that keeps no history): its text tells
+    const textThen = e.kind === "decision.edit" ? e.after : e.label;
+    if (d && typeof textThen === "string" && textThen && d.text !== textThen) return stale();
     switch (e.kind) {
       case "decision.add":
         if (d.status !== "active") return stale();
@@ -1935,6 +2020,7 @@
       "decision.unverify": () => T`أُعيد ${e.target} اقتراحاً ينتظر المراجعة`,
       "decision.confirm": () => T`أكّدتَ ${e.target}`,
       "decision.unconfirm": () => T`أُزيل تأكيد ${e.target}`,
+      "decision.remove": () => T`حُذف القرار ${e.target}: ${q(short(e.before && e.before.text))}`,
       "constraint.add": () => T`أُضيف قيد: ${q(short(e.target))}`,
       "constraint.remove": () => T`حُذف قيد: ${q(short(e.target))}`,
       summary: () => T("أُعيدت كتابة الخلاصة"),
@@ -2180,6 +2266,8 @@
       if (o.msg && !d.msg) (d.msg = o.msg), n++;
       if (o.confirmed && !d.confirmed && !d.unverified && d.status === "active") (d.confirmed = true), n++;
       if (o.pendingRevoke && !d.pendingRevoke && d.status === "active") (d.pendingRevoke = o.pendingRevoke), n++;
+      if (o.batch && !d.batch) (d.batch = o.batch), n++;
+      if (o.recheck && !d.recheck && d.status === "active" && !d.unverified) (d.recheck = o.recheck), n++;
       for (const k of Object.keys(o)) if (!KNOWN_DEC.has(k) && !(k in d)) (d[k] = o[k]), n++;
     }
     const P = m.pending.constraints,

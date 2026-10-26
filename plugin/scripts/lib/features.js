@@ -199,4 +199,4 @@ function shareCommand(args) {
   );
 }
 
-module.exports = { fixRequest, commitFix, pinsCommand, shareCommand, trustCommand, memoryContext, changesLine };
+module.exports = { fixRequest, commitFix, pinsCommand, shareCommand, trustCommand, memoryContext, changesLine, dataBlock };
