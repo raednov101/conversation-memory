@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/raednov101/conversation-memory/blob/main/docs/schema/conversation-memory-1.schema.json",
+  "title": "CONVERSATION_MEMORY.json (format conversation-memory/1)",
+  "description": "The file as written by the Claude Code plugin and the browser extension (both through the shared core's normalizeMemory). Readers must accept more: unknown fields are kept, missing ones get defaults. See docs/FORMAT.md.",
+  "type": "object",
+  "required": ["format", "title", "lang", "updated", "summary", "decisions", "constraints", "pending", "pins", "log", "imported", "mdHash", "archived"],
+  "properties": {
+    "format": { "type": "string", "pattern": "^conversation-memory/\\d{1,4}$", "description": "conversation-memory/1. A file with a higher number is read but never written over." },
+    "title": { "type": "string", "maxLength": 200 },
+    "lang": { "enum": ["ar", "en"], "description": "The language the Markdown view is written in. Files from before 2.0 have none and are Arabic." },
+    "updated": { "type": "string", "maxLength": 40, "description": "Local time of the last change, \"YYYY-MM-DD HH:MM\"." },
+    "summary": {
+      "type": "object",
+      "required": ["goal", "status", "next", "open"],
+      "properties": {
+        "goal": { "$ref": "#/$defs/str" },
+        "status": { "$ref": "#/$defs/str" },
+        "next": { "$ref": "#/$defs/list" },
+        "open": { "$ref": "#/$defs/list" }
+      }
+    },
+    "decisions": { "type": "array", "maxItems": 300, "items": { "$ref": "#/$defs/decision" } },
+    "constraints": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/str" } },
+    "pending": {
+      "type": "object",
+      "required": ["constraints"],
+      "properties": {
+        "constraints": {
+          "type": "object",
+          "required": ["add", "remove"],
+          "properties": {
+            "add": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/pendingItem" } },
+            "remove": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/pendingItem" } }
+          }
+        }
+      }
+    },
+    "pins": { "type": "array", "items": { "$ref": "#/$defs/pin" } },
+    "log": { "type": "array", "maxItems": 2000, "items": { "$ref": "#/$defs/entry" } },
+    "imported": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["date", "text"],
+          "properties": { "date": { "type": "string", "maxLength": 40 }, "text": { "type": "string", "maxLength": 400000 } },
+          "additionalProperties": false
+        }
+      ],
+      "description": "The text of a CONVERSATION_MEMORY.md written before the JSON file existed, kept as it was."
+    },
+    "mdHash": { "type": "string", "maxLength": 32, "description": "Fingerprint of the Markdown view generated with this version; a different .md is a hand edit and is kept aside before regenerating." },
+    "archived": { "type": "integer", "minimum": 0, "description": "How many old log entries were moved to .conversation-memory/archive/." }
+  },
+  "$defs": {
+    "str": { "type": "string", "maxLength": 2000 },
+    "list": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/str" } },
+    "id": { "type": "string", "pattern": "^d\\d{1,6}$" },
+    "quote": { "type": "string", "maxLength": 300 },
+    "decision": {
+      "type": "object",
+      "required": ["id", "text", "source", "date", "status", "revokedOn", "replaces", "quote", "unverified"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "text": { "$ref": "#/$defs/str", "minLength": 1 },
+        "source": { "enum": ["user", "assistant-approved", "assistant"], "description": "user: the user decided it; assistant-approved: the model suggested it and the user agreed; assistant: not approved." },
+        "date": { "type": "string", "maxLength": 40 },
+        "status": { "enum": ["active", "revoked"] },
+        "revokedOn": { "type": "string", "maxLength": 40 },
+        "replaces": { "oneOf": [{ "const": "" }, { "$ref": "#/$defs/id" }], "description": "The decision this one revoked (recorded only when it really was revoked)." },
+        "quote": { "$ref": "#/$defs/quote", "description": "The user's own words the decision rests on, verbatim." },
+        "unverified": { "type": "boolean", "description": "The model claimed more than the conversation shows: kept as a suggestion until the user reviews it." },
+        "claimed": { "enum": ["user", "assistant-approved"], "description": "What the model claimed for an unverified decision." },
+        "pendingReplaces": { "$ref": "#/$defs/id", "description": "An unverified decision's claim to replace another; applied only if the user approves." },
+        "msg": { "type": "integer", "minimum": 1, "description": "The number of the user message it was decided in, when known." },
+        "confirmed": { "const": true, "description": "The user approved it in a review." },
+        "pendingRevoke": {
+          "type": "object",
+          "required": ["date", "reason", "quote"],
+          "properties": { "date": { "type": "string" }, "reason": { "type": "string", "maxLength": 200 }, "quote": { "$ref": "#/$defs/quote" } },
+          "description": "A revocation suggested without the user's words: the decision stays in force until the user decides."
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "unverified": { "const": false } } }, "then": { "not": { "anyOf": [{ "required": ["claimed"] }, { "required": ["pendingReplaces"] }] } } },
+        { "if": { "properties": { "unverified": { "const": true } } }, "then": { "not": { "required": ["confirmed"] } } },
+        { "if": { "properties": { "status": { "const": "revoked" } } }, "then": { "not": { "required": ["pendingRevoke"] } } }
+      ]
+    },
+    "pendingItem": {
+      "type": "object",
+      "required": ["text", "reason", "date", "quote"],
+      "properties": {
+        "text": { "$ref": "#/$defs/str", "minLength": 1 },
+        "reason": { "type": "string", "maxLength": 200 },
+        "date": { "type": "string", "maxLength": 40 },
+        "quote": { "$ref": "#/$defs/quote" }
+      }
+    },
+    "pin": {
+      "type": "object",
+      "required": ["name", "version", "path", "sha", "date"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "version": { "type": "integer", "minimum": 1, "maximum": 999999 },
+        "path": { "type": "string", "pattern": "^CONVERSATION_PINS/[^/]+/v\\d+\\.md$", "description": "Always rebuilt from name and version; never taken from the file." },
+        "sha": { "type": "string", "pattern": "^([0-9a-f]{8,64})?$", "description": "SHA-256 of the pinned text (hex); the text is used only if it still matches." },
+        "date": { "type": "string", "maxLength": 40 }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "platform", "chat", "range", "date", "raised", "decided", "changed"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 100, "description": "The batch id: a summary is applied at most once." },
+        "platform": { "enum": ["claude-code", "chatgpt", "claude-web"] },
+        "chat": { "type": "string", "maxLength": 200 },
+        "range": { "type": "string", "maxLength": 40, "description": "The user messages it covers, \"3–7\"." },
+        "date": { "type": "string", "maxLength": 40 },
+        "raised": { "$ref": "#/$defs/list" },
+        "decided": { "$ref": "#/$defs/list" },
+        "changed": { "$ref": "#/$defs/list" }
+      }
+    }
+  }
+}
