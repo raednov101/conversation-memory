@@ -826,7 +826,16 @@ test("fix: explicit command asks for a correction draft; it is validated, applie
     memJson(P).decisions.some((d) => d.id === "d3"),
     "undo brings the corrected version back",
   );
-  assert.equal(fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8"), beforeJson, "undo restores the file byte for byte");
+  // the earlier version exactly, except that the history now also tells the story of the correction and of the undo
+  const strip = (t) => {
+    const j = JSON.parse(t);
+    delete j.history;
+    delete j.mdHash;
+    return j;
+  };
+  const back = fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8");
+  assert.deepEqual(strip(back), strip(beforeJson), "undo restores the earlier version");
+  assert.ok(JSON.parse(back).history.some((e) => e.by === "restore"), "…and records the restore in the history");
   assert.equal(memMd(P), beforeMd, "…and its readable view");
   assert.equal(sess(P, "a").count, 5, "commands are not counted");
 });
