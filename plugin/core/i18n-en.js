@@ -955,6 +955,8 @@
       "🧠 I sent a request to save the memory in your name; the model will reply with a summary that I save myself. You don’t need to do anything.",
     "🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.": "🔎 I have one question before I record anything as yours.",
     "🔎 عندي {0} أسئلة قبل أن أعتمد شيئاً باسمك.": "🔎 I have {0} questions before I record anything as yours.",
+    "🔎 عندي سؤالان قبل أن أعتمد شيئاً باسمك.": "🔎 I have two questions before I record anything as yours.",
+    "🔎 عندي {0} سؤالاً قبل أن أعتمد شيئاً باسمك.": "🔎 I have {0} questions before I record anything as yours.",
     "فهمتُ أنك قررت:": "I understood that you decided:",
     "✓ نعم، هذا قراري": "✓ Yes, that’s my decision",
     "✕ لا، احذفه": "✕ No, delete it",

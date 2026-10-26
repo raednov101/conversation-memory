@@ -835,7 +835,10 @@ test("fix: explicit command asks for a correction draft; it is validated, applie
   };
   const back = fs.readFileSync(path.join(P, "CONVERSATION_MEMORY.json"), "utf8");
   assert.deepEqual(strip(back), strip(beforeJson), "undo restores the earlier version");
-  assert.ok(JSON.parse(back).history.some((e) => e.by === "restore"), "…and records the restore in the history");
+  assert.ok(
+    JSON.parse(back).history.some((e) => e.by === "restore"),
+    "…and records the restore in the history",
+  );
   assert.equal(memMd(P), beforeMd, "…and its readable view");
   assert.equal(sess(P, "a").count, 5, "commands are not counted");
 });

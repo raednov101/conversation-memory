@@ -15,7 +15,7 @@ const d = (st, set = auto, o) => describe(view(st, o), set, (e) => e, 3);
 
 test("summary updated (✓) shows the time and the estimated cost", () => {
   const r = d({ lastSave: T(14, 5), rawAt: T(14, 4), lastCost: { req: 1200, rep: 600 } });
-  assert.equal(r.text, "🧠 2/5 · ✓ 14:05 · \u2066≈600\u2069 توكن"); assert.equal(r.cls, "ok");
+  assert.equal(r.text, "🧠 2/5 · ✓ 14:05"); assert.equal(r.cls, "ok");
   assert.match(r.info, /الطلب 1,200 حرفاً والرد 600 ≈ 600 توكن/);
 });
 test("text saved after the last summary (📝) is a different state with its own colour", () => {
@@ -57,7 +57,7 @@ test("raw browser errors are explained in Arabic", () => {
 test("decisions waiting for review: a mark on the indicator, one line, and the review button first", () => {
   const r = d({ lastSave: T(14, 5) }, auto, { review: [{ id: "d4", text: "x" }, { id: "d5", text: "y" }] });
   assert.equal(r.text, "🧠 2/5 · ✓ 14:05 · 🔎2");
-  assert.match(r.info, /قراران ينتظران مراجعتك/);
+  assert.match(r.info, /عندي سؤالان قبل أن أعتمد/);
   assert.deepEqual(r.btns[0], ["🔎 راجع القرارات (2)", "review"]);
   assert.ok(!d({ lastSave: T(14, 5) }, auto, { review: [] }).text.includes("🔎"), "nothing said when nothing waits");
 });

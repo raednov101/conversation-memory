@@ -177,7 +177,7 @@
     const rv = (v.phase === "chat" || v.phase === "new") && v.review ? v.review.length : 0;
     if (rv) {
       text += ` · 🔎${rv}`;
-      info += `<br><span class="muted">${rv === 1 ? T("🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.") : T`🔎 عندي ${rv} أسئلة قبل أن أعتمد شيئاً باسمك.`}</span>`;
+      info += `<br><span class="muted">${rv === 1 ? T("🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.") : rv === 2 ? T("🔎 عندي سؤالان قبل أن أعتمد شيئاً باسمك.") : rv <= 10 ? T`🔎 عندي ${rv} أسئلة قبل أن أعتمد شيئاً باسمك.` : T`🔎 عندي ${rv} سؤالاً قبل أن أعتمد شيئاً باسمك.`}</span>`;
       btns.unshift(REVIEW(rv));
     }
     if (tech) info += `<details class="tech"><summary>${T("التفاصيل")}</summary>${tech}</details>`;

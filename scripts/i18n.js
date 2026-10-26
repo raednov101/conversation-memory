@@ -117,9 +117,16 @@ function keysIn(src) {
     if (node.type === "TaggedTemplateExpression" && node.tag.type === "Identifier" && node.tag.name === "T")
       out.push(node.quasi.quasis.map((q, i) => q.value.cooked + (i < node.quasi.expressions.length ? `{${i}}` : "")).join(""));
     // tables translated where they are shown (T(TABLE[x])): their Arabic values are keys too
-    if (node.type === "VariableDeclarator" && node.id.type === "Identifier" && TABLES.has(node.id.name) && node.init && node.init.type === "ObjectExpression")
+    if (
+      node.type === "VariableDeclarator" &&
+      node.id.type === "Identifier" &&
+      TABLES.has(node.id.name) &&
+      node.init &&
+      node.init.type === "ObjectExpression"
+    )
       for (const pr of node.init.properties)
-        if (pr.value && pr.value.type === "Literal" && typeof pr.value.value === "string" && AR.test(pr.value.value)) out.push(pr.value.value);
+        if (pr.value && pr.value.type === "Literal" && typeof pr.value.value === "string" && AR.test(pr.value.value))
+          out.push(pr.value.value);
   });
   return out;
 }
