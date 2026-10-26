@@ -204,6 +204,27 @@ with sync_playwright() as pw:
     wait(lambda: "🧠" in pill(po), 10)
     ok(wait(lambda: opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')").get("scope:chatgpt-oldchat", {}).get("key") == "chatgpt-general", 8), "a chat already linked to the earlier shared memory keeps it", opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')"))
     po.close()
+    # …and that shared memory can be split, chat by chat, after a preview
+    legacy = {"format": "conversation-memory/1", "title": "مشتركة", "decisions": [
+        {"id": "d1", "text": "قرار من المحادثة القديمة", "source": "user", "quote": "قرار قديم", "status": "active", "batch": "ext-chatgpt-oldchat-1-5-aaaa"},
+        {"id": "d2", "text": "قرار من محادثة أخرى", "source": "user", "quote": "قرار آخر", "status": "active", "batch": "ext-chatgpt-otherchat-1-5-bbbb"}],
+      "constraints": ["قيد عام"], "log": [
+        {"id": "ext-chatgpt-oldchat-1-5-aaaa", "platform": "chatgpt", "chat": "قديمة", "range": "1–5", "raised": ["نقاش المحادثة القديمة عن الهوية"]},
+        {"id": "ext-chatgpt-otherchat-1-5-bbbb", "platform": "chatgpt", "chat": "أخرى", "range": "1–5", "raised": ["نقاش محادثة أخرى عن الرحلة"]}]}
+    r = opt.evaluate("d => chrome.runtime.sendMessage({ cmd: 'fs', op: 'importAll', args: { data: d } })", {"format": "conversation-memory-backup", "v": 1, "projects": [{"scope": "chatgpt-general", "name": "", "memory": legacy, "pins": {}}]})
+    plan = opt.evaluate("() => chrome.runtime.sendMessage({ cmd: 'fs', op: 'splitPlan', args: { scope: 'chatgpt-general', from: 'chatgpt-general' } })")
+    ok(plan.get("ok") and sorted((g["label"], g["entries"], g["decisions"]) for g in plan["groups"]) == [("أخرى", 1, 1), ("قديمة", 1, 1)], "the old shared memory shows each chat's part before anything moves", plan)
+    opt.reload(); opt.wait_for_load_state()
+    opt.locator("#scopes button[data-split]").first.click()
+    row = opt.locator("#scopes .split .row").filter(has_text="قديمة")
+    ok(wait(lambda: row.count() == 1, 8), "the settings page lists the chats in it, each with «move it to its own memory»", opt.locator("#scopes").inner_text()[:300])
+    row.locator("button").click()
+    own = wait(lambda: (lambda t: json.loads(t) if t else None)(read("projects", "chatgpt-c-oldchat/CONVERSATION_MEMORY.json")), 10) or {}
+    rest = json.loads(read("projects", "chatgpt-general/CONVERSATION_MEMORY.json") or "{}")
+    ok([d["text"] for d in own.get("decisions", [])] == ["قرار من المحادثة القديمة"] and len(own.get("log", [])) == 1 and own.get("constraints") == ["قيد عام"], "the chat's log and decisions move to its own memory (constraints are kept in both)", own)
+    ok([d["text"] for d in rest.get("decisions", []) if d["status"] == "active"] == ["قرار من محادثة أخرى"] and len(rest.get("log", [])) == 1, "…and leave the shared one, where the other chat's part stays", rest.get("log"))
+    sc = opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-oldchat')").get("scope:chatgpt-oldchat", {})
+    ok(sc.get("key") == "chatgpt-c-oldchat", "…and the chat itself now writes to its own memory", sc)
 
     # a chat opened from the sidebar right after a project's new-chat page is not filed into that project
     ps = ctx.new_page(); ps.goto(BASE + page("chatgpt", "/g/g-p-abc123-cafe/project/", "مشروع - ChatGPT"))

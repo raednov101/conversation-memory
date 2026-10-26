@@ -178,7 +178,10 @@ test("relevance: a task picks the decisions, pins and log entries about it; summ
       { id: "d4", text: "دعوة الافتتاح باللونين الأزرق والذهبي", quote: "الدعوة أزرق وذهبي", status: "revoked" },
     ],
     pins: [{ name: "نص دعوة الافتتاح", version: 1 }],
-    log: [{ id: "b1", raised: ["نقاش الشعار والخطوط"] }, { id: "b2", raised: ["تجهيز دعوة الافتتاح وقائمة الضيوف"] }],
+    log: [
+      { id: "b1", raised: ["نقاش الشعار والخطوط"] },
+      { id: "b2", raised: ["تجهيز دعوة الافتتاح وقائمة الضيوف"] },
+    ],
   });
   const s = C.relevant(m, "أكتب دعوة الافتتاح");
   assert.equal(s.summary, true);
@@ -187,4 +190,44 @@ test("relevance: a task picks the decisions, pins and log entries about it; summ
   assert.deepEqual(s.pins, ["نص دعوة الافتتاح"]);
   assert.deepEqual(s.log, ["b2"]);
   assert.deepEqual(C.relevant(m, "").decisions, [], "nothing typed: nothing picked beyond the summary");
+});
+
+test("split: the shared memory of earlier versions, chat by chat — by batch, or by a quote found in that chat's text", () => {
+  const m = C.normalizeMemory({
+    constraints: ["قيد عام"],
+    decisions: [
+      { id: "d1", text: "قرار بدفعته", quote: "قرار بدفعته", batch: "ext-chatgpt-aaaaaaaa-bbbb-cccc-1-5-x1" },
+      { id: "d2", text: "قرار قديم بلا دفعة", quote: "نعتمد الخط الكوفي" }, // saved before decisions recorded their batch
+      { id: "d3", text: "قرار من محادثة أخرى", quote: "شيء آخر تماماً", batch: "api-chatgpt-zzzz-1-5-x2" },
+    ],
+    log: [
+      { id: "ext-chatgpt-aaaaaaaa-bbbb-cccc-1-5-x1", chat: "الهوية", raised: ["الهوية"] },
+      { id: "api-chatgpt-zzzz-1-5-x2", chat: "الرحلة", raised: ["الرحلة"] },
+    ],
+  });
+  const key = "chatgpt-aaaaaaaa-bbbb-cccc-dddd-eeee"; // longer than the 24 characters a batch keeps
+  const tx = { [key]: "### رسالتك\nنعتمد الخط الكوفي للشعار" };
+  const plan = C.splitShared(m, undefined, tx).groups;
+  assert.deepEqual(
+    plan.map((g) => [g.key, g.label, g.entries, g.decisions]).sort(),
+    [
+      [key, "الهوية", 1, 2],
+      ["chatgpt-zzzz", "الرحلة", 1, 1],
+    ].sort(),
+    "the whole key comes from the saved text's name",
+  );
+  const r = C.splitShared(m, key, tx);
+  assert.deepEqual(
+    r.moved.decisions.map((d) => d.id),
+    ["d1", "d2"],
+  );
+  assert.deepEqual(r.moved.constraints, ["قيد عام"]);
+  assert.deepEqual(
+    r.kept.decisions.map((d) => d.id),
+    ["d3"],
+  );
+  assert.deepEqual(
+    r.kept.log.map((e) => e.chat),
+    ["الرحلة"],
+  );
 });

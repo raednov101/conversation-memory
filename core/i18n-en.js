@@ -961,6 +961,20 @@
     "في ردك تأجيل أو تحفّظ، لا موافقة بعد": "Your reply defers or holds back; it is not an agreement yet",
     "قلتَه لهذه المرة فقط، لا قيداً دائماً": "You said it for this one time, not as a standing rule",
     "كلامك يخص قراراً آخر ({0})، لا {1}": "Your words are about another decision ({0}), not {1}",
+    "ليست ذاكرة مشتركة من إصدار سابق": "Not a shared memory from an earlier version",
+    "طلب فصل غير صالح": "Invalid split request",
+    "نُقل من الذاكرة المشتركة القديمة": "moved from the old shared memory",
+    "لا شيء لهذه المحادثة في الذاكرة المشتركة": "Nothing of this chat in the shared memory",
+    "نُقل إلى ذاكرة المحادثة الخاصة": "moved to the chat’s own memory",
+    "نُسخ إلى ذاكرة المحادثة لكن لم يُحذف من المشتركة: ": "Copied to the chat’s memory but not removed from the shared one: ",
+    "✂️ افصلها حسب المحادثة": "✂️ Split it by chat",
+    "لا توجد محادثات يمكن فصلها في هذه الذاكرة.": "There are no chats to split out of this memory.",
+    "تعذّر: {0}": "Failed: {0}",
+    "كل محادثة تُنقل بسجلها وقراراتها إلى ذاكرتها الخاصة، وتبقى القيود في الاثنتين. ويمكن التراجع من «النسخ السابقة».":
+      "Each chat moves with its log and decisions to its own memory; constraints stay in both. You can undo it from “Earlier versions”.",
+    "{0} — {1}، {2}": "{0} — {1}, {2}",
+    "انقلها إلى ذاكرتها": "Move it to its own memory",
+    "✓ نُقلت: {0}، {1}": "✓ Moved: {0}, {1}",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

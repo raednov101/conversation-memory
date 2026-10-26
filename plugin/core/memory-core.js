@@ -1673,6 +1673,52 @@
   }
 
   // → { memory, changes: [human-readable lines], missing: [ids not found], redacted } — never mutates its input
+  // ---------- splitting the shared memory of earlier versions, one chat at a time ----------
+  // Before 1.5 every chat outside a project wrote into one shared memory. Each summary in it carries its batch id, and
+  // the batch id carries the chat (ext-<chat>-… / api-<chat>-…), so a chat's part can be found and moved to its own
+  // memory: its log entries, the decisions its summaries added (by their batch, or — for decisions saved before they
+  // recorded one — by their quote found word for word in that chat's saved text). Pure: the writer stores both results.
+  // → { groups: [{ key, label, entries, decisions }] } for a preview, or with key: { moved, kept } (both memories)
+  function splitShared(memory, key, transcripts) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
+    // the chat part of a batch id (the first 24 characters of the chat's key)
+    const chatOf = (batch) => {
+      const x = /^(?:ext|api)-(.+)-\d+-\d+-[a-z0-9]+$/.exec(String(batch || ""));
+      return x ? x[1].slice(0, 24) : "";
+    };
+    const tx = transcripts || {};
+    const belongs = (d, k) =>
+      d.batch
+        ? chatOf(d.batch) === k.slice(0, 24)
+        : !!(d.quote && evNorm(d.quote).length >= QUOTE_MIN && tx[k] && evNorm(tx[k]).includes(evNorm(d.quote)));
+    if (key === undefined) {
+      const groups = new Map();
+      for (const e of m.log) {
+        const k = chatOf(e.id);
+        if (!k) continue;
+        // the chat's whole key, from its saved text's name when there is one (the batch keeps only its first 24 characters)
+        const full = Object.keys(tx).find((n) => n.slice(0, 24) === k) || k;
+        const g = groups.get(k) || { key: full, prefix: k, label: "", entries: 0, decisions: 0, last: "" };
+        g.entries++;
+        g.label = e.chat || g.label;
+        g.last = e.date || g.last;
+        groups.set(k, g);
+      }
+      for (const g of groups.values()) g.decisions = m.decisions.filter((d) => belongs(d, g.key)).length;
+      return { groups: [...groups.values()].sort((a, b) => String(b.last).localeCompare(String(a.last))) };
+    }
+    const k = String(key).slice(0, 24);
+    const moved = emptyMemory(m.log.find((e) => chatOf(e.id) === k)?.chat || "");
+    moved.lang = m.lang;
+    moved.log = m.log.filter((e) => chatOf(e.id) === k);
+    moved.decisions = m.decisions.filter((d) => belongs(d, key));
+    moved.constraints = m.constraints.slice(); // standing rules stay true for the chat that moves out
+    const ids = new Set(moved.decisions.map((d) => d.id));
+    m.log = m.log.filter((e) => chatOf(e.id) !== k);
+    m.decisions = m.decisions.filter((d) => !ids.has(d.id));
+    return { moved: normalizeMemory(moved), kept: m };
+  }
+
   // ---------- relevance: what in the memory is about a task ----------
   // «I'm writing the invitation» → the date, the place, the approved wording. A plain word match (same roots, numbers,
   // names), no index and no model: decisions in force, pinned texts and recent log entries that share words with the
@@ -2223,5 +2269,6 @@
     describeEvent,
     recheckDecisions,
     relevant,
+    splitShared,
   };
 });

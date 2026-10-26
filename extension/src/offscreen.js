@@ -46,6 +46,17 @@ const {
   pinWrite,
 } = self.CMW.memory;
 
+// the saved conversation texts of a memory (chats/<chat key>.md), to find which decisions came from which chat
+async function transcriptsOf(r) {
+  const out = {};
+  try {
+    const d = await dir(await dataDir(r), ["chats"], false);
+    for await (const [n, h] of d.entries())
+      if (h.kind === "file" && n.endsWith(".md")) out[n.slice(0, -3)] = await (await h.getFile()).text();
+  } catch {}
+  return out;
+}
+
 // ---------- tickets: a summary is saved only into the memory and chat it was asked for ----------
 // When a request is prepared the writer notes which memory (scope), project folder and chat it is for; the reply is
 // written only if it comes back for the same three. Switching tabs, a chat moved to its own memory meanwhile, or a page
@@ -394,6 +405,62 @@ const ops = {
     }
     out.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
     return { ok: true, list: out, linked: !!(await kvGet("root")) };
+  },
+  // the shared memory of earlier versions, by chat: what would move (a preview), then the move itself (both memories are
+  // normal, backed-up writes, so «undo» in either brings it back)
+  async splitPlan({ from }) {
+    if (!/^(chatgpt|claude)?-?general$/.test(String(from))) return { ok: false, error: T("ليست ذاكرة مشتركة من إصدار سابق") };
+    const r = await browserRoot(String(from)),
+      cur = await readMemory(r);
+    if (cur.bad) return { ok: false, error: cur.bad };
+    const tx = await transcriptsOf(r);
+    return { ok: true, groups: C.splitShared(cur.memory, undefined, tx).groups };
+  },
+  async splitMove({ from, key }) {
+    if (!/^(chatgpt|claude)?-?general$/.test(String(from)) || !/^[a-z0-9-]{3,80}$/.test(String(key)))
+      return { ok: false, error: T("طلب فصل غير صالح") };
+    const site = String(key).split("-")[0],
+      to = String(key).replace(`${site}-`, `${site}-c-`);
+    const src = await browserRoot(String(from)),
+      dst = await browserRoot(to);
+    const tx = await transcriptsOf(src);
+    let moved = null;
+    const meta = { by: "import", why: T("نُقل من الذاكرة المشتركة القديمة") };
+    const cur = await readMemory(src);
+    if (cur.bad) return { ok: false, error: cur.bad };
+    const plan = C.splitShared(cur.memory, key, tx);
+    if (!plan.moved.log.length) return { ok: false, error: T("لا شيء لهذه المحادثة في الذاكرة المشتركة") };
+    // into the chat's own memory first (added to what it may already hold); only then out of the shared one
+    const w2 = await writeMemory(
+      dst,
+      (m) => {
+        const have = new Set(m.log.map((e) => e.id));
+        const next = JSON.parse(JSON.stringify(m));
+        let n = 1 + Math.max(0, ...next.decisions.map((d) => +d.id.slice(1) || 0));
+        for (const d of plan.moved.decisions)
+          if (!next.decisions.some((x) => x.text === d.text)) next.decisions.push({ ...d, id: "d" + n++ });
+        next.log = next.log.concat(plan.moved.log.filter((e) => !have.has(e.id)));
+        for (const c of plan.moved.constraints) if (!next.constraints.includes(c)) next.constraints.push(c);
+        if (!next.title || next.title === C.emptyMemory().title) next.title = plan.moved.title;
+        moved = { log: plan.moved.log.length, decisions: plan.moved.decisions.length };
+        return { memory: next, meta };
+      },
+      (mm) => plan.moved.log.every((e) => mm.log.some((x) => x.id === e.id)),
+    );
+    if (w2.err) return { ok: false, error: w2.err };
+    const w3 = await writeMemory(
+      src,
+      (m) => ({ memory: C.splitShared(m, key, tx).kept, meta: { by: "import", why: T("نُقل إلى ذاكرة المحادثة الخاصة") } }),
+      (mm) => !plan.moved.log.some((e) => mm.log.some((x) => x.id === e.id)),
+    );
+    if (w3.err) return { ok: false, error: T("نُسخ إلى ذاكرة المحادثة لكن لم يُحذف من المشتركة: ") + w3.err };
+    // the saved conversation text goes with it
+    const t = tx[key];
+    if (typeof t === "string") {
+      await writeVerified(await dir(await dataDir(dst), ["chats"]), `${key}.md`, t);
+      await (await dir(await dataDir(src), ["chats"])).removeEntry(`${key}.md`).catch(() => {});
+    }
+    return { ok: true, to, moved, fromProject: await projectId(src), toProject: await projectId(dst) };
   },
   // Housekeeping: each chat outside a project gets its own folder in the browser; one that never got a memory, a pinned
   // text or a saved conversation, untouched for a week, is removed (never in a folder you linked: only the browser's own).

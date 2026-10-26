@@ -116,6 +116,16 @@ async function loadScopes() {
     t.firstChild.textContent = x.name;
     t.lastChild.textContent = T`— ${self.MemoryCore.count(x.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(x.log, self.MemoryCore.W.batch)}`;
     li.append(t, dl);
+    // the shared memory of an earlier version: split it, chat by chat, after a preview
+    if (/general$/.test(x.scope)) {
+      const sp = document.createElement("button");
+      sp.type = "button";
+      sp.className = "small";
+      sp.dataset.split = x.scope;
+      sp.textContent = T("✂️ افصلها حسب المحادثة");
+      sp.onclick = () => showSplit(x.scope, li);
+      li.append(sp);
+    }
     ul.append(li);
     const o = document.createElement("option");
     o.value = x.scope;
@@ -123,6 +133,59 @@ async function loadScopes() {
     sel.append(o);
   }
   if (keep && list.some((x) => x.scope === keep)) sel.value = keep;
+}
+// what each chat holds in the shared memory, and moving one chat's part to its own memory
+async function showSplit(from, li) {
+  li.querySelector(".split")?.remove();
+  const box = document.createElement("div");
+  box.className = "split";
+  li.append(box);
+  const r = await fsOp("splitPlan", { scope: from, from });
+  if (!r.ok || !r.groups.length) {
+    box.textContent = r.ok ? T("لا توجد محادثات يمكن فصلها في هذه الذاكرة.") : T`تعذّر: ${r.error}`;
+    return;
+  }
+  const head = document.createElement("p");
+  head.className = "muted";
+  head.textContent = T("كل محادثة تُنقل بسجلها وقراراتها إلى ذاكرتها الخاصة، وتبقى القيود في الاثنتين. ويمكن التراجع من «النسخ السابقة».");
+  box.append(head);
+  const all = await chrome.storage.local.get(null);
+  for (const g of r.groups) {
+    // the chat's whole key: from its saved text, or from the chats this browser linked to the shared memory
+    const full =
+      g.key.length > 24
+        ? g.key
+        : Object.keys(all)
+            .find((k) => k.startsWith("scope:") && k.slice(6).slice(0, 24) === g.prefix && all[k].key === from)
+            ?.slice(6) || g.key;
+    const row = document.createElement("div"),
+      label = document.createElement("span"),
+      go = document.createElement("button");
+    row.className = "row";
+    label.textContent = T`${g.label || full} — ${self.MemoryCore.count(g.entries, self.MemoryCore.W.batch)}، ${self.MemoryCore.count(g.decisions, self.MemoryCore.W.decision)}`;
+    go.type = "button";
+    go.className = "small";
+    go.textContent = T("انقلها إلى ذاكرتها");
+    go.onclick = async () => {
+      go.disabled = true;
+      const m = await fsOp("splitMove", { scope: from, from, key: full });
+      if (!m.ok) {
+        go.disabled = false;
+        label.textContent += " — " + T`تعذّر: ${m.error}`;
+        return;
+      }
+      // the chat now belongs to its own memory: its link and progress go with it
+      const st = await chrome.storage.local.get([`chat:${m.fromProject}:${full}`]);
+      const upd = { [`scope:${full}`]: { key: m.to, name: g.label || "" } };
+      if (st[`chat:${m.fromProject}:${full}`]) upd[`chat:${m.toProject}:${full}`] = st[`chat:${m.fromProject}:${full}`];
+      await chrome.storage.local.set(upd);
+      await chrome.storage.local.remove(`chat:${m.fromProject}:${full}`);
+      label.textContent = T`✓ نُقلت: ${self.MemoryCore.count(m.moved.log, self.MemoryCore.W.batch)}، ${self.MemoryCore.count(m.moved.decisions, self.MemoryCore.W.decision)}`;
+      setTimeout(loadScopes, 1500);
+    };
+    row.append(label, go);
+    box.append(row);
+  }
 }
 $("pick").addEventListener("click", async () => {
   if (inPopup) return openTab();
