@@ -61,6 +61,7 @@ async function refresh() {
     if (!inPopup) {
       loadMemory();
       loadBackups();
+      loadHistory();
     }
     return;
   }
@@ -72,6 +73,7 @@ async function refresh() {
   if (p === "granted" && !inPopup) {
     loadMemory();
     loadBackups();
+    loadHistory();
   }
   s.textContent = p === "granted" ? T`في مجلد «${h.name}» على جهازك.` : T`مجلد «${h.name}» — يلزم منح الإذن.`;
   s.className = "state " + (p === "granted" ? "ok" : "warn");
@@ -153,6 +155,7 @@ $("scopeSel").addEventListener("change", () => {
   openPin = null;
   loadMemory();
   loadBackups();
+  loadHistory();
 });
 $("unlink").addEventListener("click", async () => {
   const db = await idb();
@@ -250,6 +253,54 @@ $("backups").addEventListener("click", async (e) => {
   $("restoreMsg").textContent = r.ok
     ? T`استُرجعت نسخة ${r.when}. ويمكن التراجع عن ذلك من القائمة نفسها.${r.kept ? T` وحُفظت نسختك المعدّلة يدوياً في ${r.kept}.` : ""}`
     : T`لم يُسترجع شيء: ${r.error}`;
+  loadBackups();
+});
+
+// ---------- the history: every change, why, and undoing one ----------
+async function loadHistory() {
+  const ol = $("history");
+  const r = await fsOp("history");
+  ol.textContent = "";
+  if (!r || !r.ok || !r.list.length) {
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = r && !r.ok ? T`تعذّرت قراءة السجل: ${r.error}` : T("لا تغييرات مسجّلة بعد (السجل يبدأ من الإصدار 2.0).");
+    ol.append(li);
+    return;
+  }
+  const BY = {
+    summary: T("ملخص"),
+    review: T("مراجعتك"),
+    fix: T("تصحيح"),
+    restore: T("استرجاع"),
+    undo: T("تراجع"),
+    pin: T("تثبيت"),
+    import: T("استيراد"),
+    write: T("كتابة"),
+  };
+  for (const e of r.list) {
+    const li = document.createElement("li"),
+      span = document.createElement("span"),
+      b = document.createElement("button");
+    span.textContent = `${e.at} · ${e.what}`;
+    span.title = `${e.id} — ${BY[e.by] || e.by}${e.why ? ": " + e.why : ""}`;
+    const why = document.createElement("small");
+    why.className = "muted";
+    why.textContent = ` — ${BY[e.by] || e.by}${e.why ? ": " + e.why : ""}`;
+    span.append(why);
+    b.type = "button";
+    b.textContent = T("تراجع");
+    b.dataset.ev = e.id;
+    li.append(span, b);
+    ol.append(li);
+  }
+}
+$("history").addEventListener("click", async (e) => {
+  const id = e.target && e.target.dataset && e.target.dataset.ev;
+  if (!id) return;
+  const r = await fsOp("undoEvent", { id });
+  say("histMsg", r.ok ? T`تُرجع عن هذا التغيير وحده: ${r.what}. والتراجع نفسه في السجل.` : T`لم يُتراجع: ${r.error}`);
+  loadHistory();
   loadBackups();
 });
 
@@ -388,6 +439,7 @@ chrome.storage.onChanged.addListener((ch) => {
   if (ch.folderAt && !inPopup) {
     loadMemory();
     loadBackups();
+    loadHistory();
   }
 });
 

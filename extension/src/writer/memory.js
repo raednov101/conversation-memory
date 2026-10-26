@@ -199,7 +199,8 @@
         }
         const out = mutate(m, cur.token);
         if (out.err) return { err: out.err };
-        const t = C.trimForSize(out.memory, TRIM_AT);
+        // every difference becomes an event in the history: what changed, when, by what, and why (out.meta)
+        const t = C.trimForSize(C.withHistory(m, out.memory, { at: today(), ...(out.meta || {}) }), TRIM_AT);
         const next = t.memory;
         const md = C.render(next);
         next.mdHash = C.hash(md);

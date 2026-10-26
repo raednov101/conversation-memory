@@ -158,7 +158,11 @@ const ops = {
             allowSummary: v.draft.base === token,
             evidence: evidenceArg(evidence),
           });
-          return { memory: r.memory, extra: r };
+          return {
+            memory: r.memory,
+            extra: r,
+            meta: { by: "summary", ref: batch, why: (range ? T`ملخص الرسائل ${range}` : "") + (chat ? ` — ${chat}` : "") },
+          };
         },
         (mm) => mm.log.some((e) => e.id === batch),
       );
@@ -177,6 +181,33 @@ const ops = {
       pending: r.pending || [],
       notes: w.notes,
     };
+  },
+  // the history, newest first, in words (C.describeEvent)
+  async history() {
+    const { h, err } = await root();
+    if (err) return { ok: false, error: err };
+    const cur = await readMemory(h);
+    if (cur.bad) return { ok: false, error: cur.bad };
+    return { ok: true, list: cur.memory.history.slice(-60).reverse().map(C.describeEvent) };
+  },
+  // undo one change from the history, leaving the others; refused if the same thing changed again since
+  async undoEvent({ id }) {
+    const { h, err } = await root();
+    if (err) return { ok: false, error: err };
+    if (!/^e\d{1,7}$/.test(String(id))) return { ok: false, error: T("رقم تغيير غير صالح") };
+    let what = "";
+    const w = await writeMemory(
+      h,
+      (m) => {
+        const r = C.undoEvent(m, id, today());
+        if (!r.ok) return { err: r.error };
+        what = C.describeEvent(r.event).what;
+        return { memory: r.memory, meta: { by: "undo", ref: id, undoes: id, why: T`تراجع عن ${id}` } };
+      },
+      (mm) => mm.history.some((e) => e.undoes === id && e.ref === id),
+    );
+    if (w.err) return { ok: false, error: w.err, busy: !!w.busy };
+    return { ok: true, what };
   },
   // what waits for the user: decisions not backed by their words, and changes to what they decided (C.reviewItems)
   async reviewList() {
@@ -210,7 +241,10 @@ const ops = {
         if (!C.reviewItems(m).some((x) => x.key === key)) return { err: T("لم يعد هذا بانتظار المراجعة") };
         const r = C.applyFix(m, v.fix, today());
         changes = r.changes;
-        return { memory: r.memory };
+        return {
+          memory: r.memory,
+          meta: { by: "review", ref: key, why: action === "approve" ? T("وافقتَ عليه في المراجعة") : T("رفضتَه في المراجعة") },
+        };
       },
       (mm) => !C.reviewItems(mm).some((x) => x.key === key),
     );
@@ -259,7 +293,10 @@ const ops = {
         kept = `CONVERSATION_MEMORY.edited-${stamp()}.md`;
         await writeVerified(h, kept, cur.mdText);
       }
-      const m = b.memory,
+      // the restored version continues the current history: the restore itself is recorded, change by change
+      const m = cur.bad
+          ? b.memory
+          : C.withHistory(cur.memory, b.memory, { at: today(), by: "restore", ref: b.name, why: T`استرجاع نسخة ${b.when}` }),
         md = C.render(m);
       m.mdHash = C.hash(md);
       await writeVerified(h, JSON_FILE, C.serialize(m));
@@ -399,7 +436,7 @@ const ops = {
         const parts = pin.path.split("/");
         await writeVerified(await dir(r, parts.slice(0, -1)), parts[parts.length - 1], text);
       }
-      const w = await writeMemory(r, () => ({ memory: parsed.memory }), null);
+      const w = await writeMemory(r, () => ({ memory: parsed.memory, meta: { by: "import", why: T("استيراد من ملف نسخة كاملة") } }), null);
       if (w.err) {
         skipped.push(scope);
         continue;

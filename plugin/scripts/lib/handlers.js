@@ -39,6 +39,7 @@ const {
   costText,
   modeText,
   langText,
+  historyText,
 } = require("./requests");
 
 function onPrompt(state, out) {
@@ -118,6 +119,36 @@ function onPrompt(state, out) {
     if (!inboxOk()) {
       for (const f of fixes) f.status = "expired";
     } else for (const f of fixes) ctx.push(fixRequest(f));
+  }
+  if (cmd.history) {
+    const mm = readMemory();
+    ctx.push(
+      mm.bad
+        ? T`[conversation-memory] تعذّرت قراءة الذاكرة: ${mm.bad}. أخبر المستخدم.`
+        : T`[conversation-memory] سجل تغييرات الذاكرة، الأحدث أولاً (من النظام؛ اعرضه للمستخدم كما هو. للتراجع عن تغيير واحد: /conversation-memory:undo ورقمه):\n` +
+            historyText(mm.memory, cmd.args),
+    );
+  }
+  if (cmd.undoEvent) {
+    let why = "",
+      ev = null;
+    const w = writeMemory(
+      (m) => {
+        const r = C.undoEvent(m, cmd.undoEvent, today());
+        if (!r.ok) return (why = r.error), null;
+        ev = r.event;
+        return r.memory;
+      },
+      null,
+      { by: "undo", ref: cmd.undoEvent, undoes: cmd.undoEvent, why: T`تراجع عن ${cmd.undoEvent}` },
+    );
+    const err = why || w.err;
+    if (!err) notes.push(T`↩️ ذاكرة المحادثة: تُرجع عن ${cmd.undoEvent} (${C.describeEvent(ev).what}).`);
+    ctx.push(
+      err
+        ? T`[conversation-memory] لم يُتراجع عن ${cmd.undoEvent}: ${err}. أخبر المستخدم في سطر.`
+        : T`[conversation-memory] تراجع النظام عن التغيير ${cmd.undoEvent} وحده (${C.describeEvent(ev).what})، وبقيت التغييرات الأخرى كما هي. أخبر المستخدم في سطر، وأن التراجع نفسه مسجّل ويمكن التراجع عنه من /conversation-memory:history.`,
+    );
   }
   if (cmd.pins) ctx.push(pinsCommand(cmd.args));
   if (cmd.share) ctx.push(shareCommand(cmd.args));
@@ -295,6 +326,7 @@ function stopWork(s, out) {
                 return r.memory;
               },
               (mm) => mm.log.some((e) => e.id === b.id),
+              { by: "summary", ref: b.id, why: T`ملخص الرسائل ${rangeOf(b)} (Claude Code)` },
             );
             if (w.err && w.writeFailed) {
               keep = true;

@@ -201,7 +201,10 @@ function restoreBackup(n = 1) {
       return { err: T("تعذّر حفظ نسختك المعدّلة يدوياً من CONVERSATION_MEMORY.md، فلم أسترجع شيئاً") };
     }
   }
-  const m = b.memory,
+  // the restored version continues the current history: the restore itself is recorded, change by change
+  const m = cur.bad
+      ? b.memory
+      : C.withHistory(cur.memory, b.memory, { at: today(), by: "restore", ref: b.name, why: T`استرجاع نسخة ${b.when}` }),
     md = C.render(m);
   m.mdHash = C.hash(md);
   const json = C.serialize(m);
@@ -335,7 +338,8 @@ function archive(entries) {
 // mutate(memory) → memory'. Handles legacy migration, protects hand edits of the .md, trims for size, writes both files, verifies.
 // mutate may run more than once (when another writer changed the file meanwhile), so it must be a pure function of its input.
 // Without the lock nothing is written: another writer holds it (or the data folder is unusable).
-function writeMemory(mutate, confirm) {
+// meta: what makes this change, for the history ({by, ref, why}; see C.withHistory)
+function writeMemory(mutate, confirm, meta) {
   sweepTemps(projectDir);
   const me = heldLock ? null : takeWriteLock();
   if (!heldLock && !me) return { err: T("كاتب آخر يكتب في الذاكرة الآن"), busy: true };
@@ -379,7 +383,7 @@ function writeMemory(mutate, confirm) {
       }
       let next = mutate(m, cur.token);
       if (!next) return { err: T("لا تغيير") };
-      const t = C.trimForSize(next, TRIM_AT);
+      const t = C.trimForSize(C.withHistory(m, next, { at: today(), ...(meta || {}) }), TRIM_AT);
       next = t.memory;
       const md = C.render(next);
       next.mdHash = C.hash(md);

@@ -65,6 +65,7 @@ The machine-readable schema is [`schema/conversation-memory-1.schema.json`](sche
 | `imported` | `{date, text}`: a `CONVERSATION_MEMORY.md` from before the JSON existed, kept as it was; otherwise `null`. |
 | `mdHash` | Fingerprint of the Markdown view generated with this version. |
 | `archived` | How many log entries were moved to the archive so far. |
+| `history` | Every change, oldest first (see *History*). The newest 400 stay. |
 
 ### Decisions
 
@@ -89,6 +90,31 @@ A reader that only wants *what is in force* takes `decisions` with `status: "act
 
 `path` is always `CONVERSATION_PINS/<name>/v<version>.md` and is rebuilt from `name` and `version` when read; a path
 from the file is never followed. `sha` is the SHA-256 (hex) of the text; a text that no longer matches is not used.
+
+### History
+
+Each write is compared with the version it replaces, and every difference that matters to the user becomes an event:
+
+```json
+{ "id": "e12", "at": "2026-10-26 10:05", "by": "summary", "ref": "<batch id>", "why": "summary of messages 6–10 — Brand chat",
+  "kind": "decision.revoke", "target": "d3", "before": "active", "after": "revoked" }
+```
+
+| `kind` | `target` | `before` → `after` |
+|---|---|---|
+| `decision.add` | decision id | `null` → `{text, source, unverified}` |
+| `decision.revoke` / `decision.restore` | decision id | `"active"` ↔ `"revoked"` |
+| `decision.edit` | decision id | old text → new text |
+| `decision.verify` / `decision.unverify` | decision id | `{source, unverified}` → `{source, unverified}` |
+| `decision.confirm` / `decision.unconfirm` | decision id | `false` ↔ `true` |
+| `constraint.add` / `constraint.remove` | the constraint's text | `null` ↔ the text |
+| `summary` | `"summary"` | `{goal, status}` → `{goal, status}` |
+
+`by` is what made the change: `summary`, `review`, `fix`, `restore`, `undo`, `pin`, `import` (or `write`). An undo
+records the events it causes with `undoes` set to the event undone. **Undoing one event** applies its inverse, and is
+refused if a later event touched the same `target` or the value is no longer `after` — so it never overwrites a newer
+change. The reference implementation is `undoEvent` in the core. Restoring an older file keeps the current history and
+appends the restore's own events. When the file nears its size limit the oldest events move to the archive.
 
 ## Rules for readers
 

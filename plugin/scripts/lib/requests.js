@@ -136,7 +136,15 @@ function parseCommand(prompt) {
   if (t.startsWith(CMD + "save") || t === "احفظ الذاكرة") return { save: true, slash: true };
   if (t.startsWith(CMD + "status") || t === "حالة الذاكرة") return { status: true, slash: true };
   if (t.startsWith(CMD + "pin") && !t.startsWith(CMD + "pins")) return { pin: true, name: C.slug(t.slice((CMD + "pin").length)), slash };
-  if (t.startsWith(CMD + "undo")) return { restore: 1, slash };
+  if (t.startsWith(CMD + "undo")) {
+    // /undo e12: one change from the history; /undo alone: the whole last write (the newest backup)
+    const e = t
+      .slice((CMD + "undo").length)
+      .trim()
+      .match(/^e\d{1,7}$/i);
+    return e ? { undoEvent: e[0].toLowerCase(), slash } : { restore: 1, slash };
+  }
+  if (t.startsWith(CMD + "history")) return { history: true, args: t.slice((CMD + "history").length).trim(), slash };
   if (t.startsWith(CMD + "fix"))
     return {
       fix: true,
@@ -218,6 +226,32 @@ function recordPrompt(s, pid, h, cmd, cfg) {
   return changed;
 }
 
+// the history, newest first: what changed, when, by what and why (for /conversation-memory:history [all | decision id])
+function historyText(memory, args) {
+  const a = String(args || "").trim();
+  let evs = memory.history.slice().reverse();
+  if (/^d\d+$/i.test(a)) evs = evs.filter((e) => e.target === a.toLowerCase());
+  const shown = /^(all|الكل)$/i.test(a) ? evs.slice(0, 200) : evs.slice(0, 20);
+  if (!shown.length) return T("لا تغييرات مسجّلة بعد (السجل يبدأ من الإصدار 2.0).");
+  const BY = {
+    summary: T("ملخص"),
+    review: T("مراجعتك"),
+    fix: T("تصحيح"),
+    restore: T("استرجاع"),
+    undo: T("تراجع"),
+    pin: T("تثبيت"),
+    import: T("استيراد"),
+    write: T("كتابة"),
+  };
+  return (
+    shown
+      .map((e) => {
+        const d = C.describeEvent(e);
+        return `${d.id} · ${d.at} · ${d.what} — ${BY[d.by] || d.by}${d.why ? ": " + d.why : ""}`;
+      })
+      .join("\n") + (evs.length > shown.length ? "\n" + T`… و${evs.length - shown.length} أقدم (/conversation-memory:history all)` : "")
+  );
+}
 // the project's setting in words (status, settings, notes)
 const modeText = (cfg) =>
   cfg.mode === "manual"
@@ -258,6 +292,7 @@ function parseSettings(args, cfg) {
 }
 
 module.exports = {
+  historyText,
   modeText,
   langText,
   draftPath,

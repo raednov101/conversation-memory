@@ -60,7 +60,16 @@ function main() {
           if (mode === "prompt") {
             const pr = String(input.prompt || ""),
               cmd = parseCommand(pr),
-              isCmd = !!(cmd.status || cmd.pins || cmd.share || cmd.trust || cmd.settings || cmd.restore !== undefined); // save, pin and fix still take effect when replayed
+              isCmd = !!(
+                cmd.status ||
+                cmd.pins ||
+                cmd.share ||
+                cmd.trust ||
+                cmd.settings ||
+                cmd.history ||
+                cmd.undoEvent ||
+                cmd.restore !== undefined
+              ); // save, pin and fix still take effect when replayed
             const ok = queueEvent({ type: "prompt", sid, pid: input.prompt_id || "", h: fullHash(pr), cmd });
             // a command can't run later on its own (its answer belongs to this turn): say so instead of pretending
             notes.push(

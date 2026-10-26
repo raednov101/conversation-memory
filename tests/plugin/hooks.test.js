@@ -1044,6 +1044,35 @@ test("language: follows the language the user writes in, a setting overrides it,
   assert.equal(status("o").lang, "ar", "no clear language yet: the memory's own language");
 });
 
+test("history: /history lists each change with what made it; /undo e1 undoes that one change only", () => {
+  const P = tmp();
+  const r = requests(prompts(P, "h", 5)[4])[0];
+  draft(r, { summary: { goal: "هوية مقهى", status: "اعتُمد اللون" } });
+  run("stop", { session_id: "h", cwd: P });
+  assert.deepEqual(
+    memJson(P).history.map((e) => [e.id, e.kind, e.by]),
+    [["e1", "summary", "summary"]],
+  );
+  let j = prompt(P, "h", "/conversation-memory:history");
+  assert.match(ctx(j), /e1 · .* · أُعيدت كتابة الخلاصة — ملخص: ملخص الرسائل 1–5 \(Claude Code\)/);
+  j = prompt(P, "h", "/conversation-memory:undo e1");
+  assert.match(j.systemMessage, /تُرجع عن e1/);
+  assert.equal(memJson(P).summary.goal, "", "the summary is back to what it was before");
+  assert.equal(memJson(P).log.length, 1, "nothing else is touched: the log entry stays");
+  assert.deepEqual(
+    memJson(P)
+      .history.slice(-1)
+      .map((e) => [e.id, e.by, e.undoes]),
+    [["e2", "undo", "e1"]],
+  );
+  j = prompt(P, "h", "/conversation-memory:undo e1");
+  assert.match(ctx(j), /لم يُتراجع عن e1: تغيّر هذا مرة أخرى بعده \(e2\)/);
+  j = prompt(P, "h", "/conversation-memory:undo e2");
+  assert.equal(memJson(P).summary.goal, "هوية مقهى", "undoing the undo");
+  j = prompt(P, "h", "/conversation-memory:undo");
+  assert.match(j.systemMessage || "", /استُرجعت نسخة/, "/undo alone still restores the last whole version");
+});
+
 test("an older extension (1.4) rewrote the file: the plugin's next save brings back the marks it dropped", () => {
   const OLD = require("../fixtures/memory-core-1.4.js");
   const P = tmp();

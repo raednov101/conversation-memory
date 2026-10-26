@@ -205,6 +205,7 @@
       imported: null,
       mdHash: "",
       archived: 0,
+      history: [],
     };
   }
   // Fields a later version adds are kept as they are, never dropped: two writers of different versions (the plugin and the
@@ -223,6 +224,7 @@
     "imported",
     "mdHash",
     "archived",
+    "history",
   ]);
   const KNOWN_DEC = new Set([
     "id",
@@ -267,6 +269,7 @@
     KNOWN_SUM = new Set(["goal", "status", "next", "open"]),
     KNOWN_PIN = new Set(["name", "version", "path", "sha", "date"]);
   const KNOWN_LOG = new Set(["id", "platform", "chat", "range", "date", "raised", "decided", "changed"]);
+  const KNOWN_EV = new Set(["id", "at", "by", "ref", "kind", "target", "before", "after", "why", "undoes"]);
   const pendingItems = (v) =>
     (Array.isArray(v) ? v : [])
       .filter(isObj)
@@ -372,6 +375,7 @@
       m.imported = { date: cleanStr(input.imported.date, 40), text: cut(wellFormed(input.imported.text), LIMITS.imported) };
     m.mdHash = typeof input.mdHash === "string" ? input.mdHash.slice(0, 32) : "";
     m.archived = Math.max(0, Math.floor(+input.archived) || 0);
+    m.history = (Array.isArray(input.history) ? input.history : []).filter(isObj).map(cleanEvent).filter(Boolean).slice(-HISTORY_MAX);
     m.lang = input.lang === "en" || input.lang === "ar" ? input.lang : "ar"; // files from before 2.0 are Arabic
     Object.assign(m, extras(input, KNOWN_TOP, 64000));
     if (formatNewer(input)) m.format = cleanStr(input.format, 40); // kept, so the file still says what wrote it
@@ -1206,6 +1210,199 @@
   }
 
   // → { memory, changes: [human-readable lines], missing: [ids not found], redacted } — never mutates its input
+  // ---------- history: every change, why it happened, and undoing one change ----------
+  // Each write is compared with what it replaced; every difference that matters to the user becomes an event: a decision
+  // added, cancelled, brought back, reworded, approved; a constraint added or removed; the summary rewritten. An event
+  // says when, what did it (a summary of messages 6–10, your review, a correction, a restore, an undo) and what the
+  // value was before and after, so one change can be undone without bringing back a whole older file — as long as
+  // nothing changed the same thing since. Undoing is itself an event, and can be undone.
+  const HISTORY_MAX = 400;
+  const EV_BY = ["summary", "review", "fix", "restore", "undo", "pin", "import", "write"];
+  const EV_KINDS = [
+    "decision.add",
+    "decision.revoke",
+    "decision.restore",
+    "decision.edit",
+    "decision.verify",
+    "decision.unverify",
+    "decision.confirm",
+    "decision.unconfirm",
+    "constraint.add",
+    "constraint.remove",
+    "summary",
+  ];
+  // a value before or after: nothing, a text, or a small record of texts and true/false
+  function evValue(v) {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "string") return cleanStr(v);
+    if (typeof v === "boolean") return v;
+    if (!isObj(v)) return null;
+    const o = {};
+    for (const k of Object.keys(v).slice(0, 6))
+      if (/^[a-z][A-Za-z]{0,20}$/.test(k)) o[k] = typeof v[k] === "boolean" ? v[k] : cleanStr(String(v[k] ?? ""));
+    return o;
+  }
+  function cleanEvent(e) {
+    if (!/^e\d{1,7}$/.test(String(e.id)) || !EV_KINDS.includes(e.kind)) return null;
+    return {
+      id: e.id,
+      at: cleanStr(e.at, 40),
+      by: EV_BY.includes(e.by) ? e.by : "write",
+      ref: cleanStr(e.ref, 100),
+      kind: e.kind,
+      target: cleanStr(e.target),
+      before: evValue(e.before),
+      after: evValue(e.after),
+      why: cleanStr(e.why, 300),
+      ...(/^e\d{1,7}$/.test(String(e.undoes)) ? { undoes: e.undoes } : {}),
+      ...extras(e, KNOWN_EV, 500),
+    };
+  }
+  const decSnap = (d) => ({ text: d.text, source: d.source, unverified: !!d.unverified });
+  // what changed between two versions, as events without ids
+  function diffEvents(a, b) {
+    a = normalizeMemory(a);
+    b = normalizeMemory(b);
+    const out = [],
+      ev = (kind, target, before, after) => out.push({ kind, target, before, after });
+    const old = new Map(a.decisions.map((d) => [d.id, d]));
+    for (const d of b.decisions) {
+      const o = old.get(d.id);
+      if (!o) {
+        ev("decision.add", d.id, null, decSnap(d));
+        if (d.status === "revoked") ev("decision.revoke", d.id, "active", "revoked");
+        continue;
+      }
+      if (o.text !== d.text) ev("decision.edit", d.id, o.text, d.text);
+      if (o.unverified && !d.unverified)
+        ev("decision.verify", d.id, { source: o.source, unverified: true }, { source: d.source, unverified: false });
+      if (!o.unverified && d.unverified)
+        ev("decision.unverify", d.id, { source: o.source, unverified: false }, { source: d.source, unverified: true });
+      if (!o.confirmed && d.confirmed) ev("decision.confirm", d.id, false, true);
+      if (o.confirmed && !d.confirmed && o.text === d.text) ev("decision.unconfirm", d.id, true, false);
+      if (o.status !== d.status) ev(d.status === "revoked" ? "decision.revoke" : "decision.restore", d.id, o.status, d.status);
+    }
+    for (const c of b.constraints) if (!a.constraints.includes(c)) ev("constraint.add", c, null, c);
+    for (const c of a.constraints) if (!b.constraints.includes(c)) ev("constraint.remove", c, c, null);
+    if (a.summary.goal !== b.summary.goal || a.summary.status !== b.summary.status)
+      ev("summary", "summary", { goal: a.summary.goal, status: a.summary.status }, { goal: b.summary.goal, status: b.summary.status });
+    return out;
+  }
+  // `after` with the history of `before` plus the events of this change (meta: {at, by, ref, why}). The base is always
+  // the history of the version being replaced, so a restore of an older file keeps the full story and adds to it.
+  function withHistory(before, after, meta) {
+    const b = normalizeMemory(before),
+      next = normalizeMemory(after),
+      evs = diffEvents(b, next);
+    let n = Math.max(0, ...b.history.map((e) => +e.id.slice(1)));
+    const mt = meta || {};
+    next.history = b.history
+      .concat(
+        evs.map((e) =>
+          cleanEvent({
+            id: "e" + ++n,
+            at: mt.at || "",
+            by: mt.by || "write",
+            ref: mt.ref || "",
+            why: mt.why || "",
+            undoes: mt.undoes,
+            ...e,
+          }),
+        ),
+      )
+      .slice(-HISTORY_MAX);
+    return next;
+  }
+  // undo one change: → { ok, memory } | { ok: false, error }. Refused when the same thing changed again since.
+  function undoEvent(memory, id, date) {
+    const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
+    const e = m.history.find((x) => x.id === id);
+    if (!e) return { ok: false, error: T`لا يوجد تغيير برقم ${id} في السجل` };
+    const later = m.history
+      .slice(m.history.indexOf(e) + 1)
+      .find((x) => x.target === e.target && x.kind !== "decision.confirm" && x.kind !== "decision.unconfirm");
+    if (later) return { ok: false, error: T`تغيّر هذا مرة أخرى بعده (${later.id})؛ تراجع عن ذلك أولاً` };
+    const d = e.kind.startsWith("decision.") ? m.decisions.find((x) => x.id === e.target) : null;
+    if (e.kind.startsWith("decision.") && !d) return { ok: false, error: T`القرار ${e.target} لم يعد في الذاكرة` };
+    const stale = () => ({ ok: false, error: T("تغيّرت القيمة منذ ذلك الحين؛ لم أتراجع عنها") });
+    switch (e.kind) {
+      case "decision.add":
+        if (d.status !== "active") return stale();
+        d.status = "revoked";
+        d.revokedOn = date || "";
+        break;
+      case "decision.revoke":
+        if (d.status !== "revoked") return stale();
+        d.status = "active";
+        d.revokedOn = "";
+        break;
+      case "decision.restore":
+        if (d.status !== "active") return stale();
+        d.status = "revoked";
+        d.revokedOn = date || "";
+        break;
+      case "decision.edit":
+        if (d.text !== e.after) return stale();
+        d.text = e.before;
+        delete d.confirmed;
+        break;
+      case "decision.verify":
+        if (d.unverified || !e.before || !e.after || d.source !== e.after.source) return stale();
+        Object.assign(d, { unverified: true, claimed: d.source === "assistant" ? "user" : d.source, source: "assistant" });
+        delete d.confirmed;
+        break;
+      case "decision.unverify":
+        if (!d.unverified || !e.before) return stale();
+        d.source = e.before.source;
+        d.unverified = false;
+        delete d.claimed;
+        delete d.pendingReplaces;
+        break;
+      case "decision.confirm":
+        if (!d.confirmed) return stale();
+        delete d.confirmed;
+        break;
+      case "decision.unconfirm":
+        if (d.confirmed || d.unverified) return stale();
+        d.confirmed = true;
+        break;
+      case "constraint.add":
+        if (!m.constraints.includes(e.target)) return stale();
+        m.constraints = m.constraints.filter((c) => c !== e.target);
+        break;
+      case "constraint.remove":
+        if (m.constraints.includes(e.target)) return stale();
+        m.constraints.push(e.target);
+        break;
+      case "summary":
+        if (!e.before || !e.after || m.summary.goal !== e.after.goal || m.summary.status !== e.after.status) return stale();
+        m.summary.goal = e.before.goal;
+        m.summary.status = e.before.status;
+        break;
+      default:
+        return { ok: false, error: T("لا يمكن التراجع عن هذا النوع") };
+    }
+    return { ok: true, memory: normalizeMemory(m), event: e };
+  }
+  // one line per event, for people: "e12 · 2026-10-26 10:05 · decision d3 cancelled — summary of messages 6–10"
+  function describeEvent(e) {
+    const q = (t) => (LANG === "en" ? `“${t}”` : `«${t}»`);
+    const short = (t) => cut(String(t || ""), 80);
+    const what = {
+      "decision.add": () => T`أُضيف القرار ${e.target}: ${q(short(e.after && e.after.text))}`,
+      "decision.revoke": () => T`أُلغي القرار ${e.target}`,
+      "decision.restore": () => T`أُعيد القرار ${e.target} سارياً`,
+      "decision.edit": () => T`عُدّل نص ${e.target}: ${q(short(e.before))} ← ${q(short(e.after))}`,
+      "decision.verify": () => T`اعتُمد ${e.target} قراراً لك`,
+      "decision.unverify": () => T`أُعيد ${e.target} اقتراحاً ينتظر المراجعة`,
+      "decision.confirm": () => T`أكّدتَ ${e.target}`,
+      "decision.unconfirm": () => T`أُزيل تأكيد ${e.target}`,
+      "constraint.add": () => T`أُضيف قيد: ${q(short(e.target))}`,
+      "constraint.remove": () => T`حُذف قيد: ${q(short(e.target))}`,
+      summary: () => T("أُعيدت كتابة الخلاصة"),
+    }[e.kind];
+    return { id: e.id, at: e.at, by: e.by, what: what ? what() : e.kind, why: e.why, undoes: e.undoes || "" };
+  }
   function applyFix(memory, fix, date) {
     const m = normalizeMemory(JSON.parse(JSON.stringify(memory)));
     const changes = [],
@@ -1437,6 +1634,7 @@
       p = normalizeMemory(previous);
     let n = 0;
     if (m.lang !== p.lang) (m.lang = p.lang), n++;
+    if (p.history.length && !m.history.length) (m.history = p.history), n++;
     for (const k of Object.keys(p)) if (!KNOWN_TOP.has(k) && !(k in m)) (m[k] = p[k]), n++;
     for (const d of m.decisions) {
       const o = p.decisions.find((x) => x.id === d.id && x.text === d.text);
@@ -1463,7 +1661,12 @@
       archived.push({ id: "imported-v0", imported: m.imported });
       m.imported = null;
     }
-    m.archived += archived.length;
+    // then the oldest history events go to the archive too (they can no longer be undone from the panel, but stay readable)
+    while (utf8Len(serialize(m)) > maxBytes && m.history.length > 50) {
+      const k = Math.max(1, Math.floor(m.history.length / 10));
+      archived.push({ id: "history", events: m.history.splice(0, k) });
+    }
+    m.archived += archived.filter((x) => x.id !== "history").length;
     return { memory: m, archived, fits: utf8Len(serialize(m)) <= maxBytes };
   }
 
@@ -1522,5 +1725,9 @@
     lang,
     droppedByOlder,
     recoverDropped,
+    diffEvents,
+    withHistory,
+    undoEvent,
+    describeEvent,
   };
 });

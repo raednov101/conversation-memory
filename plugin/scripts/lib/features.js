@@ -74,10 +74,14 @@ function commitFix(j) {
   const v = C.validateFix(j);
   if (!v.ok) return { err: v.error };
   let res = null;
-  const w = writeMemory((m) => {
-    res = C.applyFix(m, v.fix, today());
-    return res.changes.length ? res.memory : null;
-  });
+  const w = writeMemory(
+    (m) => {
+      res = C.applyFix(m, v.fix, today());
+      return res.changes.length ? res.memory : null;
+    },
+    null,
+    { by: "fix", why: T("تصحيح بالأمر /conversation-memory:fix") },
+  );
   if (res && !res.changes.length)
     return { err: res.missing.length ? T`لم أجد ${res.missing.join(T("، "))} في الذاكرة` : T("لا تغيير: الذاكرة مطابقة للتصحيح أصلاً") };
   if (w.err) return { err: w.err, writeFailed: !!w.writeFailed };
