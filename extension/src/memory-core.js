@@ -101,6 +101,7 @@
   };
   const W = {
     msg: ["رسالة واحدة", "رسالتان", "رسائل", "رسالة"],
+    msgGen: ["رسالة واحدة", "رسالتين", "رسائل", "رسالة"], // after a preposition: «بعد رسالتين»
     version: ["نسخة واحدة", "نسختان", "نسخ", "نسخة"],
     project: ["مشروع واحد", "مشروعان", "مشاريع", "مشروعاً"],
     summary: ["تلخيص واحد", "تلخيصان", "تلخيصات", "تلخيصاً"],
@@ -109,6 +110,7 @@
   };
   const W_EN = {
     msg: ["message", "messages"],
+    msgGen: ["message", "messages"],
     version: ["version", "versions"],
     project: ["project", "projects"],
     summary: ["summary", "summaries"],
@@ -1354,7 +1356,7 @@
   function parseModelReply(text) {
     const i = text.indexOf(START),
       j = i < 0 ? -1 : text.indexOf(END, i + START.length);
-    if (i < 0 || j < 0) return { ok: false, error: T("لم أجد الملخص في رد النموذج (العلامات مفقودة)") };
+    if (i < 0 || j < 0) return { ok: false, error: T("لم يأتِ رد النموذج بالصيغة المطلوبة") };
     let body = text
       .slice(i + START.length, j)
       .trim()
@@ -2011,16 +2013,17 @@
   function describeEvent(e) {
     const q = (t) => (LANG === "en" ? `“${t}”` : `«${t}»`);
     const short = (t) => cut(String(t || ""), 80);
+    const L = () => (e.label ? q(short(e.label)) : e.target); // the decision's words, not its internal id
     const what = {
-      "decision.add": () => T`أُضيف القرار ${e.target}: ${q(short(e.after && e.after.text))}`,
-      "decision.revoke": () => T`أُلغي القرار ${e.target}`,
-      "decision.restore": () => T`أُعيد القرار ${e.target} سارياً`,
-      "decision.edit": () => T`عُدّل نص ${e.target}: ${q(short(e.before))} ← ${q(short(e.after))}`,
-      "decision.verify": () => T`اعتُمد ${e.target} قراراً لك`,
-      "decision.unverify": () => T`أُعيد ${e.target} اقتراحاً ينتظر المراجعة`,
-      "decision.confirm": () => T`أكّدتَ ${e.target}`,
-      "decision.unconfirm": () => T`أُزيل تأكيد ${e.target}`,
-      "decision.remove": () => T`حُذف القرار ${e.target}: ${q(short(e.before && e.before.text))}`,
+      "decision.add": () => T`أُضيف قرار: ${q(short(e.after && e.after.text))}`,
+      "decision.revoke": () => T`أُلغي قرار: ${L()}`,
+      "decision.restore": () => T`أُعيد قرار سارياً: ${L()}`,
+      "decision.edit": () => T`عُدّل قرار: ${q(short(e.before))} ← ${q(short(e.after))}`,
+      "decision.verify": () => T`اعتُمد قراراً لك: ${L()}`,
+      "decision.unverify": () => T`أُعيد اقتراحاً ينتظر مراجعتك: ${L()}`,
+      "decision.confirm": () => T`أكّدتَ قراراً: ${L()}`,
+      "decision.unconfirm": () => T`أُزيل تأكيد قرار: ${L()}`,
+      "decision.remove": () => T`حُذف قرار: ${q(short(e.before && e.before.text))}`,
       "constraint.add": () => T`أُضيف قيد: ${q(short(e.target))}`,
       "constraint.remove": () => T`حُذف قيد: ${q(short(e.target))}`,
       summary: () => T("أُعيدت كتابة الخلاصة"),

@@ -146,10 +146,10 @@ test("history: bounded, and garbage in a hand-edited file is dropped, not truste
 test("history: described in words, in the interface's language", () => {
   const m = story();
   const d = C.describeEvent(m.history[0]);
-  assert.match(d.what, /أُضيف القرار d1: «اللون الأزرق الداكن للهوية»/);
+  assert.match(d.what, /أُضيف قرار: «اللون الأزرق الداكن للهوية»/);
   C.setLang("en");
   try {
-    assert.match(C.describeEvent(m.history[0]).what, /^Decision d1 added: “/);
+    assert.match(C.describeEvent(m.history[0]).what, /^Decision added: “/);
   } finally {
     C.setLang("ar");
   }

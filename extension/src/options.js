@@ -388,7 +388,7 @@ async function loadHistory() {
   if (!r || !r.ok || !r.list.length) {
     const li = document.createElement("li");
     li.className = "muted";
-    li.textContent = r && !r.ok ? T`تعذّرت قراءة السجل: ${r.error}` : T("لا تغييرات مسجّلة بعد (السجل يبدأ من الإصدار 2.0).");
+    li.textContent = r && !r.ok ? T`تعذّرت قراءة السجل: ${r.error}` : T("لا تغييرات مسجّلة بعد.");
     ol.append(li);
     return;
   }
@@ -414,6 +414,7 @@ async function loadHistory() {
     span.append(why);
     b.type = "button";
     b.textContent = T("↩️ تراجع");
+    b.style.whiteSpace = "nowrap";
     b.dataset.ev = e.id;
     li.append(span, b);
     ol.append(li);
@@ -609,6 +610,7 @@ async function loadKey() {
   $("model").value = (k && k.model) || MODEL[$("provider").value];
   $("apiKey").value = "";
   $("apiKey").placeholder = k && k.key ? T("محفوظ ••••") + k.key.slice(-4) : "sk-…";
+  $("keyOff").hidden = !(k && k.key); // nothing to turn off before a key is saved
   say(
     "keyMsg",
     s.byok && k && k.key ? T`✓ مفعّل: يُلخَّص في الخلفية بـ ${k.model || MODEL[k.provider]}.` : T("غير مفعّل: يُلخَّص داخل المحادثة."),

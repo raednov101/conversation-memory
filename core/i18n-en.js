@@ -257,14 +257,8 @@
     '<br><span class="muted">اربطها إن كان موضوعها يخص هذه الذاكرة؛ تُلخَّص حينها من أولها ({0} حتى الآن).</span>':
       '<br><span class="muted">Link it if its topic belongs to this memory; it will then be summarized from the start ({0} so far).</span>',
     "🔗 اربطها بالذاكرة": "🔗 Link it to the memory",
-    "🧠 محادثة جديدة": "🧠 New chat",
-    "خارج المشاريع لكل محادثة ذاكرتها، فلا تختلط مواضيعك. لتكمل من محادثة سابقة اختر ذاكرتها.":
-      "Outside projects, each chat has its own memory, so your topics don't get mixed. To continue from an earlier chat, choose its memory.",
-    "📥 أدرج ذاكرة محادثة سابقة": "📥 Insert an earlier chat's memory",
-    "📤 انقل منها معلومات مختارة": "📤 Transfer selected information from it",
     "الذاكرة: <bdi>{0}</bdi>": "Memory: <bdi>{0}</bdi>",
     "المجلد: <bdi>{0}</bdi>": "Folder: <bdi>{0}</bdi>",
-    "📥 أدرج الذاكرة في الرسالة": "📥 Insert the memory into the message",
     "{0} · يدوي": "{0} · manual",
     "🧠 ❓ موضوع آخر؟": "🧠 ❓ Another topic?",
     "يبدو أن هذه المحادثة عن موضوع آخر غير ذاكرة {0}، فلم يُلخَّص شيء فيها حتى لا تختلط. هل تخصّها؟":
@@ -276,9 +270,6 @@
     "🧠 ⏳ {0} · 🔑 يلخّص": "🧠 ⏳ {0} · 🔑 summarizing",
     "يُلخَّص في الخلفية بمفتاحك؛ لا شيء يظهر في المحادثة.": "Summarizing in the background with your API key; nothing appears in the chat.",
     "🧠 ⚠️ {0} · تعثّر الحفظ": "🧠 ⚠️ {0} · save failed",
-    "تعثّر الحفظ: {0}": "Save failed: {0}",
-    " (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)": " (auto-retry stopped after 3 attempts; use the button)",
-    " (يعيد المحاولة بعد رسالتك القادمة)": " (will retry after your next message)",
     "✓ آخر تحديث للملخص {0} — الرسائل حتى {1}.": "✓ Summary last updated {0} — messages up to {1}.",
     "لم يُحدَّث الملخص بعد.": "The summary hasn't been updated yet.",
     "📝 النص الكامل محفوظ {0}.<br>{1}": "📝 Full text saved {0}.<br>{1}",
@@ -295,15 +286,12 @@
       '<br><span class="muted">{0}: no readable text (image or file); only what the reply says about it is saved.</span>',
     "الوضع اليدوي: لا يُطلب ملخص إلا بالزر.": "Manual mode: a summary is requested only with the button.",
     "التلخيص القادم بعد {0}.": "Next summary after {0}.",
-    "التلخيص مستحق.": "A summary is due.",
     '<br><span class="muted">{0} النص الكامل يُحفظ بعد كل رد.': '<br><span class="muted">{0} The full text is saved after every reply.',
     " (التلخيص التلقائي متوقف)": " (auto-summarize is paused)",
     " لا أجد خانة الكتابة.": " I can't find the typing box.",
     "💾 لخّص واحفظ الآن": "💾 Summarize and save now",
     "▶️ تشغيل التلخيص التلقائي": "▶️ Turn on auto-summarize",
     "⏸️ إيقاف التلخيص التلقائي": "⏸️ Turn off auto-summarize",
-    "↩️ تراجع عن آخر تغيير في الذاكرة": "↩️ Undo the last change to the memory",
-    "⛓️ فك ربط المحادثة بالمشروع": "⛓️ Unlink chat from project",
     "خطأ داخلي: ": "Internal error: ",
     '<style>{0}</style><button class="pill idle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cm-panel">🧠 …</button><div class="panel" id="cm-panel" role="dialog" aria-label="ذاكرة المحادثة"></div><div class="toast" role="status" aria-live="polite"></div>':
       '<style>{0}</style><button class="pill idle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cm-panel">🧠 …</button><div class="panel" id="cm-panel" role="dialog" aria-label="Conversation Memory"></div><div class="toast" role="status" aria-live="polite"></div>',
@@ -316,14 +304,11 @@
     "اسم غير صالح: حتى 60 حرفاً، بلا / أو : أو رموز.": "Invalid name: up to 60 characters, no / or : or symbols.",
     "✕ ألغِه": "✕ Discard it",
     " (رسالتك {0})": " (your message {0})",
-    '<button type="button" data-a="pin-cancel">إغلاق</button>': '<button type="button" data-a="pin-cancel">Close</button>',
     '<p><b>📚 من أي ذاكرة؟</b><br><span class="muted">اختر ذاكرة المحادثة أو المشروع الذي تكمل منه.</span></p>':
       '<p><b>📚 Which memory?</b><br><span class="muted">Pick the chat or project memory you\'re continuing from.</span></p>',
     '<button type="button" data-a="pick" data-id="{0}">{1}<br><span class="muted">{2} · {3} قرار</span></button>':
       '<button type="button" data-a="pick" data-id="{0}">{1}<br><span class="muted">{2} · {3} decisions</span></button>',
     '<button type="button" data-a="pin-cancel">إلغاء</button>': '<button type="button" data-a="pin-cancel">Cancel</button>',
-    '<p><b>📤 انقل معلومات مختارة</b><br><span class="muted">اختر ما تريد، وراجع المعاينة، ثم تُدرج في خانة الرسالة دون إرسال.</span></p>':
-      '<p><b>📤 Share selected information</b><br><span class="muted">Choose what you want, check the preview, then it\'s inserted into the message box without being sent.</span></p>',
     "الخلاصة الحالية": "Current summary",
     "القيود ({0})": "Constraints ({0})",
     "<h4>القرارات</h4>": "<h4>Decisions</h4>",
@@ -333,8 +318,6 @@
     "الرسائل ": "Messages ",
     '<h4>المعاينة</h4><div class="preview share-prev"></div><div class="count"></div>':
       '<h4>Preview</h4><div class="preview share-prev"></div><div class="count"></div>',
-    '<button type="button" data-a="share-insert">📥 أدرج في الرسالة</button><button type="button" data-a="pin-cancel">إلغاء</button>':
-      '<button type="button" data-a="share-insert">📥 Insert into message</button><button type="button" data-a="pin-cancel">Cancel</button>',
     "(لم تختر شيئاً بعد)": "(nothing chosen yet)",
     "{0} / {1} حرف": "{0} / {1} characters",
     "اختر شيئاً أولاً.": "Choose something first.",
@@ -670,7 +653,6 @@
     "constraints يجب أن يكون كائناً فيه add و remove": "constraints must be an object containing add and remove",
     "entry مطلوب (raised و decided و changed)": "entry is required (raised, decided and changed)",
     "ملخص الدفعة (entry) فارغ أو قصير جداً": "The batch summary (entry) is empty or too short",
-    "لم أجد الملخص في رد النموذج (العلامات مفقودة)": "I couldn't find the summary in the model's reply (markers missing)",
     "الملخص ليس JSON": "The summary is not JSON",
     "الملخص ليس JSON صالحاً: ": "The summary is not valid JSON: ",
     " ⚠️ لم يثبت من كلامك؛ راجعه": " ⚠️ Not confirmed by your words; review it",
@@ -754,8 +736,6 @@
       "I couldn't find text in the chat that starts and ends with what was written. Copy the start and end exactly",
     "ذاكرة المحادثة — الإعدادات": "Conversation Memory — Settings",
     "ذاكرة المحادثة": "Conversation Memory",
-    "ذاكرة لمحادثاتك الطويلة في ChatGPT وClaude، لكل مشروع ذاكرته":
-      "Memory for your long chats in ChatGPT and Claude, with its own memory for each project",
     "أين تُحفظ الذاكرة": "Where memory is saved",
     "🔓 منح إذن الكتابة": "🔓 Grant write permission",
     "↩️ العودة للحفظ داخل المتصفح": "↩️ Back to saving in the browser",
@@ -800,8 +780,6 @@
     المشروع: "Project",
     "📌 النصوص المعتمدة": "📌 Pinned texts",
     "↩️ النسخ السابقة": "↩️ Previous versions",
-    "آخر 20 نسخة، مشتركة مع بلقن Claude Code. الاسترجاع يحفظ الحالية أولاً فيمكن التراجع عنه.":
-      "Last 20 versions, shared with the Claude Code plugin. Restoring saves the current one first, so you can undo it.",
     "طريقة الاستخدام": "How to use",
     "• الشارة 🧠 أسفل يسار الصفحة: عدد رسائلك حتى التلخيص القادم، و📝 حُفظ النص، و✓ حُدّث الملخص، و⚠️ مع السبب.":
       "• The 🧠 indicator at the bottom left of the page: the number of your messages until the next summary, 📝 text saved, ✓ summary updated, and ⚠️ with the reason.",
@@ -872,19 +850,10 @@
     "القرار {0} لم يعد في الذاكرة": "Decision {0} is no longer in the memory",
     "تغيّرت القيمة منذ ذلك الحين؛ لم أتراجع عنها": "The value has changed since then; it was not undone",
     "لا يمكن التراجع عن هذا النوع": "This kind of change can't be undone",
-    "أُضيف القرار {0}: {1}": "Decision {0} added: {1}",
-    "أُلغي القرار {0}": "Decision {0} cancelled",
-    "أُعيد القرار {0} سارياً": "Decision {0} back in force",
-    "عُدّل نص {0}: {1} ← {2}": "{0} reworded: {1} → {2}",
-    "اعتُمد {0} قراراً لك": "{0} approved as your decision",
-    "أُعيد {0} اقتراحاً ينتظر المراجعة": "{0} back to a suggestion waiting for review",
-    "أُزيل تأكيد {0}": "Confirmation of {0} removed",
     "أُضيف قيد: {0}": "Constraint added: {0}",
     "حُذف قيد: {0}": "Constraint removed: {0}",
     "أُعيدت كتابة الخلاصة": "Summary rewritten",
     "🕘 سجل التغييرات": "🕘 History",
-    "كل تغيير في الذاكرة: متى، وما الذي غيّره، ولماذا. «تراجع» يلغي هذا التغيير وحده ويبقي غيره، ويُرفض إن تغيّر الشيء نفسه بعده.":
-      "Every change to the memory: when, what made it, and why. “Undo” cancels that change alone and keeps the rest; it is refused if the same thing changed again later.",
     "وقرار بُني على ما عدّلته لم يعد كلامك يثبته؛ راجعه من «🔎 راجع القرارات».":
       "A decision built on what you edited is no longer backed by your words; review it from “🔎 Review decisions”.",
     "و{0} بُنيت على ما عدّلته لم يعد كلامك يثبتها؛ راجعها من «🔎 راجع القرارات».":
@@ -893,7 +862,6 @@
     "عدّلتَ رسالتك رقم {0}: {1}": "You edited your message {0}: {1}",
     "قرار عُدّلت رسالته فيحتاج نظرة جديدة": "decision whose message was edited, needs a new look",
     "قرار عُدّلت رسالته": "decision whose message was edited",
-    "عمّ ستتكلم؟ اكتب كلمات المهمة فأختار لك ما يخصها": "What will you talk about? Type the task and I will pick what is about it",
     "اختيار ما يخص مهمة": "Pick what is about a task",
     "[conversation-memory] ما يمكن نقله إلى محادثة أخرى (اعرض القائمة للمستخدم كما هي، ثم يكتب الأمر مع ما يختاره، مثل: /conversation-memory:share summary d1 d3 L2، أو يصف مهمته: /conversation-memory:share about دعوة الافتتاح):\n":
       "[conversation-memory] What can be moved to another chat (show the list to the user as is; they then type the command with what they choose, e.g.: /conversation-memory:share summary d1 d3 L2, or describe the task: /conversation-memory:share about the opening invitation):\n",
@@ -907,8 +875,6 @@
     التالي: "Next",
     التفاصيل: "Details",
     "🧠 تعمل وحدها": "🧠 It works on its own",
-    "افتح أي محادثة في ChatGPT أو Claude وتكلّم كعادتك. كل 10 رسائل تلخّص الإضافة ما طُرح وتقرّر، وتحفظه في ذاكرة المشروع داخل متصفحك. لا حساب ولا إعداد.":
-      "Open any chat in ChatGPT or Claude and talk as usual. Every 10 messages the extension summarizes what was raised and decided and keeps it in the project’s memory inside your browser. No account, no setup.",
     "الشارة أسفل الصفحة": "The badge at the bottom of the page",
     "📝 حُفظ نص المحادثة · ✓ حُدّث الملخص · 🔎 شيء ينتظر رأيك · ⚠️ تعثّر، ومعه السبب. اضغطها لترى التفاصيل والأزرار.":
       "📝 the chat text is saved · ✓ the summary was updated · 🔎 something waits for your say · ⚠️ something failed, with the reason. Click it for details and actions.",
@@ -950,7 +916,6 @@
     "لم يُمنح الإذن؛ بقي الوضع كما كان.": "Permission not granted; nothing changed.",
     "لم أتعرّف على هذه المحادثة كاملة؛ افتحها مرة في الموقع ثم أعد المحاولة":
       "I couldn’t identify this chat fully; open it once on the site, then try again",
-    "حُذف القرار {0}: {1}": "Decision {0} removed: {1}",
     "🧠 أرسلتُ باسمك طلب حفظ الذاكرة؛ سيرد النموذج بملخص أحفظه وحدي. لا تحتاج أن تفعل شيئاً.":
       "🧠 I sent a request to save the memory in your name; the model will reply with a summary that I save myself. You don’t need to do anything.",
     "🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.": "🔎 I have one question before I record anything as yours.",
@@ -959,7 +924,6 @@
     "🔎 عندي {0} سؤالاً قبل أن أعتمد شيئاً باسمك.": "🔎 I have {0} questions before I record anything as yours.",
     "فهمتُ أنك قررت:": "I understood that you decided:",
     "✓ نعم، هذا قراري": "✓ Yes, that’s my decision",
-    "✕ لا، احذفه": "✕ No, delete it",
     "عدّلتَ رسالتك. هل ما زال هذا صحيحاً؟": "You edited your message. Is this still right?",
     "فهمتُ أنك تريد إلغاء:": "I understood that you want to cancel:",
     "✓ نعم، ألغِه": "✓ Yes, cancel it",
@@ -971,8 +935,6 @@
     "✓ نعم، احذفه": "✓ Yes, remove it",
     '<br><span class="muted">كلامك{0}: {1}</span>': '<br><span class="muted">Your words{0}: {1}</span>',
     '<br><span class="muted small">لماذا أسأل: {0}</span>': '<br><span class="muted small">Why I ask: {0}</span>',
-    '<p><b>🔎 هل هذا ما قصدته؟</b><br><span class="muted">لا أحفظ شيئاً باسمك قبل أن أتأكد منه من كلامك. هذه لم أتأكد منها، فأسألك.</span></p>':
-      '<p><b>🔎 Is this what you meant?</b><br><span class="muted">I don’t record anything as yours before I confirm it from your words. I couldn’t confirm these, so I’m asking.</span></p>',
     "ستظهر في المحادثة رسالة باسمك تبدأ بـ «🧠 ذاكرة المحادثة:» ثم رد بالملخص: هذا طلب الحفظ، لا تحتاج أن تفعل شيئاً. ولا يظهر أبداً وأنت تكتب.":
       "A message in your name starting with “🧠 Conversation memory:” will appear in the chat, then a reply with the summary: that is the save request; you don’t need to do anything. It never appears while you are typing.",
     "🧠 ذاكرتك": "🧠 Your memory",
@@ -980,6 +942,49 @@
     "عند تفعيله يطلب المتصفح إذنك بموقع Gemini وحده، ولا يمس أي موقع آخر.":
       "When you turn it on, the browser asks your permission for the Gemini site only; no other site is touched.",
     "↩️ تراجع": "↩️ Undo",
+    "لا تغييرات مسجّلة بعد.": "No changes recorded yet.",
+    "🧠 لا ذاكرة بعد": "🧠 No memory yet",
+    "لهذه المحادثة ذاكرتها الخاصة، فلا تختلط مواضيعك. لتكمل محادثة سابقة اختر ذاكرتها.":
+      "This chat has its own memory, so your topics don’t mix. To continue an earlier chat, choose its memory.",
+    "📥 أكمل من ذاكرة محادثة سابقة": "📥 Continue from an earlier chat’s memory",
+    "📤 انقل معلومات من ذاكرة سابقة": "📤 Bring in items from an earlier memory",
+    "🧠 الذاكرة جاهزة": "🧠 Memory ready",
+    "📥 ضع الذاكرة في خانة الكتابة": "📥 Put the memory in the chat box",
+    "لم يُحفظ الملخص هذه المرة: {0}.": "This summary wasn’t saved: {0}.",
+    "<br>توقفتُ عن المحاولة التلقائية بعد 3 محاولات. اضغط «لخّص واحفظ الآن» حين تريد.":
+      "<br>I stopped retrying automatically after 3 attempts. Press “Summarize and save now” when you like.",
+    "<br>سأحاول مجدداً بعد رسالتك القادمة، أو اضغط «لخّص واحفظ الآن».":
+      "<br>I’ll try again after your next message, or press “Summarize and save now”.",
+    "حان وقت التلخيص.": "A summary is due now.",
+    "↩️ تراجع عن آخر تغيير": "↩️ Undo the last change",
+    "⏹️ أوقف حفظ هذه المحادثة": "⏹️ Stop saving this chat",
+    "✕ لا، لم أقرره": "✕ No, I didn’t decide that",
+    '<p><b>🔎 هل هذا ما قصدته؟</b><br><span class="muted">لا أحفظ شيئاً باسمك إلا بعد تأكيدك.</span></p>':
+      '<p><b>🔎 Is this what you meant?</b><br><span class="muted">I only save something as yours after you confirm it.</span></p>',
+    '<button type="button" class="link" data-a="pin-cancel">إغلاق</button>':
+      '<button type="button" class="link" data-a="pin-cancel">Close</button>',
+    '<p><b>📤 انقل معلومات مختارة</b><br><span class="muted">اختر ما تريد وراجع المعاينة، ثم يوضع في خانة الكتابة دون إرسال.</span></p>':
+      '<p><b>📤 Bring in selected items</b><br><span class="muted">Pick what you want and check the preview; it goes into the chat box without being sent.</span></p>',
+    "عمّ هذه المحادثة؟ أقترح لك ما يخصها": "What’s this chat about? I’ll suggest what fits",
+    '<button type="button" class="primary" data-a="share-insert">📥 ضعه في خانة الكتابة</button><button type="button" data-a="pin-cancel">إلغاء</button>':
+      '<button type="button" class="primary" data-a="share-insert">📥 Put it in the chat box</button><button type="button" data-a="pin-cancel">Cancel</button>',
+    "لم يأتِ رد النموذج بالصيغة المطلوبة": "the model’s reply wasn’t in the expected format",
+    "أُضيف قرار: {0}": "Decision added: {0}",
+    "أُلغي قرار: {0}": "Decision cancelled: {0}",
+    "أُعيد قرار سارياً: {0}": "Decision back in force: {0}",
+    "عُدّل قرار: {0} ← {1}": "Decision edited: {0} → {1}",
+    "اعتُمد قراراً لك: {0}": "Recorded as your decision: {0}",
+    "أُعيد اقتراحاً ينتظر مراجعتك: {0}": "Back to a suggestion awaiting your review: {0}",
+    "أكّدتَ قراراً: {0}": "You confirmed: {0}",
+    "أُزيل تأكيد قرار: {0}": "Confirmation removed: {0}",
+    "حُذف قرار: {0}": "Decision deleted: {0}",
+    "ذاكرة لمحادثاتك الطويلة في ChatGPT و Claude، لكل مشروع ذاكرته": "A memory for your long ChatGPT and Claude chats, one per project",
+    "افتح أي محادثة في ChatGPT أو Claude وتكلّم كعادتك. كل بضع رسائل (10 افتراضياً، وتغيّرها من الإعدادات) تلخّص الإضافة ما طُرح وتقرّر، وتحفظه في ذاكرة المشروع داخل متصفحك. لا حساب ولا إعداد.":
+      "Open any chat in ChatGPT or Claude and talk as usual. Every few messages (10 by default; change it in the settings) the extension summarizes what was raised and decided and keeps it in the project’s memory inside your browser. No account, no setup.",
+    "كل تغيير في الذاكرة: متى، وما الذي غيّره، ولماذا. «تراجع» يلغي هذا التغيير وحده ويبقي غيره. إن تغيّر الشيء نفسه لاحقاً فتراجع عن الأحدث أولاً.":
+      "Every change to the memory: when, what made it, and why. “Undo” reverses that change alone and keeps the rest. If the same item changed again later, undo the later change first.",
+    "آخر 20 نسخة. الاسترجاع يحفظ الحالية أولاً، فتتراجع إن أردت.":
+      "The last 20 versions. Restoring one saves the current version first, so you can go back.",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

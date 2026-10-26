@@ -13,12 +13,14 @@
     .panel{position:fixed;right:16px;bottom:132px;z-index:2147483647;direction:var(--cm-dir,rtl);font:13px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
       background:#fff;color:#1f2328;border:1px solid #d0d7de;border-radius:10px;padding:12px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none}
     .panel.open{display:block}.panel p{margin:0 0 8px;overflow-wrap:anywhere}
-    .panel button{display:block;width:100%;margin:6px 0 0;padding:7px 8px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;color:#1f2328;cursor:pointer;font:inherit;text-align:right}
+    .panel button{display:block;width:100%;margin:6px 0 0;padding:7px 8px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;color:#1f2328;cursor:pointer;font:inherit;text-align:start}
     .panel button:hover{background:#eaeef2}.muted{color:#57606a;font-size:12px}
     .panel input{box-sizing:border-box;width:100%;font:inherit;padding:6px 8px;border:1px solid #d0d7de;border-radius:6px;margin:4px 0}
     .preview{max-height:90px;overflow:auto;white-space:pre-wrap;background:#f6f8fa;border-radius:6px;padding:6px;font-size:12px;margin:0 0 6px}
     .panel.wide{width:340px;max-height:72vh;overflow:auto}
     .panel .small{font-size:11px}
+    .panel button.primary{background:#1f2328;color:#fff;border-color:#1f2328}.panel button.primary:hover{background:#32383f}
+    .panel button.link{width:auto;background:none;border:none;padding:2px 0;margin:8px 0 0;color:#57606a;font-size:11.5px;text-decoration:underline}
     .panel .sec{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:6px;padding-top:6px;border-top:1px solid #eaeef2}
     .panel .sec button{width:auto;background:none;border:none;padding:2px 0;margin:0;color:#57606a;font-size:11.5px;text-decoration:underline;cursor:pointer}
     .panel details.tech{margin-top:4px}.panel details.tech summary{cursor:pointer;color:#57606a;font-size:11.5px}
@@ -29,7 +31,7 @@
     .rv{border-top:1px solid #d0d7de;padding-top:6px;margin-top:6px}.rv button{display:inline-block;width:auto;margin:0 0 0 6px}
     .share-prev{max-height:150px}.count{font-size:11px;color:#57606a;text-align:left}
     :host(.side-left) .pill,:host(.side-left) .panel,:host(.side-left) .toast{right:auto;left:16px}
-    .toast{position:fixed;right:16px;bottom:56px;z-index:2147483647;direction:var(--cm-dir,rtl);font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
+    .toast{position:fixed;right:16px;bottom:136px;z-index:2147483647;direction:var(--cm-dir,rtl);font:13px system-ui,Tahoma,sans-serif;background:#1f2328;color:#fff;padding:8px 12px;border-radius:8px;display:none;max-width:320px}`;
   const T = root.MemoryCore.T;
   const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   const fmt = (n) => Number(n || 0).toLocaleString("en-US");
@@ -95,13 +97,13 @@
         btns.push(REPORT());
       }
     } else if (v.phase === "new" && v.outside) {
-      text = T("🧠 محادثة جديدة");
-      info = T("خارج المشاريع لكل محادثة ذاكرتها، فلا تختلط مواضيعك. لتكمل من محادثة سابقة اختر ذاكرتها.");
-      btns.push([T("📥 أدرج ذاكرة محادثة سابقة"), "insert"], [T("📤 انقل منها معلومات مختارة"), "share"]);
+      text = T("🧠 لا ذاكرة بعد");
+      info = T("لهذه المحادثة ذاكرتها الخاصة، فلا تختلط مواضيعك. لتكمل محادثة سابقة اختر ذاكرتها.");
+      btns.push([T("📥 أكمل من ذاكرة محادثة سابقة"), "insert"], [T("📤 انقل معلومات من ذاكرة سابقة"), "share"]);
     } else if (v.phase === "new") {
-      text = T("🧠 محادثة جديدة");
+      text = T("🧠 الذاكرة جاهزة");
       info = v.fsSt.inBrowser ? T`الذاكرة: <bdi>${esc(v.fsSt.folder)}</bdi>` : T`المجلد: <bdi>${esc(v.fsSt.folder)}</bdi>`;
-      btns.push([T("📥 أدرج الذاكرة في الرسالة"), "insert"], SHARE());
+      btns.push([T("📥 ضع الذاكرة في خانة الكتابة"), "insert"], SHARE());
     } else if (v.phase === "chat") {
       const since = Math.max(0, v.userCount - s.summarizedUpTo),
         manual = settings.mode === "manual";
@@ -138,8 +140,10 @@
         cls = "err";
         text = T`🧠 ⚠️ ${prog} · تعثّر الحفظ`;
         info =
-          T`تعثّر الحفظ: ${esc(s.error)}` +
-          (s.attempts >= maxAttempts ? T(" (توقف التلقائي بعد 3 محاولات؛ استخدم الزر)") : T(" (يعيد المحاولة بعد رسالتك القادمة)"));
+          T`لم يُحفظ الملخص هذه المرة: ${esc(String(s.error || "").replace(/\.\s*$/, ""))}.` +
+          (s.attempts >= maxAttempts
+            ? T("<br>توقفتُ عن المحاولة التلقائية بعد 3 محاولات. اضغط «لخّص واحفظ الآن» حين تريد.")
+            : T("<br>سأحاول مجدداً بعد رسالتك القادمة، أو اضغط «لخّص واحفظ الآن»."));
       }
       // three outcomes, never confused: 📝 the full text is saved (summary later) · ✓ the summary was updated · ⚠️ failed
       else if (s.rawAt && s.rawAt > (s.lastSave || 0)) {
@@ -160,25 +164,26 @@
       if (!v.unreadable) {
         const left = Math.max(0, settings.every - since);
         info +=
-          T`<br><span class="muted">${manual ? T("الوضع اليدوي: لا يُطلب ملخص إلا بالزر.") : `${left ? T`التلخيص القادم بعد ${n(left, "msg")}.` : T("التلخيص مستحق.")}`} النص الكامل يُحفظ بعد كل رد.` +
+          T`<br><span class="muted">${manual ? T("الوضع اليدوي: لا يُطلب ملخص إلا بالزر.") : `${left ? T`التلخيص القادم بعد ${n(left, "msgGen")}.` : T("حان وقت التلخيص.")}`} النص الكامل يُحفظ بعد كل رد.` +
           `${!manual && settings.paused ? T(" (التلخيص التلقائي متوقف)") : ""}${v.noComposer ? T(" لا أجد خانة الكتابة.") : ""}</span>`;
-        if (v.userCount > s.summarizedUpTo && !s.pending) btns.push([T("💾 لخّص واحفظ الآن"), "summarize"]);
+        if (v.userCount > s.summarizedUpTo && !s.pending)
+          btns[s.status === "error" ? "unshift" : "push"]([T("💾 لخّص واحفظ الآن"), "summarize"]);
         if (settings.mode === "auto")
           btns.push([settings.paused ? T("▶️ تشغيل التلخيص التلقائي") : T("⏸️ إيقاف التلخيص التلقائي"), "pause", "sec"]);
       }
       if (v.src === "data" && !v.unreadable) tech += `${tech ? "<br>" : ""}<span class="muted">${VIA_DATA()}</span>`;
-      btns.push([T("📥 أدرج الذاكرة في الرسالة"), "insert"], SHARE());
+      btns.push([T("📥 ضع الذاكرة في خانة الكتابة"), "insert"], SHARE());
       if (v.unreadable || v.src === "data") btns.push([...REPORT(), "sec"]);
       btns.push([T("🕘 سجل التغييرات"), "history", "sec"]);
-      btns.push([T("↩️ تراجع عن آخر تغيير في الذاكرة"), "undo", "sec"]);
-      btns.push([T("⛓️ فك ربط المحادثة بالمشروع"), "unlink", "sec"]);
+      btns.push([T("↩️ تراجع عن آخر تغيير"), "undo", "sec"]);
+      btns.push([T("⏹️ أوقف حفظ هذه المحادثة"), "unlink", "sec"]);
     }
     // decisions saved without evidence in the conversation wait for the user: said once, with one button
     const rv = (v.phase === "chat" || v.phase === "new") && v.review ? v.review.length : 0;
     if (rv) {
       text += ` · 🔎${rv}`;
       info += `<br><span class="muted">${rv === 1 ? T("🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.") : rv === 2 ? T("🔎 عندي سؤالان قبل أن أعتمد شيئاً باسمك.") : rv <= 10 ? T`🔎 عندي ${rv} أسئلة قبل أن أعتمد شيئاً باسمك.` : T`🔎 عندي ${rv} سؤالاً قبل أن أعتمد شيئاً باسمك.`}</span>`;
-      btns.unshift(REVIEW(rv));
+      btns.splice(btns[0] && btns[0][1] === "summarize" && s.status === "error" ? 1 : 0, 0, REVIEW(rv));
     }
     if (tech) info += `<details class="tech"><summary>${T("التفاصيل")}</summary>${tech}</details>`;
     if (v.crash) {
@@ -225,7 +230,10 @@
       if (pinDraft || share) return; // don't redraw over the pin form or the share panel
       const d = describe(last.view, last.settings, opts.why, opts.maxAttempts);
       pill.className = "pill " + d.cls;
-      pill.textContent = d.text;
+      pill.innerHTML = d.text
+        .split(" · ")
+        .map((x) => `<bdi>${esc(x)}</bdi>`)
+        .join(" · ");
       pill.setAttribute("aria-expanded", String(panel.classList.contains("open")));
       const b = ([t, a]) => `<button type="button" data-a="${a}">${t}</button>`;
       const main = d.btns.filter((x) => x[2] !== "sec"),
@@ -271,18 +279,19 @@
     }
     // what waits for review: each with the words it came from and why it was not trusted; approve or reject one at a time
     // each item a plain question: what I understood, your words, and two answers
-    const RV = {
-      decision: [T("فهمتُ أنك قررت:"), T("✓ نعم، هذا قراري"), T("✕ لا، احذفه")],
+    const RV = () => ({
+      decision: [T("فهمتُ أنك قررت:"), T("✓ نعم، هذا قراري"), T("✕ لا، لم أقرره")],
       recheck: [T("عدّلتَ رسالتك. هل ما زال هذا صحيحاً؟"), T("✓ ما زال صحيحاً"), T("✕ ألغِه")],
       revoke: [T("فهمتُ أنك تريد إلغاء:"), T("✓ نعم، ألغِه"), T("✕ لا، أبقِه")],
       "constraint-add": [T("فهمتُ أنك تريد هذا دائماً:"), T("✓ نعم، احفظه"), T("✕ لا")],
       "constraint-remove": [T("فهمتُ أنك لم تعد تريد:"), T("✓ نعم، احذفه"), T("✕ لا، أبقِه")],
-    };
+    });
     function openReview(list) {
       render();
       share = { review: true };
+      const rvt = RV();
       const item = (d) => {
-        const k = RV[d.kind] || RV.decision;
+        const k = rvt[d.kind] || rvt.decision;
         return (
           `<div class="rv"><p><span class="muted">${k[0]}</span><br><b>${esc(d.text)}</b>` +
           `${d.quote ? T`<br><span class="muted">كلامك${d.msg ? T` (رسالتك ${esc(String(d.msg))})` : ""}: ${q(d.quote)}</span>` : ""}` +
@@ -291,9 +300,9 @@
         );
       };
       panel.innerHTML =
-        T`<p><b>🔎 هل هذا ما قصدته؟</b><br><span class="muted">لا أحفظ شيئاً باسمك قبل أن أتأكد منه من كلامك. هذه لم أتأكد منها، فأسألك.</span></p>` +
+        T`<p><b>🔎 هل هذا ما قصدته؟</b><br><span class="muted">لا أحفظ شيئاً باسمك إلا بعد تأكيدك.</span></p>` +
         list.map(item).join("") +
-        T`<button type="button" data-a="pin-cancel">إغلاق</button>`;
+        T`<button type="button" class="link" data-a="pin-cancel">إغلاق</button>`;
       panel.classList.add("open", "wide");
     }
     // which saved memory to bring into a new chat outside any project (each such chat has its own)
@@ -321,9 +330,9 @@
         `<label class="opt"><input type="checkbox" data-k="${kind}" data-v="${esc(val)}"><span>${label}${tag ? ` <span class="tag">${tag}</span>` : ""}</span></label>`;
       const act = m.decisions.filter((d) => d.status === "active");
       const cut = (t, n = 90) => esc(t.length > n ? t.slice(0, n) + "…" : t);
-      let h = T`<p><b>📤 انقل معلومات مختارة</b><br><span class="muted">اختر ما تريد، وراجع المعاينة، ثم تُدرج في خانة الرسالة دون إرسال.</span></p>`;
+      let h = T`<p><b>📤 انقل معلومات مختارة</b><br><span class="muted">اختر ما تريد وراجع المعاينة، ثم يوضع في خانة الكتابة دون إرسال.</span></p>`;
       if (o.relevant)
-        h += `<input type="search" class="find" data-a="share-find" placeholder="${esc(T("عمّ ستتكلم؟ اكتب كلمات المهمة فأختار لك ما يخصها"))}" aria-label="${esc(T("اختيار ما يخص مهمة"))}">`;
+        h += `<input type="search" class="find" data-a="share-find" placeholder="${esc(T("عمّ هذه المحادثة؟ أقترح لك ما يخصها"))}" aria-label="${esc(T("اختيار ما يخص مهمة"))}">`;
       h +=
         opt("summary", "1", T("الخلاصة الحالية")) +
         (m.constraints.length ? opt("constraints", "1", T`القيود (${m.constraints.length})`) : "");
@@ -347,7 +356,7 @@
             .join("");
       h +=
         T`<h4>المعاينة</h4><div class="preview share-prev"></div><div class="count"></div>` +
-        T`<button type="button" data-a="share-insert">📥 أدرج في الرسالة</button><button type="button" data-a="pin-cancel">إلغاء</button>`;
+        T`<button type="button" class="primary" data-a="share-insert">📥 ضعه في خانة الكتابة</button><button type="button" data-a="pin-cancel">إلغاء</button>`;
       panel.innerHTML = h;
       panel.classList.add("open", "wide");
       update();
