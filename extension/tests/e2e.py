@@ -739,7 +739,7 @@ with sync_playwright() as pw:
     rv = wait(lambda: (lambda t: t if "كلامك" in t else None)(p.locator("#cm-memory-indicator .panel").inner_text()), 8) or p.locator("#cm-memory-indicator .panel").inner_text()
     ok("اعتماد اللون الأزرق الداكن" in rv and "اعتمدنا اللون الأزرق الداكن" in rv, "the review panel shows the decision and the words it was saved from", rv[:300])
     p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").first.click()
-    ok(wait(lambda: p.locator("#cm-memory-indicator .panel").inner_text().count("فهمتُ أنك تريد هذا دائماً") == 1 and p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").count() == 1, 10), "the panel stays open with what is left (the constraint)", p.locator("#cm-memory-indicator .panel").inner_text()[:300])
+    ok(wait(lambda: p.locator("#cm-memory-indicator .panel").inner_text().count("فهمتُ أن هذا شرط ثابت تريده") == 1 and p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").count() == 1, 10), "the panel stays open with what is left (the constraint)", p.locator("#cm-memory-indicator .panel").inner_text()[:300])
     p.locator("#cm-memory-indicator .panel button[data-a=rv-revoke]").first.click()
     ja = wait(lambda: (lambda j: j if j and not j["decisions"][0].get("unverified") else None)(mem(proj)), 10) or mem(proj) or {}
     ok(ja.get("decisions") and ja["decisions"][0]["source"] == "user" and not ja["decisions"][0].get("unverified"), "approving it makes it what it claimed to be (your decision), and the mark goes", ja.get("decisions"))
