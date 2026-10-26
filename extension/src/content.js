@@ -123,12 +123,8 @@
       !(st.topicOk && !st.summarizedUpTo) &&
       !(B.scope.startsWith(`${P}-c-`) && folder.v && folder.v.inBrowser)
     );
-  const reviewNote = (r) => {
-    const k = (r.unverified ? r.unverified.length : 0) + (r.pending ? r.pending.length : 0);
-    return k
-      ? T`🔎 ${k === 1 ? T("شيء واحد لم يثبت") : k === 2 ? T("شيئان لم يثبتا") : k + T(" أشياء لم تثبت")} من كلامك في المحادثة، فلم يُعتمد وينتظر مراجعتك من «راجع القرارات».`
-      : "";
-  };
+  // what waits for review is said once, by the panel's own «🔎» line (it stays until answered): no second note here
+  const reviewNote = () => "";
   const saved = (st, w, note, replyLen) => (
     saves++,
     Object.assign(
@@ -532,6 +528,11 @@
             )
           ) {
             await CP.send(A, c2);
+            // the first time ever: say what that message in your name is
+            if (!(await B.get("seenFirstRequest", false))) {
+              await B.set("seenFirstRequest", true);
+              ui.toast(T("🧠 أرسلتُ باسمك طلب حفظ الذاكرة؛ سيرد النموذج بملخص أحفظه وحدي. لا تحتاج أن تفعل شيئاً."), 9000);
+            }
             Object.assign(st, {
               pending: {
                 batch,
@@ -669,8 +670,8 @@
       location.reload();
       return;
     }
-    if (a === "options") {
-      B.call({ cmd: "openOptions" });
+    if (a === "options" || a === "history") {
+      B.call({ cmd: "openOptions", tab: a === "history" ? "history" : "", scope: B.scope });
       return;
     }
     if (a === "share") {

@@ -133,6 +133,11 @@ async function loadScopes() {
     sel.append(o);
   }
   if (keep && list.some((x) => x.scope === keep)) sel.value = keep;
+  const want = decodeURIComponent((location.hash.match(/^#history=([a-z0-9-]{1,80})$/) || [])[1] || "");
+  if (want && list.some((x) => x.scope === want) && sel.value !== want) {
+    sel.value = want;
+    sel.dispatchEvent(new Event("change"));
+  }
 }
 // what each chat holds in the shared memory, and moving one chat's part to its own memory
 async function showSplit(from, li) {
@@ -402,13 +407,13 @@ async function loadHistory() {
       span = document.createElement("span"),
       b = document.createElement("button");
     span.textContent = `${e.at} · ${e.what}`;
-    span.title = `${e.id} — ${BY[e.by] || e.by}${e.why ? ": " + e.why : ""}`;
+    span.title = e.id;
     const why = document.createElement("small");
     why.className = "muted";
-    why.textContent = ` — ${BY[e.by] || e.by}${e.why ? ": " + e.why : ""}`;
+    why.textContent = ` — ${e.why || BY[e.by] || e.by}`; // the reason when there is one («summary of messages 1–5»), else what made it
     span.append(why);
     b.type = "button";
-    b.textContent = T("تراجع");
+    b.textContent = T("↩️ تراجع");
     b.dataset.ev = e.id;
     li.append(span, b);
     ol.append(li);

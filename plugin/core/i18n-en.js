@@ -9,11 +9,6 @@
     "لم يرد المزوّد خلال دقيقتين": "The provider didn't respond within two minutes",
     "تعذّر الاتصال بالمزوّد (هل منحت الإذن من الإعدادات؟)": "Couldn't connect to the provider (did you grant permission in Settings?)",
     "📌 ثبّت النص المحدد في ذاكرة المشروع": "📌 Pin the selected text in the project memory",
-    "شيء واحد لم يثبت": "One item couldn't be found",
-    "شيئان لم يثبتا": "Two items couldn't be found",
-    " أشياء لم تثبت": " items couldn't be found",
-    "🔎 {0} من كلامك في المحادثة، فلم يُعتمد وينتظر مراجعتك من «راجع القرارات».":
-      "🔎 {0} in your words in the chat; not approved, waiting for your review via “Review decisions”.",
     "تغيّر نص الصفحة مراراً؛ أُوقفت إعادة التلخيص التلقائية لهذه المحادثة نصف ساعة.":
       "The page text kept changing; automatic re-summarizing is paused for this chat for half an hour.",
     "عُدّلت رسالتك رقم {0}؛ سيُعاد تلخيص المحادثة من عندها.":
@@ -287,7 +282,6 @@
     "✓ آخر تحديث للملخص {0} — الرسائل حتى {1}.": "✓ Summary last updated {0} — messages up to {1}.",
     "لم يُحدَّث الملخص بعد.": "The summary hasn't been updated yet.",
     "📝 النص الكامل محفوظ {0}.<br>{1}": "📝 Full text saved {0}.<br>{1}",
-    " · {0} توكن": " · {0} tokens",
     "✓ حُدّث الملخص {0} — الرسائل حتى {1}.": "✓ Summary updated {0} — messages up to {1}.",
     "لم يُحفظ ملخص بعد.": "No summary saved yet.",
     "؛ في هذه المحادثة {0} تلخيصات ≈ {1} توكن": "; in this chat {0} summaries ≈ {1} tokens",
@@ -310,14 +304,6 @@
     "⏸️ إيقاف التلخيص التلقائي": "⏸️ Turn off auto-summarize",
     "↩️ تراجع عن آخر تغيير في الذاكرة": "↩️ Undo the last change to the memory",
     "⛓️ فك ربط المحادثة بالمشروع": "⛓️ Unlink chat from project",
-    "قرار ينتظر": "decision waiting",
-    "قراران ينتظران": "two decisions waiting",
-    " تنتظر": " waiting",
-    دليله: "its evidence",
-    دليلهما: "their evidence",
-    دليلها: "its evidence",
-    '<br><span class="muted">🔎 {0} مراجعتك: لم أجد {1} في كلامك، فحُفظ اقتراحاً.</span>':
-      '<br><span class="muted">🔎 {0} for your review: I couldn\'t find {1} in what you wrote, so it was saved as a suggestion.</span>',
     "خطأ داخلي: ": "Internal error: ",
     '<style>{0}</style><button class="pill idle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cm-panel">🧠 …</button><div class="panel" id="cm-panel" role="dialog" aria-label="ذاكرة المحادثة"></div><div class="toast" role="status" aria-live="polite"></div>':
       '<style>{0}</style><button class="pill idle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cm-panel">🧠 …</button><div class="panel" id="cm-panel" role="dialog" aria-label="Conversation Memory"></div><div class="toast" role="status" aria-live="polite"></div>',
@@ -328,22 +314,8 @@
     '<button type="button" data-a="pin-save">حفظ</button><button type="button" data-a="pin-cancel">إلغاء</button>':
       '<button type="button" data-a="pin-save">Save</button><button type="button" data-a="pin-cancel">Cancel</button>',
     "اسم غير صالح: حتى 60 حرفاً، بلا / أو : أو رموز.": "Invalid name: up to 60 characters, no / or : or symbols.",
-    "قرار نُسب إليك": "A decision attributed to you",
-    "✓ اعتمده قراراً": "✓ Approve as a decision",
     "✕ ألغِه": "✕ Discard it",
-    "اقتُرح إلغاء قرارك": "Revoking your decision was suggested",
-    "✓ ألغِه": "✓ Revoke it",
-    "✕ أبقِه": "✕ Keep it",
-    "اقتُرح قيد جديد": "A new constraint was suggested",
-    "✓ أضفه": "✓ Add it",
-    "✕ لا تضفه": "✕ Don't add it",
-    "اقتُرح حذف قيد": "Deleting a constraint was suggested",
-    "✓ احذفه": "✓ Delete it",
     " (رسالتك {0})": " (your message {0})",
-    '<br><span class="muted">الاقتباس{0}: {1}</span>': '<br><span class="muted">Quote{0}: {1}</span>',
-    '<br><span class="muted">بلا اقتباس</span>': '<br><span class="muted">No quote</span>',
-    '<p><b>🔎 تنتظر مراجعتك</b><br><span class="muted">كتبها النموذج ولم أجد كلامك الذي يثبتها، أو قد يعاكس معناها كلامك، فلم تُطبَّق. وافق على الصحيح وارفض الخطأ.</span></p>':
-      "<p><b>🔎 Waiting for your review</b><br><span class=\"muted\">The model wrote these and I couldn't find your words backing them up, or your words may contradict them, so they weren't applied. Approve the correct ones and reject the wrong ones.</span></p>",
     '<button type="button" data-a="pin-cancel">إغلاق</button>': '<button type="button" data-a="pin-cancel">Close</button>',
     '<p><b>📚 من أي ذاكرة؟</b><br><span class="muted">اختر ذاكرة المحادثة أو المشروع الذي تكمل منه.</span></p>':
       '<p><b>📚 Which memory?</b><br><span class="muted">Pick the chat or project memory you\'re continuing from.</span></p>',
@@ -828,8 +800,6 @@
     المشروع: "Project",
     "📌 النصوص المعتمدة": "📌 Pinned texts",
     "↩️ النسخ السابقة": "↩️ Previous versions",
-    "كل تعديل نسخة جديدة، ولا تُحذف السابقة. التثبيت: حدّد نصاً في المحادثة ثم «📌 ثبّت النص المحدد» من قائمة الزر الأيمن.":
-      "Every edit is a new version, and earlier ones are never deleted. To pin: select text in the chat, then choose “📌 Pin selected text” from the right-click menu.",
     "آخر 20 نسخة، مشتركة مع بلقن Claude Code. الاسترجاع يحفظ الحالية أولاً فيمكن التراجع عنه.":
       "Last 20 versions, shared with the Claude Code plugin. Restoring saves the current one first, so you can undo it.",
     "طريقة الاستخدام": "How to use",
@@ -919,7 +889,6 @@
       "A decision built on what you edited is no longer backed by your words; review it from “🔎 Review decisions”.",
     "و{0} بُنيت على ما عدّلته لم يعد كلامك يثبتها؛ راجعها من «🔎 راجع القرارات».":
       "{0} built on what you edited are no longer backed by your words; review them from “🔎 Review decisions”.",
-    "قرار عدّلتَ رسالته": "A decision whose message you edited",
     "✓ ما زال صحيحاً": "✓ Still holds",
     "عدّلتَ رسالتك رقم {0}: {1}": "You edited your message {0}: {1}",
     "قرار عُدّلت رسالته فيحتاج نظرة جديدة": "decision whose message was edited, needs a new look",
@@ -982,6 +951,33 @@
     "لم أتعرّف على هذه المحادثة كاملة؛ افتحها مرة في الموقع ثم أعد المحاولة":
       "I couldn’t identify this chat fully; open it once on the site, then try again",
     "حُذف القرار {0}: {1}": "Decision {0} removed: {1}",
+    "🧠 أرسلتُ باسمك طلب حفظ الذاكرة؛ سيرد النموذج بملخص أحفظه وحدي. لا تحتاج أن تفعل شيئاً.":
+      "🧠 I sent a request to save the memory in your name; the model will reply with a summary that I save myself. You don’t need to do anything.",
+    "🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.": "🔎 I have one question before I record anything as yours.",
+    "🔎 عندي {0} أسئلة قبل أن أعتمد شيئاً باسمك.": "🔎 I have {0} questions before I record anything as yours.",
+    "فهمتُ أنك قررت:": "I understood that you decided:",
+    "✓ نعم، هذا قراري": "✓ Yes, that’s my decision",
+    "✕ لا، احذفه": "✕ No, delete it",
+    "عدّلتَ رسالتك. هل ما زال هذا صحيحاً؟": "You edited your message. Is this still right?",
+    "فهمتُ أنك تريد إلغاء:": "I understood that you want to cancel:",
+    "✓ نعم، ألغِه": "✓ Yes, cancel it",
+    "✕ لا، أبقِه": "✕ No, keep it",
+    "فهمتُ أنك تريد هذا دائماً:": "I understood that you always want this:",
+    "✓ نعم، احفظه": "✓ Yes, keep it",
+    "✕ لا": "✕ No",
+    "فهمتُ أنك لم تعد تريد:": "I understood that you no longer want:",
+    "✓ نعم، احذفه": "✓ Yes, remove it",
+    '<br><span class="muted">كلامك{0}: {1}</span>': '<br><span class="muted">Your words{0}: {1}</span>',
+    '<br><span class="muted small">لماذا أسأل: {0}</span>': '<br><span class="muted small">Why I ask: {0}</span>',
+    '<p><b>🔎 هل هذا ما قصدته؟</b><br><span class="muted">لا أحفظ شيئاً باسمك قبل أن أتأكد منه من كلامك. هذه لم أتأكد منها، فأسألك.</span></p>':
+      '<p><b>🔎 Is this what you meant?</b><br><span class="muted">I don’t record anything as yours before I confirm it from your words. I couldn’t confirm these, so I’m asking.</span></p>',
+    "ستظهر في المحادثة رسالة باسمك تبدأ بـ «🧠 ذاكرة المحادثة:» ثم رد بالملخص: هذا طلب الحفظ، لا تحتاج أن تفعل شيئاً. ولا يظهر أبداً وأنت تكتب.":
+      "A message in your name starting with “🧠 Conversation memory:” will appear in the chat, then a reply with the summary: that is the save request; you don’t need to do anything. It never appears while you are typing.",
+    "🧠 ذاكرتك": "🧠 Your memory",
+    "كل تعديل نسخة جديدة، ولا تُحذف السابقة.": "Every edit is a new version; earlier ones are never deleted.",
+    "عند تفعيله يطلب المتصفح إذنك بموقع Gemini وحده، ولا يمس أي موقع آخر.":
+      "When you turn it on, the browser asks your permission for the Gemini site only; no other site is touched.",
+    "↩️ تراجع": "↩️ Undo",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

@@ -148,7 +148,22 @@ function htmlKeys(html) {
 }
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "wrap") for (const f of args) wrap(path.resolve(f));
-else if (cmd === "keys") {
+else if (cmd === "prune") {
+  // drop catalog entries no code uses any more (the file is rewritten whole, keys in their order)
+  const k = keys(),
+    f = path.join(ROOT, "core/i18n-en.js"),
+    src = fs.readFileSync(f, "utf8"),
+    en = require(f),
+    drop = new Set(k.unused);
+  const body = Object.entries(en)
+    .filter(([key]) => !drop.has(key))
+    .map(([key, v]) => `    ${JSON.stringify(key)}: ${JSON.stringify(v)},`)
+    .join("\n");
+  const start = src.indexOf("{", src.indexOf("const EN")),
+    end = src.indexOf("\n  };", start);
+  fs.writeFileSync(f, src.slice(0, start + 1) + "\n" + body + src.slice(end));
+  console.log(`removed ${drop.size}`);
+} else if (cmd === "keys") {
   const k = keys();
   console.log(`used ${k.used.length} · missing ${k.missing.length} · unused ${k.unused.length}`);
   if (args[0] === "--missing") console.log(JSON.stringify(k.missing, null, 1));

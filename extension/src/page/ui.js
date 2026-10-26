@@ -18,6 +18,7 @@
     .panel input{box-sizing:border-box;width:100%;font:inherit;padding:6px 8px;border:1px solid #d0d7de;border-radius:6px;margin:4px 0}
     .preview{max-height:90px;overflow:auto;white-space:pre-wrap;background:#f6f8fa;border-radius:6px;padding:6px;font-size:12px;margin:0 0 6px}
     .panel.wide{width:340px;max-height:72vh;overflow:auto}
+    .panel .small{font-size:11px}
     .panel .sec{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:6px;padding-top:6px;border-top:1px solid #eaeef2}
     .panel .sec button{width:auto;background:none;border:none;padding:2px 0;margin:0;color:#57606a;font-size:11.5px;text-decoration:underline;cursor:pointer}
     .panel details.tech{margin-top:4px}.panel details.tech summary{cursor:pointer;color:#57606a;font-size:11.5px}
@@ -36,8 +37,6 @@
   // a name keeps its own direction inside the text (English names in Arabic, Arabic names in English)
   const q = (t) => (en() ? `“<bdi>${esc(t)}</bdi>”` : `«<bdi>${esc(t)}</bdi>»`);
   const n = (k, w) => root.MemoryCore.count(k, root.MemoryCore.W[w]); // Arabic counting forms
-  // "≈665" keeps its sign before the number inside Arabic text (isolated left-to-right run)
-  const approx = (n) => `\u2066≈${fmt(n)}\u2069`;
   const tokens = (chars) => root.MemoryCore.estTokens(chars); // the shared core's estimate (≈ 3 characters per token)
   const hhmm = (t) => (t ? new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 
@@ -52,7 +51,8 @@
     const s = v.st || {};
     let cls = "idle",
       text = T("🧠 الذاكرة"),
-      info = "";
+      info = "",
+      tech = ""; // what only a curious or technical reader needs, shown last behind «Details»
     const btns = [];
     if (v.fsSt && v.fsSt.error === "inactive") {
       cls = "warn";
@@ -115,7 +115,17 @@
         cls = "warn";
         text = T`🧠 ❓ موضوع آخر؟`;
         info = T`يبدو أن هذه المحادثة عن موضوع آخر غير ذاكرة ${q(v.fsSt.folder)}، فلم يُلخَّص شيء فيها حتى لا تختلط. هل تخصّها؟`;
-        btns.push([T("🔗 نعم، تخصّها: لخّصها فيها"), "topic-yes"], [T("✂️ لا، افصلها عن هذه الذاكرة"), "topic-no"]);
+        // one question at a time: only its two answers
+        return {
+          cls,
+          text,
+          info,
+          btns: [
+            [T("🔗 نعم، تخصّها: لخّصها فيها"), "topic-yes"],
+            [T("✂️ لا، افصلها عن هذه الذاكرة"), "topic-no"],
+            [T("⚙️ الإعدادات"), "options", "sec"],
+          ],
+        };
       } else if (s.pending) {
         cls = "busy";
         text = T`🧠 ⏳ ${prog} · يحفظ`;
@@ -138,11 +148,10 @@
         info = T`📝 النص الكامل محفوظ ${hhmm(s.rawAt)}.<br>${s.lastSave ? T`✓ آخر تحديث للملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : T("لم يُحدَّث الملخص بعد.")}`;
       } else {
         cls = s.lastSave ? "ok" : "idle";
-        text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "") + (s.lastSave && cost ? T` · ${approx(cost)} توكن` : "");
+        text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "");
         info = s.lastSave ? T`✓ حُدّث الملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : T("لم يُحفظ ملخص بعد.");
       }
-      // what only a curious or technical reader needs (cost, where the text was read from) waits behind «Details»
-      let tech = "";
+      // cost and where the text was read from: behind «Details», at the end
       if (s.lastCost && !v.unreadable)
         tech += T`<span class="muted">كلفة آخر تلخيص: الطلب ${fmt(s.lastCost.req)} حرفاً والرد ${fmt(s.lastCost.rep)} ≈ ${fmt(cost)} توكن${s.costTotal && s.costTotal.n > 1 ? T`؛ في هذه المحادثة ${s.costTotal.n} تلخيصات ≈ ${fmt(tokens(s.costTotal.chars))} توكن` : ""} (تقدير). ${v.byok ? T("يُحتسب على مفتاحك، لا على رسائلك في الموقع.") : T("ويبقى الطلب ورده في سياق المحادثة.")}</span>`;
       if (s.note && !v.unreadable) info += `<br><span class="muted">${esc(s.note)}</span>`;
@@ -158,9 +167,9 @@
           btns.push([settings.paused ? T("▶️ تشغيل التلخيص التلقائي") : T("⏸️ إيقاف التلخيص التلقائي"), "pause", "sec"]);
       }
       if (v.src === "data" && !v.unreadable) tech += `${tech ? "<br>" : ""}<span class="muted">${VIA_DATA()}</span>`;
-      if (tech) info += `<details class="tech"><summary>${T("التفاصيل")}</summary>${tech}</details>`;
       btns.push([T("📥 أدرج الذاكرة في الرسالة"), "insert"], SHARE());
       if (v.unreadable || v.src === "data") btns.push([...REPORT(), "sec"]);
+      btns.push([T("🕘 سجل التغييرات"), "history", "sec"]);
       btns.push([T("↩️ تراجع عن آخر تغيير في الذاكرة"), "undo", "sec"]);
       btns.push([T("⛓️ فك ربط المحادثة بالمشروع"), "unlink", "sec"]);
     }
@@ -168,9 +177,10 @@
     const rv = (v.phase === "chat" || v.phase === "new") && v.review ? v.review.length : 0;
     if (rv) {
       text += ` · 🔎${rv}`;
-      info += T`<br><span class="muted">🔎 ${rv === 1 ? T("قرار ينتظر") : rv === 2 ? T("قراران ينتظران") : n(rv, "decision") + T(" تنتظر")} مراجعتك: لم أجد ${rv === 1 ? T("دليله") : rv === 2 ? T("دليلهما") : T("دليلها")} في كلامك، فحُفظ اقتراحاً.</span>`;
+      info += `<br><span class="muted">${rv === 1 ? T("🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.") : T`🔎 عندي ${rv} أسئلة قبل أن أعتمد شيئاً باسمك.`}</span>`;
       btns.unshift(REVIEW(rv));
     }
+    if (tech) info += `<details class="tech"><summary>${T("التفاصيل")}</summary>${tech}</details>`;
     if (v.crash) {
       cls = "err";
       info = T("خطأ داخلي: ") + esc(v.crash);
@@ -196,11 +206,11 @@
       share = null,
       last = { view: {}, settings: {} };
 
-    function toast(msg) {
+    function toast(msg, ms) {
       toastEl.textContent = msg;
       toastEl.style.display = "block";
       clearTimeout(toast.t);
-      toast.t = setTimeout(() => (toastEl.style.display = "none"), 6000);
+      toast.t = setTimeout(() => (toastEl.style.display = "none"), ms || 6000);
     }
     function render(view, settings) {
       if (view) last = { view, settings };
@@ -260,12 +270,13 @@
       opts.onPinSave(name, text);
     }
     // what waits for review: each with the words it came from and why it was not trusted; approve or reject one at a time
+    // each item a plain question: what I understood, your words, and two answers
     const RV = {
-      decision: [T("قرار نُسب إليك"), T("✓ اعتمده قراراً"), T("✕ ألغِه")],
-      recheck: [T("قرار عدّلتَ رسالته"), T("✓ ما زال صحيحاً"), T("✕ ألغِه")],
-      revoke: [T("اقتُرح إلغاء قرارك"), T("✓ ألغِه"), T("✕ أبقِه")],
-      "constraint-add": [T("اقتُرح قيد جديد"), T("✓ أضفه"), T("✕ لا تضفه")],
-      "constraint-remove": [T("اقتُرح حذف قيد"), T("✓ احذفه"), T("✕ أبقِه")],
+      decision: [T("فهمتُ أنك قررت:"), T("✓ نعم، هذا قراري"), T("✕ لا، احذفه")],
+      recheck: [T("عدّلتَ رسالتك. هل ما زال هذا صحيحاً؟"), T("✓ ما زال صحيحاً"), T("✕ ألغِه")],
+      revoke: [T("فهمتُ أنك تريد إلغاء:"), T("✓ نعم، ألغِه"), T("✕ لا، أبقِه")],
+      "constraint-add": [T("فهمتُ أنك تريد هذا دائماً:"), T("✓ نعم، احفظه"), T("✕ لا")],
+      "constraint-remove": [T("فهمتُ أنك لم تعد تريد:"), T("✓ نعم، احذفه"), T("✕ لا، أبقِه")],
     };
     function openReview(list) {
       render();
@@ -273,13 +284,14 @@
       const item = (d) => {
         const k = RV[d.kind] || RV.decision;
         return (
-          `<div class="rv"><p><span class="muted">${k[0]}${d.reason ? ` — ${esc(d.reason)}` : ""}</span><br>${d.kind === "decision" || d.kind === "revoke" || d.kind === "recheck" ? `<b><bdi>${esc(d.key.replace(/^[xr]-/, ""))}</bdi></b> ` : ""}${esc(d.text)}` +
-          `${d.quote ? T`<br><span class="muted">الاقتباس${d.msg ? T` (رسالتك ${esc(String(d.msg))})` : ""}: ${q(d.quote)}</span>` : T`<br><span class="muted">بلا اقتباس</span>`}</p>` +
+          `<div class="rv"><p><span class="muted">${k[0]}</span><br><b>${esc(d.text)}</b>` +
+          `${d.quote ? T`<br><span class="muted">كلامك${d.msg ? T` (رسالتك ${esc(String(d.msg))})` : ""}: ${q(d.quote)}</span>` : ""}` +
+          `${d.reason ? T`<br><span class="muted small">لماذا أسأل: ${esc(d.reason)}</span>` : ""}</p>` +
           `<button type="button" data-a="rv-approve" data-id="${esc(d.key)}">${k[1]}</button><button type="button" data-a="rv-revoke" data-id="${esc(d.key)}">${k[2]}</button></div>`
         );
       };
       panel.innerHTML =
-        T`<p><b>🔎 تنتظر مراجعتك</b><br><span class="muted">كتبها النموذج ولم أجد كلامك الذي يثبتها، أو قد يعاكس معناها كلامك، فلم تُطبَّق. وافق على الصحيح وارفض الخطأ.</span></p>` +
+        T`<p><b>🔎 هل هذا ما قصدته؟</b><br><span class="muted">لا أحفظ شيئاً باسمك قبل أن أتأكد منه من كلامك. هذه لم أتأكد منها، فأسألك.</span></p>` +
         list.map(item).join("") +
         T`<button type="button" data-a="pin-cancel">إغلاق</button>`;
       panel.classList.add("open", "wide");
@@ -318,9 +330,7 @@
       if (act.length)
         h +=
           T`<h4>القرارات</h4>` +
-          act
-            .map((d) => opt("decisions", d.id, `${esc(d.id)} — ${cut(d.text)}`, d.source === "assistant" ? T("اقتراح لم يُعتمد") : ""))
-            .join("");
+          act.map((d) => opt("decisions", d.id, cut(d.text), d.source === "assistant" ? T("اقتراح لم يُعتمد") : "")).join("");
       if (m.pins.length) h += T`<h4>النصوص المعتمدة</h4>` + m.pins.map((p) => opt("pins", p.name, esc(p.name))).join("");
       const log = m.log.slice(-10).reverse();
       if (log.length)

@@ -283,7 +283,7 @@ with sync_playwright() as pw:
         ok(j.get("summary", {}).get("goal", "").startswith("هوية بصرية لمقهى") and j.get("constraints") == ["الميزانية 40 ألف ريال"], f"{name}: summary and constraints applied", j.get("summary"))
         ok("## القرارات السارية" in md and "**d1** اعتماد اللون الأزرق الداكن للمشروع" in md and "## السجل" in md and j.get("mdHash"), f"{name}: CONVERSATION_MEMORY.md rendered from the JSON", md[:300])
         ok(wait(lambda: "✓" in pill(p), 8), f"{name}: indicator shows ✓ with time after saving", pill(p))
-        ok(re.fullmatch(r"🧠 0/5 · ✓ \d\d:\d\d · \u2066?≈[\d,]+\u2069? توكن", pill(p)), f"{name}: indicator format «🧠 0/5 · ✓ HH:MM · ≈N توكن» (same as the plugin)", pill(p))
+        ok(re.fullmatch(r"🧠 0/5 · ✓ \d\d:\d\d", pill(p)), f"{name}: indicator format «🧠 0/5 · ✓ HH:MM» (the cost is under «Details», not on the badge)", pill(p))
         ok(re.search(r"كلفة آخر تلخيص: الطلب [\d,]+ حرفاً والرد [\d,]+ ≈ [\d,]+ توكن", panel_text(p)), f"{name}: the panel shows what the summary cost", panel_text(p))
         ok(len(requests(p)) == 1, f"{name}: exactly one summary request sent")
         raw = read(proj, rawf) or ""
@@ -488,7 +488,7 @@ with sync_playwright() as pw:
     ok(jr["decisions"][0].get("recheck") and jr["decisions"][0]["status"] == "active", "after you edit message 2, the decision is marked for a new look (still in force)", jr.get("decisions"))
     ok(wait(lambda: "🔎1" in pill(pk), 10) and "لم يعد كلامك يثبته" in panel_text(pk), "the indicator asks for review and says why", panel_text(pk)[:300])
     pk.locator("#cm-memory-indicator .pill").click(); pk.locator("#cm-memory-indicator .panel button[data-a=review]").click()
-    rv = wait(lambda: (lambda t: t if "عدّلتَ رسالته" in t else None)(pk.locator("#cm-memory-indicator .panel").inner_text()), 8) or ""
+    rv = wait(lambda: (lambda t: t if "عدّلتَ رسالتك" in t else None)(pk.locator("#cm-memory-indicator .panel").inner_text()), 8) or ""
     ok("ما زال صحيحاً" in rv and "عدّلتَ رسالتك رقم 2" in rv, "the review offers «still holds» or «cancel it», with the reason", rv[:300])
     pk.locator("#cm-memory-indicator .panel button[data-a=rv-revoke]").first.click()
     jr = wait(lambda: (lambda m: m if m and m["decisions"][0]["status"] == "revoked" else None)(mem(proj)), 10) or mem(proj) or {}
@@ -736,10 +736,10 @@ with sync_playwright() as pw:
     jc = mem(proj) or {}
     ok(jc.get("constraints") == [] and [x["text"] for x in (jc.get("pending") or {}).get("constraints", {}).get("add", [])] == ["الميزانية 40 ألف ريال"], "an unbacked constraint is not applied: it waits", jc.get("pending"))
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=review]").click()
-    rv = wait(lambda: (lambda t: t if "الاقتباس" in t else None)(p.locator("#cm-memory-indicator .panel").inner_text()), 8) or p.locator("#cm-memory-indicator .panel").inner_text()
+    rv = wait(lambda: (lambda t: t if "كلامك" in t else None)(p.locator("#cm-memory-indicator .panel").inner_text()), 8) or p.locator("#cm-memory-indicator .panel").inner_text()
     ok("اعتماد اللون الأزرق الداكن" in rv and "اعتمدنا اللون الأزرق الداكن" in rv, "the review panel shows the decision and the words it was saved from", rv[:300])
     p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").first.click()
-    ok(wait(lambda: p.locator("#cm-memory-indicator .panel").inner_text().count("اقتُرح قيد جديد") == 1 and p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").count() == 1, 10), "the panel stays open with what is left (the constraint)", p.locator("#cm-memory-indicator .panel").inner_text()[:300])
+    ok(wait(lambda: p.locator("#cm-memory-indicator .panel").inner_text().count("فهمتُ أنك تريد هذا دائماً") == 1 and p.locator("#cm-memory-indicator .panel button[data-a=rv-approve]").count() == 1, 10), "the panel stays open with what is left (the constraint)", p.locator("#cm-memory-indicator .panel").inner_text()[:300])
     p.locator("#cm-memory-indicator .panel button[data-a=rv-revoke]").first.click()
     ja = wait(lambda: (lambda j: j if j and not j["decisions"][0].get("unverified") else None)(mem(proj)), 10) or mem(proj) or {}
     ok(ja.get("decisions") and ja["decisions"][0]["source"] == "user" and not ja["decisions"][0].get("unverified"), "approving it makes it what it claimed to be (your decision), and the mark goes", ja.get("decisions"))

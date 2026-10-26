@@ -231,7 +231,12 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true;
   }
   if (msg.cmd === "openOptions") {
-    chrome.runtime.openOptionsPage();
+    // straight to the history when asked from the chat («🕘 History»)
+    if (msg.tab === "history")
+      chrome.tabs.create({
+        url: chrome.runtime.getURL("src/options.html#history" + (/^[a-z0-9-]{1,80}$/.test(String(msg.scope || "")) ? "=" + msg.scope : "")),
+      });
+    else chrome.runtime.openOptionsPage();
     reply({ ok: true });
     return;
   }
