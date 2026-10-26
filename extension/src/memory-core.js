@@ -69,7 +69,7 @@
   const SOURCES = ["user", "assistant-approved", "assistant"];
   // labels: translated where they are shown (T(SOURCE_LABEL[x])), so they follow the language of that moment
   const SOURCE_LABEL = { user: "المستخدم", "assistant-approved": "اقتراح اعتمده المستخدم", assistant: "اقتراح لم يُعتمد" }; // i18n-skip
-  const PLATFORMS = { "claude-code": "Claude Code", chatgpt: "ChatGPT", "claude-web": "Claude (الويب)" }; // i18n-skip
+  const PLATFORMS = { "claude-code": "Claude Code", chatgpt: "ChatGPT", "claude-web": "Claude (الويب)", gemini: "Gemini" }; // i18n-skip
 
   // ---------- small helpers ----------
   const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);

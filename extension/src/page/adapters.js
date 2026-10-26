@@ -44,8 +44,9 @@
     const h = location.hostname;
     if (h === "chatgpt.com" || h === "chat.openai.com") return "chatgpt";
     if (h === "claude.ai") return "claude";
+    if (h === "gemini.google.com") return "gemini";
     const t = document.documentElement.dataset.cmTestPlatform; // local test pages only; the real manifest never runs there
-    return (h === "127.0.0.1" || h === "localhost") && (t === "chatgpt" || t === "claude") ? t : null;
+    return (h === "127.0.0.1" || h === "localhost") && (t === "chatgpt" || t === "claude" || t === "gemini") ? t : null;
   }
 
   const ADAPTERS = {
@@ -155,6 +156,53 @@
         const id = a && (a.getAttribute("href").match(/^\/project\/([0-9a-f-]{8,64})/i) || [])[1];
         return id ? { key: "claude-" + id.toLowerCase(), name: (a.innerText || "").trim() } : null;
       },
+    },
+  };
+
+  // Gemini (experimental, turned on in the settings): its page is built of <user-query> and <model-response> elements, the
+  // composer is a rich-textarea editor. Chats live at /app/<id> (or /u/<n>/app/<id>); a Gem's chats at /gem/<gem>/<id>.
+  ADAPTERS.gemini = {
+    name: "Gemini",
+    platform: "gemini",
+    chatId: () => (location.pathname.match(/\/(?:app|gem\/[\w-]+)\/([0-9a-f]{8,})/i) || [])[1],
+    messages: () => {
+      const els = inOrder([...document.querySelectorAll("user-query, model-response")]);
+      return els.map((el) => {
+        const user = el.tagName.toLowerCase() === "user-query";
+        return {
+          role: user ? "user" : "assistant",
+          el,
+          text: user
+            ? partsText(el, [".query-text-line", ".query-text", "[data-test-id='query-text']"])
+            : partsText(el, ["message-content .markdown", "message-content", ".model-response-text", ".markdown"]),
+        };
+      });
+    },
+    generating: () =>
+      !!pick([
+        'button[aria-label*="Stop" i]',
+        'button[aria-label*="إيقاف"]',
+        ".send-button.stop",
+        "model-response:last-of-type [aria-busy='true']",
+      ]),
+    composer: () =>
+      pick([
+        "rich-textarea .ql-editor[contenteditable='true']",
+        "rich-textarea [contenteditable='true']",
+        ".ql-editor[contenteditable='true']",
+      ]),
+    sendButton: () =>
+      pick(['button[aria-label*="Send" i]', 'button[aria-label*="إرسال"]', "button.send-button", "button[data-test-id='send-button']"]),
+    title: () =>
+      document.title
+        .replace(/\s*[-|]\s*Gemini\s*$/i, "")
+        .replace(/^(Google )?Gemini$/i, "")
+        .trim(),
+    probes: ["user-query", "model-response", "message-content", ".query-text", "rich-textarea", ".ql-editor", "button.send-button"],
+    // a Gem: its chats share one memory, like a project
+    scope: () => {
+      const m = location.pathname.match(/\/gem\/([\w-]{3,64})/i);
+      return m ? { key: "gemini-gem-" + m[1].toLowerCase(), name: "" } : null;
     },
   };
 

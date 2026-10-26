@@ -30,12 +30,14 @@ def page(platform, path, title, pre=(), timeout=0, after="", variant="", thread_
     d = os.path.join(site, path.strip("/")); os.makedirs(d, exist_ok=True)
     cid = ("composer-2026" if variant else "prompt-textarea") if platform == "chatgpt" else "composer"
     def msg(role, text):
+        if platform == "gemini":
+            return f'<user-query><div class="query-text"><p class="query-text-line">{text}</p></div></user-query>' if role == "user" else f'<model-response><message-content><div class="markdown">{text}</div></message-content></model-response>'
         if platform == "chatgpt": return f'<div data-message-author-role="{role}">{text}</div>'
         return f'<div data-testid="user-message">{text}</div>' if role == "user" else f'<div data-is-streaming="false" class="font-claude-response">{text}</div>'
     thread = thread_html if thread_html is not None else "".join(msg("user", f"رسالة قديمة {i}") + msg("assistant", f"رد قديم {i}") for i in pre)
     to = (f' data-cm-test-timeout="{timeout}"' if timeout else "") + (f' data-cm-test-after-send="{after}"' if after else "") + (f' data-cm-test-variant="{variant}"' if variant else "")
     open(os.path.join(d, "index.html"), "w").write(f"""<!doctype html><html data-cm-test-platform="{platform}"{to}><head><meta charset="utf-8"><title>{title}</title></head>
-<body><main id="thread">{thread}</main><div id="{cid}" class="ProseMirror" contenteditable="true"></div><div id="bar"></div><script src="/mock.js"></script></body></html>""")
+<body><main id="thread">{thread}</main>{f'<rich-textarea><div id="{cid}" class="ql-editor" contenteditable="true"></div></rich-textarea>' if platform == "gemini" else f'<div id="{cid}" class="ProseMirror" contenteditable="true"></div>'}<div id="bar"></div><script src="/mock.js"></script></body></html>""")
     return path
 # a chat you start yourself: a new-chat page whose address becomes the chat's after the first message
 def new_chat(platform, chat_path, title, **kw):
@@ -841,6 +843,17 @@ with sync_playwright() as pw:
     ok(wait(lambda: "الموقع تغيّر" in pill(p), 25), "no readable messages and no readable data → «the site changed», memory safe", pill(p))
     ok("ذاكرتك المحفوظة سليمة" in panel_text(p), "…saying the saved memory is safe", panel_text(p))
     p.close()
+
+    print("— Gemini (experimental): the same memory on gemini.google.com —")
+    proj = "proj-gemini"; use_folder(proj)
+    pg = ctx.new_page(); pg.goto(BASE + new_chat("gemini", "/app/0123abcd4567/", "رحلة - Gemini"))
+    ok(wait(lambda: "🧠" in pill(pg) and "…" not in pill(pg), 10), "Gemini: the indicator appears", pill(pg))
+    for i in range(1, 6): say(pg, f"رسالة جيميني {i}")
+    jg = wait(lambda: (lambda m: m if m and m.get("log") else None)(mem(proj)), 20) or {}
+    ok(jg.get("log") and jg["log"][0]["platform"] == "gemini" and jg["log"][0]["range"] == "1–5", "Gemini: summarized every 5 messages into the memory, marked as Gemini", jg.get("log"))
+    rawg = wait(lambda: read(proj, ".conversation-memory/chats/gemini-0123abcd4567.md"), 10) or ""
+    ok("رسالة جيميني 3" in rawg and "🧠 ذاكرة المحادثة" not in rawg, "Gemini: the full text is saved, without the housekeeping exchange", rawg[-200:])
+    pg.close()
 
     print("— the writer checks where a summary goes, whatever the page says —")
     FS = "a => chrome.runtime.sendMessage({cmd: 'fs', op: a[0], args: a[1]})"

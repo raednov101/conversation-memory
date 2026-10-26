@@ -409,7 +409,7 @@ const ops = {
   // the shared memory of earlier versions, by chat: what would move (a preview), then the move itself (both memories are
   // normal, backed-up writes, so «undo» in either brings it back)
   async splitPlan({ from }) {
-    if (!/^(chatgpt|claude)?-?general$/.test(String(from))) return { ok: false, error: T("ليست ذاكرة مشتركة من إصدار سابق") };
+    if (!/^(chatgpt|claude|gemini)?-?general$/.test(String(from))) return { ok: false, error: T("ليست ذاكرة مشتركة من إصدار سابق") };
     const r = await browserRoot(String(from)),
       cur = await readMemory(r);
     if (cur.bad) return { ok: false, error: cur.bad };
@@ -417,7 +417,7 @@ const ops = {
     return { ok: true, groups: C.splitShared(cur.memory, undefined, tx).groups };
   },
   async splitMove({ from, key }) {
-    if (!/^(chatgpt|claude)?-?general$/.test(String(from)) || !/^[a-z0-9-]{3,80}$/.test(String(key)))
+    if (!/^(chatgpt|claude|gemini)?-?general$/.test(String(from)) || !/^[a-z0-9-]{3,80}$/.test(String(key)))
       return { ok: false, error: T("طلب فصل غير صالح") };
     const site = String(key).split("-")[0],
       to = String(key).replace(`${site}-`, `${site}-c-`);

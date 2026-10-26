@@ -5,6 +5,34 @@ importScripts("i18n-en.js", "memory-core.js"); // the interface's language (T) f
 const T = self.MemoryCore.T;
 const OFFSCREEN = "src/offscreen.html";
 const SITES = ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"];
+// Gemini is optional: turned on in the settings (the browser asks for the site), its content script registered here
+const GEMINI = "https://gemini.google.com/*";
+const CONTENT = [
+  "src/i18n-en.js",
+  "src/memory-core.js",
+  "src/linking.js",
+  "src/page/policy.js",
+  "src/page/adapters.js",
+  "src/page/reader.js",
+  "src/page/sitedata.js",
+  "src/page/composer.js",
+  "src/page/summarizer.js",
+  "src/page/bridge.js",
+  "src/page/ui.js",
+  "src/content.js",
+];
+async function syncGemini() {
+  try {
+    const on = await chrome.permissions.contains({ origins: [GEMINI] });
+    const have = (await chrome.scripting.getRegisteredContentScripts({ ids: ["cm-gemini"] })).length > 0;
+    if (on && !have)
+      await chrome.scripting.registerContentScripts([{ id: "cm-gemini", matches: [GEMINI], js: CONTENT, runAt: "document_idle" }]);
+    if (!on && have) await chrome.scripting.unregisterContentScripts({ ids: ["cm-gemini"] });
+  } catch {}
+}
+chrome.permissions.onAdded.addListener(syncGemini);
+chrome.permissions.onRemoved.addListener(syncGemini);
+chrome.runtime.onStartup.addListener(syncGemini);
 const DEFAULTS = { every: 10, mode: "auto", paused: false, autoLink: true, byok: false };
 
 // ---------- optional: summaries in the background with the user's own API key ----------
@@ -168,9 +196,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
           ? "chatgpt"
           : host === "claude.ai" || host.endsWith(".claude.ai")
             ? "claude"
-            : self.CM_TEST_HOSTS
-              ? "*"
-              : "";
+            : host === "gemini.google.com"
+              ? "gemini"
+              : self.CM_TEST_HOSTS
+                ? "*"
+                : "";
       const scope = String((msg.args && msg.args.scope) || "");
       if (
         !site ||
@@ -216,6 +246,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 
 // housekeeping once per browser start: empty folders of chats that never got a memory (inside the browser only)
 chrome.runtime.onStartup.addListener(() => toOffscreen("sweepEmpty", {}).catch(() => {}));
+chrome.runtime.onInstalled.addListener(syncGemini);
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") chrome.runtime.openOptionsPage();
   chrome.contextMenus.removeAll(() => {
@@ -223,7 +254,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       id: "cm-pin",
       title: T("📌 ثبّت النص المحدد في ذاكرة المشروع"),
       contexts: ["selection"],
-      documentUrlPatterns: [...SITES, ...(self.CM_TEST_HOSTS || [])],
+      documentUrlPatterns: [...SITES, GEMINI, ...(self.CM_TEST_HOSTS || [])],
     });
   });
   const s = await chrome.storage.local.get("settings");

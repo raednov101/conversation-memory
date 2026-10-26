@@ -975,6 +975,11 @@
     "{0} — {1}، {2}": "{0} — {1}, {2}",
     "انقلها إلى ذاكرتها": "Move it to its own memory",
     "✓ نُقلت: {0}، {1}": "✓ Moved: {0}, {1}",
+    "Gemini (تجريبي): شغّل الذاكرة في gemini.google.com أيضاً": "Gemini (experimental): run the memory on gemini.google.com too",
+    "شُغّلت في Gemini؛ افتح محادثة هناك (أو حدّث صفحتها). هذه نسخة تجريبية: إن لاحظت خللاً فأبلغنا.":
+      "Turned on for Gemini; open a chat there (or reload its page). This is experimental: if something looks wrong, tell us.",
+    "أُوقفت في Gemini.": "Turned off for Gemini.",
+    "لم يُمنح الإذن؛ بقي الوضع كما كان.": "Permission not granted; nothing changed.",
   };
   if (typeof module === "object" && module.exports) module.exports = EN;
   else root.CM_I18N_EN = EN;

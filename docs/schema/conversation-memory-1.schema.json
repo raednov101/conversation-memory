@@ -466,7 +466,8 @@
           "enum": [
             "claude-code",
             "chatgpt",
-            "claude-web"
+            "claude-web",
+            "gemini"
           ]
         },
         "chat": {

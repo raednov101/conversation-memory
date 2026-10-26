@@ -8,11 +8,13 @@
   "permissions": [
     "storage",
     "offscreen",
-    "contextMenus"
+    "contextMenus",
+    "scripting"
   ],
   "optional_host_permissions": [
     "https://api.anthropic.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://gemini.google.com/*"
   ],
   "background": {
     "service_worker": "src/background.js"
@@ -43,7 +45,7 @@
   ],
   "options_page": "src/options.html",
   "action": {
-    "default_title": "ذاكرة المحادثة",
+    "default_title": "__MSG_appShort__",
     "default_popup": "src/options.html?popup=1"
   },
   "icons": {

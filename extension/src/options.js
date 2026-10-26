@@ -265,6 +265,25 @@ async function saveSettings() {
 $("every").addEventListener("change", saveSettings);
 $("mode").addEventListener("change", saveSettings);
 $("autoLink").addEventListener("change", saveSettings);
+// Gemini is optional: the browser asks for the site once; turning it off gives the site back
+const GEMINI = "https://gemini.google.com/*";
+chrome.permissions.contains({ origins: [GEMINI] }).then(
+  (on) => ($("gemini").checked = on),
+  () => {},
+);
+$("gemini").addEventListener("change", async (e) => {
+  const want = e.target.checked;
+  let ok = false;
+  try {
+    ok = want ? await chrome.permissions.request({ origins: [GEMINI] }) : await chrome.permissions.remove({ origins: [GEMINI] });
+  } catch {}
+  if (!ok) e.target.checked = !want;
+  $("geminiMsg").textContent = ok
+    ? want
+      ? T("شُغّلت في Gemini؛ افتح محادثة هناك (أو حدّث صفحتها). هذه نسخة تجريبية: إن لاحظت خللاً فأبلغنا.")
+      : T("أُوقفت في Gemini.")
+    : T("لم يُمنح الإذن؛ بقي الوضع كما كان.");
+});
 $("lang").addEventListener("change", async () => {
   const { settings = {} } = await chrome.storage.local.get("settings");
   await chrome.storage.local.set({ settings: { ...settings, lang: $("lang").value } });

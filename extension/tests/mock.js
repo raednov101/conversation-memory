@@ -31,7 +31,19 @@
     else { el.setAttribute("data-testid", "assistant-message"); el.setAttribute("data-is-streaming", "true"); }
     setText(text); el.__set = setText; thread.appendChild(el); return el;
   }
+  // Gemini flavour: <user-query> with its .query-text, <model-response> with message-content .markdown
+  function addMsgGemini(role, text) {
+    const el = document.createElement(role === "user" ? "user-query" : "model-response");
+    el.innerHTML = role === "user" ? '<div class="query-text"><p class="query-text-line"></p></div>' : '<message-content><div class="markdown"></div></message-content>';
+    const inner = el.querySelector(role === "user" ? ".query-text-line" : ".markdown");
+    inner.innerText = text;
+    el.__set = (t) => (inner.innerText = t);
+    Object.defineProperty(el, "innerText", { get: () => inner.innerText, set: (t) => (inner.innerText = t), configurable: true });
+    thread.appendChild(el);
+    return el;
+  }
   function addMsg(role, text) {
+    if (P === "gemini") return addMsgGemini(role, text);
     if (V) return addMsg2026(role, text);
     const el = document.createElement("div");
     if (P === "chatgpt") el.setAttribute("data-message-author-role", role);
@@ -79,7 +91,7 @@
     composer.innerHTML = "";
     addMsg("user", t);
     const stream = window.__stream;   // as on the real sites: the reply element appears at once and its text grows
-    const a = P === "claude" || stream ? addMsg("assistant", "") : null;
+    const a = P === "claude" || P === "gemini" || stream ? addMsg("assistant", "") : null;
     bar.innerHTML = ""; bar.appendChild(button("stop"));
     if (stream) {
       const full = reply(t), steps = 6; let i = 0;
@@ -92,7 +104,7 @@
     }
     setTimeout(() => {
       const text = reply(t);
-      if (P === "chatgpt") addMsg("assistant", text); else if (V) { a.__set(text); a.setAttribute("data-is-streaming", "false"); } else { a.innerText = text; a.setAttribute("data-is-streaming", "false"); }
+      if (P === "chatgpt") addMsg("assistant", text); else if (P === "gemini") a.__set(text); else if (V) { a.__set(text); a.setAttribute("data-is-streaming", "false"); } else { a.innerText = text; a.setAttribute("data-is-streaming", "false"); }
       bar.innerHTML = ""; bar.appendChild(button("send"));
     }, window.__delay);
   };
