@@ -114,7 +114,7 @@ async function loadScopes() {
     t.className = "txt";
     t.innerHTML = "<b></b> <span class=muted></span>";
     t.firstChild.textContent = x.name;
-    t.lastChild.textContent = T`— ${self.MemoryCore.count(x.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(x.log, self.MemoryCore.W.batch)}`;
+    t.lastChild.textContent = T`— ${self.MemoryCore.count(x.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(x.log, self.MemoryCore.W.summary)}`;
     li.append(t, dl);
     // the shared memory of an earlier version: split it, chat by chat, after a preview
     if (/general$/.test(x.scope)) {
@@ -167,7 +167,7 @@ async function showSplit(from, li) {
       label = document.createElement("span"),
       go = document.createElement("button");
     row.className = "row";
-    label.textContent = T`${g.label || full} — ${self.MemoryCore.count(g.entries, self.MemoryCore.W.batch)}، ${self.MemoryCore.count(g.decisions, self.MemoryCore.W.decision)}`;
+    label.textContent = T`${g.label || full} — ${self.MemoryCore.count(g.entries, self.MemoryCore.W.summary)}، ${self.MemoryCore.count(g.decisions, self.MemoryCore.W.decision)}`;
     go.type = "button";
     go.className = "small";
     go.textContent = T("انقلها إلى ذاكرتها");
@@ -185,7 +185,7 @@ async function showSplit(from, li) {
       if (st[`chat:${m.fromProject}:${full}`]) upd[`chat:${m.toProject}:${full}`] = st[`chat:${m.fromProject}:${full}`];
       await chrome.storage.local.set(upd);
       await chrome.storage.local.remove(`chat:${m.fromProject}:${full}`);
-      label.textContent = T`✓ نُقلت: ${self.MemoryCore.count(m.moved.log, self.MemoryCore.W.batch)}، ${self.MemoryCore.count(m.moved.decisions, self.MemoryCore.W.decision)}`;
+      label.textContent = T`✓ نُقلت: ${self.MemoryCore.count(m.moved.log, self.MemoryCore.W.summary)}، ${self.MemoryCore.count(m.moved.decisions, self.MemoryCore.W.decision)}`;
       setTimeout(loadScopes, 1500);
     };
     row.append(label, go);
@@ -362,7 +362,7 @@ async function loadBackups() {
     const li = document.createElement("li"),
       span = document.createElement("span"),
       btn = document.createElement("button");
-    span.textContent = T`${b.when} — ${self.MemoryCore.count(b.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(b.log, self.MemoryCore.W.batch)}${b.goal ? ` — «${b.goal}»` : ""}`;
+    span.textContent = T`${b.when} — ${self.MemoryCore.count(b.decisions, self.MemoryCore.W.decision)}، ${self.MemoryCore.count(b.log, self.MemoryCore.W.summary)}${b.goal ? ` — «${b.goal}»` : ""}`;
     btn.type = "button";
     btn.textContent = T("استرجاع");
     btn.dataset.n = String(i + 1);

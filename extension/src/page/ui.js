@@ -88,17 +88,17 @@
       info = BROKEN();
       btns.push(REPORT());
     } else if (v.phase === "unlinked") {
-      text = T("🧠 غير مربوطة");
+      text = T("🧠 لا تُحفظ");
       info =
-        T`هذه المحادثة غير مربوطة بالذاكرة ${q(v.fsSt.folder)}، فلا تُلخَّص ولا تُحفظ.` +
-        T`<br><span class="muted">اربطها إن كان موضوعها يخص هذه الذاكرة؛ تُلخَّص حينها من أولها (${n(v.userCount, "msg")} حتى الآن).</span>`;
+        T`هذه المحادثة لا تُحفظ في الذاكرة ${q(v.fsSt.folder)}، فلا يُلخَّص منها شيء من الآن.` +
+        T`<br><span class="muted">ما حُفظ منها سابقاً باقٍ في الذاكرة. اربطها إن كان موضوعها يخص هذه الذاكرة؛ تُلخَّص حينها من أولها (${n(v.userCount, "msg")} حتى الآن).</span>`;
       btns.push([T("🔗 اربطها بالذاكرة"), "link"], SHARE());
       if (v.src === "data") {
         info += `<br><span class="muted">${VIA_DATA()}</span>`;
         btns.push(REPORT());
       }
     } else if (v.phase === "new" && v.outside) {
-      text = T("🧠 لا ذاكرة بعد");
+      text = T("🧠 ذاكرة جديدة");
       info = T("لهذه المحادثة ذاكرتها الخاصة، فلا تختلط مواضيعك. لتكمل محادثة سابقة اختر ذاكرتها.");
       btns.push([T("📥 أكمل من ذاكرة محادثة سابقة"), "insert"], [T("📤 انقل معلومات من ذاكرة سابقة"), "share"]);
     } else if (v.phase === "new") {
@@ -156,6 +156,7 @@
         text = `🧠 ${prog}` + (s.lastSave ? ` · ✓ ${hhmm(s.lastSave)}` : "");
         info = s.lastSave ? T`✓ حُدّث الملخص ${hhmm(s.lastSave)} — الرسائل حتى ${s.summarizedUpTo}.` : T("لم يُحفظ ملخص بعد.");
       }
+      if (!manual && settings.paused && cls !== "err" && !v.unreadable) text = text.replace(/^🧠/, "🧠 ⏸️");
       // cost and where the text was read from: behind «Details», at the end
       if (s.lastCost && !v.unreadable)
         tech += T`<span class="muted">كلفة آخر تلخيص: الطلب ${fmt(s.lastCost.req)} حرفاً والرد ${fmt(s.lastCost.rep)} ≈ ${fmt(cost)} توكن${s.costTotal && s.costTotal.n > 1 ? T`؛ في هذه المحادثة ${s.costTotal.n} تلخيصات ≈ ${fmt(tokens(s.costTotal.chars))} توكن` : ""} (تقدير). ${v.byok ? T("يُحتسب على مفتاحك، لا على رسائلك في الموقع.") : T("ويبقى الطلب ورده في سياق المحادثة.")}</span>`;
@@ -165,12 +166,12 @@
       if (!v.unreadable) {
         const left = Math.max(0, settings.every - since);
         info +=
-          T`<br><span class="muted">${manual ? T("الوضع اليدوي: لا يُطلب ملخص إلا بالزر.") : s.status === "error" ? "" : `${left ? T`التلخيص القادم بعد ${n(left, "msgGen")}.` : T("حان وقت التلخيص.")}`} النص الكامل يُحفظ بعد كل رد.` +
-          `${!manual && settings.paused ? T(" (التلخيص التلقائي متوقف)") : ""}${v.noComposer ? T(" لا أجد خانة الكتابة.") : ""}</span>`;
+          T`<br><span class="muted">${manual ? T("الوضع اليدوي: لا يُطلب ملخص إلا بالزر.") : settings.paused ? T("التلخيص التلقائي متوقف في كل المحادثات؛ لخّص بالزر متى شئت.") : s.status === "error" ? "" : `${left ? T`التلخيص القادم بعد ${n(left, "msgGen")}.` : T("حان وقت التلخيص.")}`} النص الكامل يُحفظ بعد كل رد.` +
+          `${v.noComposer ? T(" لا أجد خانة الكتابة.") : ""}</span>`;
         if (v.userCount > s.summarizedUpTo && !s.pending)
           btns[s.status === "error" ? "unshift" : "push"]([T("💾 لخّص واحفظ الآن"), "summarize"]);
         if (settings.mode === "auto")
-          btns.push([settings.paused ? T("▶️ تشغيل التلخيص التلقائي") : T("⏸️ إيقاف التلخيص التلقائي"), "pause", "sec"]);
+          btns.push([settings.paused ? T("▶️ أعد التلخيص التلقائي") : T("⏸️ أوقف التلخيص التلقائي (كل المحادثات)"), "pause", "sec"]);
       }
       if (v.src === "data" && !v.unreadable) tech += `${tech ? "<br>" : ""}<span class="muted">${VIA_DATA()}</span>`;
       btns.push([T("📥 ضع الذاكرة في خانة الكتابة"), "insert"], SHARE());
@@ -183,6 +184,7 @@
     const rv = (v.phase === "chat" || v.phase === "new") && v.review ? v.review.length : 0;
     if (rv) {
       text += ` · 🔎${rv}`;
+      if (cls === "ok" || cls === "idle" || cls === "txt") cls = "warn";
       info += `<br><span class="muted">${rv === 1 ? T("🔎 عندي سؤال واحد قبل أن أعتمد شيئاً باسمك.") : rv === 2 ? T("🔎 عندي سؤالان قبل أن أعتمد شيئاً باسمك.") : rv <= 10 ? T`🔎 عندي ${rv} أسئلة قبل أن أعتمد شيئاً باسمك.` : T`🔎 عندي ${rv} سؤالاً قبل أن أعتمد شيئاً باسمك.`}</span>`;
       btns.splice(btns[0] && btns[0][1] === "summarize" && s.status === "error" ? 1 : 0, 0, REVIEW(rv));
     }
@@ -289,7 +291,7 @@
       decision: [T("فهمتُ أنك قررت:"), T("✓ نعم، هذا قراري"), T("✕ لا، لم أقرره")],
       recheck: [T("عدّلتَ رسالتك. هل ما زال هذا صحيحاً؟"), T("✓ ما زال صحيحاً"), T("✕ ألغِه")],
       revoke: [T("فهمتُ أنك تريد إلغاء:"), T("✓ نعم، ألغِه"), T("✕ لا، أبقِه")],
-      "constraint-add": [T("فهمتُ أنك تريد هذا دائماً:"), T("✓ نعم، احفظه"), T("✕ لا")],
+      "constraint-add": [T("فهمتُ أن هذا شرط ثابت تريده:"), T("✓ نعم، احفظه"), T("✕ لا")],
       "constraint-remove": [T("فهمتُ أنك لم تعد تريد:"), T("✓ نعم، احذفه"), T("✕ لا، أبقِه")],
     });
     function openReview(list) {

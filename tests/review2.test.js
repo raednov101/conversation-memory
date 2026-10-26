@@ -169,3 +169,18 @@ test("review: a huge pasted message does not stall the checks", () => {
   decide(e, add);
   assert.ok(Date.now() - t < 8000, `took ${Date.now() - t} ms`);
 });
+
+test("review: a thousands comma or a decimal point is not a clause break («$5,000» is not two details swapped)", () => {
+  const r = decide(ev([["user", "I only have $5,000 to start, and we open at 10:30"]]), [
+    { text: "Startup budget $5,000", source: "user", quote: "I only have $5,000 to start" },
+  ]);
+  assert.equal(held(r), false, JSON.stringify(r.memory.decisions));
+  assert.ok(
+    held(
+      decide(ev([["user", "Ahmad drives the van and Salem cooks the food"]]), [
+        { text: "Salem drives the van and Ahmad cooks the food", source: "user", quote: "Ahmad drives the van and Salem cooks the food" },
+      ]),
+    ),
+    "a real swap is still held",
+  );
+});

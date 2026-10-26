@@ -17,6 +17,7 @@
   body{margin:0;min-height:100vh;color:var(--fg);font:14px/1.7 "PlexAr",system-ui,"Segoe UI",Tahoma,sans-serif;
     background:var(--bg2) linear-gradient(160deg,var(--bg1),var(--bg2)) fixed}
   main{max-width:760px;margin:0 auto;padding:22px 16px 28px}
+  .privacy{margin:0 0 12px;font-size:12.5px;color:var(--muted,#57606a);line-height:1.6}.privacy a{color:inherit}
   .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
   .brand{display:flex;align-items:center;gap:12px}
   .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,var(--primary),var(--primary2));box-shadow:0 6px 18px rgba(9,82,168,.35)}
@@ -78,6 +79,7 @@
     </div>
     <span id="folderChip" class="chip">…</span>
   </header>
+  <p class="privacy">🔒 <span>ذاكرتك داخل متصفحك، أو في مجلدك إن اخترته. لا خادم لنا ولا يُجمع أي استخدام. طلب التلخيص يذهب إلى ChatGPT أو Claude داخل المحادثة نفسها، كأي رسالة تكتبها.</span> <a href="https://github.com/raednov101/conversation-memory/blob/main/PRIVACY.md" target="_blank" rel="noopener">سياسة الخصوصية</a></p>
 
   <section class="card welcome" id="welcome" hidden aria-live="polite">
     <div class="step" data-step="1">
@@ -87,7 +89,7 @@
     </div>
     <div class="step" data-step="2" hidden>
       <h2>الشارة أسفل الصفحة</h2>
-      <p>📝 حُفظ نص المحادثة · ✓ حُدّث الملخص · 🔎 شيء ينتظر رأيك · ⚠️ تعثّر، ومعه السبب. اضغطها لترى التفاصيل والأزرار.</p>
+      <p>الرقم مثل 4/10: رسائلك حتى التلخيص القادم. 📝 حُفظ نص المحادثة · ✓ حُدّث الملخص · 🔎 سؤال ينتظر جوابك · ⚠️ تعثّر، ومعه السبب. اضغطها لترى التفاصيل والأزرار.</p>
     </div>
     <div class="step" data-step="3" hidden>
       <h2>أنت صاحب القرار</h2>
@@ -95,7 +97,7 @@
     </div>
     <div class="step" data-step="4" hidden>
       <h2>في محادثة جديدة</h2>
-      <p>«📥 أدرج الذاكرة» تضعها في خانة الرسالة، أو «📤 انقل معلومات» واكتب مهمتك فأختار ما يخصها. لا يُرسل شيء دون أن تضغط أنت.</p>
+      <p>اضغط الشارة 🧠 ثم «📥 ضع الذاكرة في خانة الكتابة»، أو «📤 انقل معلومات» واكتب عمّ المحادثة لتقترح عليك الإضافة ما يخصها. لا يُرسل شيء حتى تضغط إرسال.</p>
     </div>
     <div class="row"><button type="button" id="tourBack" hidden>السابق</button><button type="button" id="tourNext" class="primary">التالي</button><button type="button" id="tourSkip">تخطَّ الجولة</button><span id="tourDots" class="muted"></span></div>
   </section>
@@ -152,7 +154,7 @@
       <p id="keepMsg" class="msg" role="status"></p>
       <p class="muted" id="keepNote" style="margin:6px 0 0">تنبيه: حذف الإضافة من المتصفح يحذف ذاكرتها معها. احفظ نسخة في ملف قبل ذلك، أو اربطها بمجلد.</p>
       <details><summary>متى أربط مجلداً؟</summary>
-        <p>فقط إن أردت أن تشترك الإضافة وبلقن Claude Code في ذاكرة مشروع واحد. يُكتب فيه <code>CONVERSATION_MEMORY.json</code> و<code>.md</code> والنصوص المعتمدة، وعند طلب الإذن اختر «السماح في كل زيارة».</p>
+        <p>فقط إن أردت أن تشترك الإضافة وبلقن Claude Code (للمبرمجين) في ذاكرة مشروع واحد. يُكتب فيه <code>CONVERSATION_MEMORY.json</code> و<code>.md</code> والنصوص المعتمدة، وعند طلب الإذن اختر «السماح في كل زيارة».</p>
         <p>ربط المجلد لا ينقل إليه ما حُفظ داخل المتصفح: يبقى كما هو، وتعود إليه بزر «العودة للحفظ داخل المتصفح».</p>
       </details>
     </section>
@@ -171,7 +173,7 @@
       <p class="muted" style="margin:6px 0 0">للعلم: التلخيص يرسل رسالة قصيرة باسمك في المحادثة نفسها، فتُحتسب من رصيد رسائلك في الموقع، ويذهب نص الذاكرة معها إلى ChatGPT أو Claude.</p>
       <details><summary>كيف يعمل؟</summary>
         <p>إن أضفت مفتاحك أدناه يُلخَّص في الخلفية بدل ذلك، فلا يظهر شيء في المحادثة.</p>
-        <p>عند الاستحقاق ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» والخانة فارغة والنموذج متوقف، وتتحقق من رده قبل الحفظ. هذه الرسائل لا تُحتسب ولا تُحفظ في نص المحادثة، والنص الكامل يُحفظ بعد كل رد. المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة.</p>
+        <p>عند الاستحقاق ترسل الإضافة رسالة تبدأ بـ «🧠 ذاكرة المحادثة:» والخانة فارغة والنموذج متوقف، وتتحقق من رده قبل الحفظ. هذه الرسائل لا تدخل في عدّ رسائلك حتى التلخيص، ولا تُحفظ في نص المحادثة، والنص الكامل يُحفظ بعد كل رد. المحادثات القديمة لا تُلخَّص إلا إذا ربطتها من الشارة.</p>
       </details>
     </section>
 
@@ -193,9 +195,9 @@
 
   <footer class="card">
     <details><summary>طريقة الاستخدام</summary>
-      <p>• الشارة 🧠 أسفل يسار الصفحة: عدد رسائلك حتى التلخيص القادم، و📝 حُفظ النص، و✓ حُدّث الملخص، و⚠️ مع السبب.<br>
-        • في محادثة جديدة: «📥 أدرج الذاكرة» تضع نسخة مختصرة في خانة الرسالة.<br>
-        • «📤 انقل معلومات مختارة»: تختار، وتعاين، ثم تُدرج دون إرسال.<br>
+      <p>• الشارة 🧠 أسفل الصفحة: عدد رسائلك حتى التلخيص القادم، و📝 حُفظ النص، و✓ حُدّث الملخص، و⚠️ مع السبب.<br>
+        • في محادثة جديدة: «📥 ضع الذاكرة في خانة الكتابة» تضع نسخة مختصرة منها.<br>
+        • «📤 انقل معلومات مختارة»: تختار، وتعاين، ثم توضع في خانة الكتابة دون إرسال.<br>
         • «🔎 راجع القرارات»: ما كتبه النموذج ولم يثبت من كلامك (قرار، أو إلغاء قرار، أو تغيير قيد)، فلم يُطبَّق حتى توافق عليه أو ترفضه.</p>
     </details>
     <p><button type="button" id="tourAgain">🧭 جولة التعريف من جديد</button></p>

@@ -770,7 +770,7 @@
   };
   const clausesOf0 = (t) =>
     String(t)
-      .split(/[.!?؟،,؛;:\n]+|\s+(?:and|while|but)\s+|\s+(?=و[^\s]{3,})/i)
+      .split(/(?:(?<!\d)[.,:]|[.,:](?!\d)|[!?؟،؛;\n])+|\s+(?:and|while|but)\s+|\s+(?=و[^\s]{3,})/i) // «$5,000», «2.5» and «10:30» stay whole
       .map(evNorm)
       .filter(Boolean);
   // Two details swapped between their owners («أحمد يسوق وسالم يطبخ» → «سالم يسوق وأحمد يطبخ», «$300 here and $500
@@ -2015,7 +2015,12 @@
     const short = (t) => cut(String(t || ""), 80);
     const L = () => (e.label ? q(short(e.label)) : e.target); // the decision's words, not its internal id
     const what = {
-      "decision.add": () => T`أُضيف قرار: ${q(short(e.after && e.after.text))}`,
+      "decision.add": () =>
+        e.after && e.after.unverified
+          ? T`سُجّل ليُعرض عليك (لم يُعتمد بعد): ${q(short(e.after.text))}`
+          : e.after && e.after.source === "assistant"
+            ? T`أُضيف اقتراح: ${q(short(e.after.text))}`
+            : T`أُضيف قرار: ${q(short(e.after && e.after.text))}`,
       "decision.revoke": () => T`أُلغي قرار: ${L()}`,
       "decision.restore": () => T`أُعيد قرار سارياً: ${L()}`,
       "decision.edit": () => T`عُدّل قرار: ${q(short(e.before))} ← ${q(short(e.after))}`,

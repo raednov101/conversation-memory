@@ -246,7 +246,7 @@ with sync_playwright() as pw:
     ok(wait(lambda: "موضوع آخر" in pill(pt), 15), "inside a project: the model says the chat is about something else → ❓", pill(pt))
     pt.locator("#cm-memory-indicator .pill").click(); pt.locator("#cm-memory-indicator .panel button[data-a=topic-no]").click()
     rec = wait(lambda: (opt.evaluate("() => chrome.storage.local.get('scope:chatgpt-tp')").get("scope:chatgpt-tp") or {}).get("key") == "chatgpt-c-tp" or None, 10)
-    ok(rec and wait(lambda: "غير مربوطة" in pill(pt), 10), "…«separate» gives it its own memory (one click links it there)", pill(pt))
+    ok(rec and wait(lambda: "لا تُحفظ" in pill(pt), 10), "…«separate» gives it its own memory (one click links it there)", pill(pt))
     pt.close()
     # «different» when it was not asked (a chat's own memory is never asked): no answer, never the question
     pu = ctx.new_page(); pu.goto(BASE + new_chat("chatgpt", "/c/unasked/", "سؤال - ChatGPT"))
@@ -376,7 +376,7 @@ with sync_playwright() as pw:
     print("— old chats are not touched until linked —")
     proj = "proj-old"; use_folder(proj)
     p = ctx.new_page(); p.goto(BASE + page("chatgpt", "/c/old-chat/", "قديمة - ChatGPT", pre=range(1, 9)))
-    ok(wait(lambda: "غير مربوطة" in pill(p), 10), "an existing chat with history shows «غير مربوطة»", pill(p))
+    ok(wait(lambda: "لا تُحفظ" in pill(p), 10), "an existing chat with history shows «لا تُحفظ»", pill(p))
     p.wait_for_timeout(4000)
     ok(not requests(p) and mem(proj) is None and not ls(proj, ".conversation-memory/chats"), "…and nothing is sent or saved from it")
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=link]").click()
@@ -397,16 +397,16 @@ with sync_playwright() as pw:
     wait(lambda: (lambda m: m and len(m["log"]) >= 2)(mem(proj)), 20)
     p.evaluate("window.__stream = false; window.__delay = 500")
     p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=unlink]").click()
-    ok(wait(lambda: "غير مربوطة" in pill(p), 8), "…and it can be unlinked again", pill(p))
+    ok(wait(lambda: "لا تُحفظ" in pill(p), 8), "…and it can be unlinked again", pill(p))
     p.close()
 
     p = ctx.new_page(); p.goto(BASE + page("claude", "/chat/old-one/", "رسالة واحدة - Claude", pre=[1]))
-    ok(wait(lambda: "غير مربوطة" in pill(p), 10), "an old chat with a single message is not linked automatically", pill(p))
+    ok(wait(lambda: "لا تُحفظ" in pill(p), 10), "an old chat with a single message is not linked automatically", pill(p))
     p.close()
     p = ctx.new_page(); p.goto(BASE + page("chatgpt", "/c/slow-old/", "تحميل بطيء - ChatGPT"))
     p.wait_for_timeout(2500)
     p.evaluate("() => { const t = document.getElementById('thread'); for (let i = 1; i <= 3; i++) { for (const r of ['user', 'assistant']) { const d = document.createElement('div'); d.setAttribute('data-message-author-role', r); d.innerText = r + ' قديم ' + i; t.appendChild(d); } } }")
-    ok(wait(lambda: "غير مربوطة" in pill(p), 10), "an old chat that appears empty while loading is not linked automatically", pill(p))
+    ok(wait(lambda: "لا تُحفظ" in pill(p), 10), "an old chat that appears empty while loading is not linked automatically", pill(p))
     p.wait_for_timeout(3000); ok(not requests(p) and "chatgpt-slow-old.md" not in ls(proj, ".conversation-memory/chats"), "…and nothing is sent or saved from it")
     p.close()
 
@@ -419,7 +419,7 @@ with sync_playwright() as pw:
     wait(lambda: "محادثة جديدة" in pill(p), 10)
     p.evaluate("t => window.__type(t)", "مسودة لم أرسلها")          # 1) a draft on the new-chat page, not sent
     spa_old(p, "/c/old-single/", "رسالة قديمة وحيدة")                 # 2) an old one-message chat within two minutes
-    ok(wait(lambda: "غير مربوطة" in pill(p), 10), "a draft typed (not sent) on a new-chat page does not link the old chat opened next", pill(p))
+    ok(wait(lambda: "لا تُحفظ" in pill(p), 10), "a draft typed (not sent) on a new-chat page does not link the old chat opened next", pill(p))
     p.wait_for_timeout(3000); ok("chatgpt-old-single.md" not in ls(proj, ".conversation-memory/chats") and not requests(p), "…and nothing of it is saved")
     p.close()
     p = ctx.new_page(); p.goto(BASE + new_chat("chatgpt", "/c/proof-b/", "إثبات - ChatGPT"))
@@ -427,7 +427,7 @@ with sync_playwright() as pw:
     p.evaluate("""() => { const c = document.getElementById('prompt-textarea'); c.innerText = 'رسالتي الجديدة';
         c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }""")   # sent — but the site lands on another chat
     spa_old(p, "/c/old-other/", "رسالة قديمة مختلفة")
-    ok(wait(lambda: "غير مربوطة" in pill(p), 10), "a sent message only links the chat whose first message is that text", pill(p))
+    ok(wait(lambda: "لا تُحفظ" in pill(p), 10), "a sent message only links the chat whose first message is that text", pill(p))
     p.close()
 
     print("— another project folder: chats and pending requests stay with their own project —")
@@ -440,7 +440,7 @@ with sync_playwright() as pw:
     use_folder("proj-B"); opt.evaluate("() => chrome.storage.local.set({ folderAt: Date.now() })")
     p.wait_for_timeout(9000)
     ok(mem("proj-B") is None and not ls("proj-B", ".conversation-memory/chats"), "after switching folders, nothing from that chat is written to the new folder", ls("proj-B"))
-    ok("غير مربوطة" in pill(p), "…the chat is simply not linked to the new project", pill(p))
+    ok("لا تُحفظ" in pill(p), "…the chat is simply not linked to the new project", pill(p))
     ok(mem("proj-A") is None, "…and the old folder isn't written behind your back either")
     use_folder("proj-A"); opt.evaluate("() => chrome.storage.local.set({ folderAt: Date.now() })")
     j = wait(lambda: (lambda m: m if m and m["log"] else None)(mem("proj-A")), 20) or {}
@@ -711,7 +711,7 @@ with sync_playwright() as pw:
         ok("موضوع آخر" in (pb.evaluate("window.__asked") or "") and len((mem(proj) or {}).get("log", [])) == 1, f"{answer}: the request asked it (the memory already holds a project), and the memory is untouched")
         pb.locator("#cm-memory-indicator .pill").click(); pb.locator(f"#cm-memory-indicator .panel button[data-a={answer}]").click()
         if answer == "topic-no":
-            ok(wait(lambda: "غير مربوطة" in pill(pb), 10) and len((mem(proj) or {}).get("log", [])) == 1, "«not this project» unlinks the chat; nothing of it enters the memory", pill(pb))
+            ok(wait(lambda: "لا تُحفظ" in pill(pb), 10) and len((mem(proj) or {}).get("log", [])) == 1, "«not this project» unlinks the chat; nothing of it enters the memory", pill(pb))
         else:
             ok(wait(lambda: len((mem(proj) or {}).get("log", [])) == 2, 20), "«it belongs» summarizes it into the memory", (mem(proj) or {}).get("log"))
             ok("موضوع آخر" not in (requests(pb)[-1] if requests(pb) else "موضوع آخر"), "…and the model is not asked again about the messages you just placed")
@@ -817,7 +817,7 @@ with sync_playwright() as pw:
                 {"uuid": "m3", "parent_message_uuid": "m2", "sender": "human", "index": 2, "text": "والميزانية 40 ألف"},
                 {"uuid": "m4", "parent_message_uuid": "m3", "sender": "assistant", "index": 3, "text": "سجّلت الميزانية."}]})
         p = ctx.new_page(); p.goto(BASE + page(platform, path, f"بيانات - {sitename}", thread_html=unknown))
-        ok(wait(lambda: "غير مربوطة" in pill(p), 20), f"{sitename}: a page whose design is unknown is not «unreadable» when the site's data can be read", pill(p))
+        ok(wait(lambda: "لا تُحفظ" in pill(p), 20), f"{sitename}: a page whose design is unknown is not «unreadable» when the site's data can be read", pill(p))
         t = wait(lambda: (lambda x: x if "بيانات الموقع نفسه" in x else None)(panel_text(p)), 15) or panel_text(p)
         ok("بيانات الموقع نفسه" in t and "أبلغ" in t, f"{sitename}: the panel says it reads from the site's data, and offers a report", t[:300])
         p.locator("#cm-memory-indicator .pill").click(); p.locator("#cm-memory-indicator .panel button[data-a=link]").click()
